@@ -1,0 +1,101 @@
+services:
+    web:
+        build:
+            # Indicar la ruta del dockerfile para la versión de PHP del proyecto: 8.0, 8.1, 8.2, 8.3 u 8.4.
+            context: ./vendor/quadralia/laravel-docker-local-environment/sail/8.2
+            dockerfile: Dockerfile
+            args:
+                WWWGROUP: 1000
+        # Indicar el tag de la imagen docker para la versión de PHP del proyecto: 8.0, 8.1, 8.2, 8.3 u 8.4.
+        image: sail:8.2
+        extra_hosts:
+            - 'host.docker.internal:host-gateway'
+        environment:
+            WWWUSER: 1000
+            LARAVEL_SAIL: 1
+            XDEBUG_MODE: '${SAIL_XDEBUG_MODE:-off}'
+            XDEBUG_CONFIG: '${SAIL_XDEBUG_CONFIG:-client_host=host.docker.internal}'
+            TZ: 'Europe/Madrid'
+        volumes:
+            - '..:/var/www'
+            - '~/.ssh:/home/sail/.ssh'
+            - '~/.config/composer:/home/sail/.config/composer'
+            - '~/.config/psysh:/home/sail/.config/psysh'
+        networks:
+            network:
+                # IP servicio web en subred del proyecto, añadir a /etc/hosts. Ej: 192.168.85.85
+                ipv4_address: 192.168.30.30
+        depends_on:
+            - mysql
+    mysql:
+        image: 'mysql/mysql-server:8.0'
+        environment:
+            MYSQL_ROOT_PASSWORD: '${DB_PASSWORD}'
+            MYSQL_ROOT_HOST: "%"
+            MYSQL_DATABASE: '${DB_DATABASE}'
+            MYSQL_USER: '${DB_USERNAME}'
+            MYSQL_PASSWORD: '${DB_PASSWORD}'
+            MYSQL_ALLOW_EMPTY_PASSWORD: 1
+        volumes:
+            - './docker/db/mysql:/var/lib/mysql'
+            - './docker/scripts/mysql:/docker-entrypoint-initdb.d'
+        networks:
+            network:
+                # IP servicio mysql en subred del proyecto. Ej: 192.168.85.86
+                ipv4_address: 192.168.30.31
+        healthcheck:
+            test: [ "CMD", "mysqladmin", "ping", "-p${DB_PASSWORD}" ]
+            retries: 3
+            timeout: 5s
+#    # -------------------------------------------------------------------------------------- #
+#    # Activación opcional del servicio de Redis
+#    # -------------------------------------------------------------------------------------- #
+#    redis:
+#        image: 'redis:alpine'
+#        ports:
+#            - '${FORWARD_REDIS_PORT:-6379}:6379'
+#        volumes:
+#            - './docker/db/redis:/data'
+#        networks:
+#            network:
+#                # IP servicio redis en subred del proyecto. Ej: 192.168.85.87
+#                ipv4_address: 192.168.XX.ZZ
+#        healthcheck:
+#            test: [ "CMD", "redis-cli", "ping" ]
+#            retries: 3
+#            timeout: 5s
+#    # -------------------------------------------------------------------------------------- #
+#    # Activación opcional del servicio de Microsoft SQL Server
+#    # https://darkghosthunter.medium.com/laravel-sail-with-microsoft-sql-server-b0b8fb600c44
+#    # -------------------------------------------------------------------------------------- #
+#    sqlsrv:
+#        image: 'mcr.microsoft.com/mssql/server:2022-latest'
+#        user: root
+#        ports:
+#            - '${FORWARD_DB_PORT:-1433}:1433'
+#        environment:
+#            MSSQL_SA_PASSWORD: '${DB_ROOT_PASSWORD_SQLSRV}'
+#            MSSQL_DB_NAME: '${DB_DATABASE_SQLSRV}'
+#            MSSQL_USER: '${DB_USERNAME_SQLSRV}'
+#            MSSQL_PASSWORD: '${DB_PASSWORD_SQLSRV}'
+#            ACCEPT_EULA: '${ACCEPT_EULA}'
+#        volumes:
+#            - './docker/db/mssql:/var/opt/mssql/data'
+#            - './docker/scripts/mssql/entrypoint.sh:/entrypoint.sh'
+#            - './docker/shared/mssql:/var/opt/mssql/shared'
+#        networks:
+#            network:
+#                # IP servicio sqlsrv en subred del proyecto. Ej: 192.168.85.88
+#                ipv4_address: 192.168.XX.AA
+#        entrypoint: '/entrypoint.sh'
+#        healthcheck:
+#            test: [ "CMD", "timeout", "1", "bash", "-c", "cat < /dev/null > /dev/tcp/127.0.0.1/1433" ]
+#            timeout: 5s
+#            retries: 3
+networks:
+    network:
+        driver: bridge
+        ipam:
+            config:
+                # Subred única del proyecto. Ej: 192.168.85.0/24
+                - subnet: 192.168.30.0/24

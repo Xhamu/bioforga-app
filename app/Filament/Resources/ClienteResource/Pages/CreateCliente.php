@@ -1,0 +1,15 @@
+<?php
+
+namespace App\Filament\Resources\ClienteResource\Pages;
+
+use App\Filament\Resources\ClienteResource;
+use App\Models\Cliente;
+use App\Models\DireccionEnvio;
+use App\Models\PersonaContacto;
+use Filament\Actions;
+use Filament\Resources\Pages\CreateRecord;
+
+class CreateCliente extends CreateRecord
+{
+    protected static string $resource = ClienteResource::class;
+}

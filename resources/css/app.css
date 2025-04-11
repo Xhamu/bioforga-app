@@ -1,0 +1,6 @@
+@import '../../vendor/awcodes/filament-table-repeater/resources/css/plugin.css';
+
+/* Tailwind base styles */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
