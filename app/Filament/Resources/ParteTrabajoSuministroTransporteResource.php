@@ -4,9 +4,12 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\ParteTrabajoSuministroTransporteResource\Pages;
 use App\Filament\Resources\ParteTrabajoSuministroTransporteResource\RelationManagers;
+use App\Filament\Resources\ParteTrabajoSuministroTransporteResource\RelationManagers\CargasRelationManager;
+use App\Models\Camion;
 use App\Models\ParteTrabajoSuministroTransporte;
 use Awcodes\TableRepeater\Components\TableRepeater;
 use Awcodes\TableRepeater\Header;
+use Filament\Facades\Filament;
 use Filament\Forms;
 use Filament\Forms\Components\Actions\Action;
 use Filament\Resources\Resource;
@@ -23,7 +26,19 @@ use Filament\Forms\Form;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\View;
+use Filament\Resources\RelationManagers\RelationGroup;
 use Filament\Support\Enums\Alignment;
+use Illuminate\Support\Facades\DB;
+use Filament\Notifications\Notification;
+use Illuminate\Support\Facades\Http;
+use Filament\Forms\Components\Actions;
+use Filament\Forms\Components\Grid;
+use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\Placeholder;
+use Filament\Support\Enums\FontWeight;
+use Filament\Tables\Columns\TextColumn;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 
 class ParteTrabajoSuministroTransporteResource extends Resource
 {
@@ -45,115 +60,230 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                             ->relationship('usuario', 'name')
                             ->searchable()
                             ->preload()
+                            ->default(Filament::auth()->user()->id)
+                            ->getOptionLabelFromRecordUsing(fn($record) => $record->name . ' ' . strtoupper(substr($record->apellidos, 0, 1)) . '.')
                             ->required(),
 
                         Select::make('camion_id')
-                            ->relationship('camion', 'matricula_cabeza')
+                            ->label('Camión')
+                            ->options(function () {
+                                $usuario = Auth::user();
+
+                                $camiones = Camion::where('proveedor_id', $usuario->proveedor_id)->get();
+
+                                if ($camiones->isEmpty()) {
+                                    return [
+                                        '' => '- No hay ningún camión vinculado -'
+                                    ];
+                                }
+
+                                return $camiones->mapWithKeys(fn($camion) => [
+                                    $camion->id => '[' . $camion->matricula_cabeza . '] ' . $camion->marca . ' ' . $camion->modelo
+                                ])->toArray();
+                            })
                             ->searchable()
                             ->preload()
-                            ->required(),
+                            ->required()
+                            ->validationMessages([
+                                'required' => 'El :attribute es obligatorio.',
+                            ]),
                     ])
                     ->columns([
                         'default' => 1,
                         'md' => 2,
                     ]),
 
-                Section::make('Cargas realizadas')
+                Section::make()
                     ->schema([
-                        TableRepeater::make('cargas')
-                            ->relationship('cargas') // asegúrate que la relación se llama así en el modelo
-                            ->label('')
-                            ->addActionLabel('Añadir carga')
-                            ->headers([
-                                Header::make('referencia_id')
-                                    ->label('Referencia')
-                                    ->align(Alignment::Center)
-                                    ->width('200px'),
+                        Grid::make([
+                            'default' => 1,
+                            'md' => 1,
+                        ])
+                            ->schema(function ($record) {
+                                if (!$record)
+                                    return [];
 
-                                Header::make('fecha_hora_inicio_carga')
-                                    ->label('Inicio carga')
-                                    ->align(Alignment::Center)
-                                    ->width('200px'),
+                                $ultimaCarga = $record->cargas()->latest()->first();
 
-                                Header::make('gps_inicio_carga')
-                                    ->label('GPS inicio')
-                                    ->align(Alignment::Center)
-                                    ->width('200px'),
+                                $acciones = [];
 
-                                Header::make('fecha_hora_fin_carga')
-                                    ->label('Fin carga')
-                                    ->align(Alignment::Center)
-                                    ->width('200px'),
+                                if (!$ultimaCarga || $ultimaCarga->fecha_hora_fin_carga) {
+                                    $acciones[] = Action::make('Iniciar carga')
+                                        ->label('Iniciar carga')
+                                        ->button()
+                                        ->size('xl')
+                                        ->modalHeading('Iniciar nueva carga')
+                                        ->modalSubmitActionLabel('Iniciar')
+                                        ->modalWidth('xl')
+                                        ->extraAttributes(['class' => 'w-full']) // Hace que el botón ocupe todo el ancho disponible
+                                        ->form([
+                                            Select::make('referencia_id')
+                                                ->label('Referencia')
+                                                ->relationship('referencia', 'referencia')
+                                                ->searchable()
+                                                ->preload()
+                                                ->required()
+                                                ->getOptionLabelFromRecordUsing(function ($record) {
+                                                    return "{$record->referencia} | {$record->proveedor->razon_social} ({$record->monte_parcela}, {$record->ayuntamiento})";
+                                                })
+                                                ->columnSpanFull(),
 
-                                Header::make('gps_fin_carga')
-                                    ->label('GPS fin')
-                                    ->align(Alignment::Center)
-                                    ->width('200px'),
+                                            TextInput::make('gps_inicio_carga')
+                                                ->label('GPS')
+                                                ->required(),
 
-                                Header::make('cantidad')
-                                    ->label('Cantidad (m³)')
-                                    ->align(Alignment::Center)
-                                    ->width('150px'),
-                            ])
-                            ->schema([
-                                Select::make('referencia_id')
-                                    ->relationship('referencia', 'referencia')
-                                    ->searchable()
-                                    ->preload()
-                                    ->required(),
+                                            View::make('livewire.location-inicio-carga'),
+                                        ])
+                                        ->action(function (array $data, $record) {
+                                            $record->cargas()->create([
+                                                'referencia_id' => $data['referencia_id'],
+                                                'fecha_hora_inicio_carga' => now(),
+                                                'gps_inicio_carga' => $data['gps_inicio_carga'] ?? '0.0000, 0.0000',
+                                            ]);
 
-                                DateTimePicker::make('fecha_hora_inicio_carga')
-                                    ->label('Inicio de la carga'),
-                                TextInput::make('gps_inicio_carga')
-                                    ->label('Posición inicio carga')
-                                    ->suffixAction(
-                                        Action::make('Capturar')
-                                            ->icon('heroicon-m-map-pin')
-                                            ->action('capturarGpsInicio')
-                                    ),
+                                            Notification::make()
+                                                ->success()
+                                                ->title('Carga iniciada correctamente')
+                                                ->send();
+                                        })
+                                        ->color('success');
+                                }
 
-                                DateTimePicker::make('fecha_hora_fin_carga')
-                                    ->label('Fin de la carga'),
+                                if ($ultimaCarga && !$ultimaCarga->fecha_hora_fin_carga) {
+                                    $acciones[] = Action::make('Finalizar carga')
+                                        ->label('Finalizar carga')
+                                        ->button()
+                                        ->size('xl')
+                                        ->modalHeading('Finalizar carga en curso')
+                                        ->modalSubmitActionLabel('Finalizar')
+                                        ->modalWidth('xl')
+                                        ->extraAttributes(['class' => 'w-full']) // Hace que el botón ocupe todo el ancho disponible
+                                        ->form([
+                                            TextInput::make('cantidad')
+                                                ->label('Cantidad (m³)')
+                                                ->numeric()
+                                                ->required(),
 
-                                TextInput::make('gps_fin_carga')
-                                    ->label('Posición fin carga'),
+                                            TextInput::make('gps_fin_carga')
+                                                ->label('GPS')
+                                                ->required(),
 
-                                TextInput::make('cantidad')
-                                    ->label('Cantidad (m³)')
-                                    ->numeric(),
-                            ])
-                            ->emptyLabel('Aún no se han registrado cargas')
-                            ->columnSpan('full')
-                            ->defaultItems(0),
-                    ]),
+                                            View::make('livewire.location-fin-carga')
+                                                ->columnSpanFull(),
+                                        ])
+                                        ->action(function (array $data, $record) {
+                                            $ultimaCarga = $record->cargas()->latest()->first();
 
-                Section::make('Datos de Descarga')
+                                            if (!$ultimaCarga || $ultimaCarga->fecha_hora_fin_carga) {
+                                                Notification::make()
+                                                    ->danger()
+                                                    ->title('No hay ninguna carga en progreso.')
+                                                    ->send();
+                                                return;
+                                            }
+
+                                            $ultimaCarga->update([
+                                                'fecha_hora_fin_carga' => now(),
+                                                'gps_fin_carga' => $data['gps_fin_carga'] ?? '0.0000, 0.0000',
+                                                'cantidad' => $data['cantidad'],
+                                            ]);
+
+                                            $record->update([
+                                                'cantidad_total' => $record->cargas()->sum('cantidad'),
+                                            ]);
+
+                                            Notification::make()
+                                                ->success()
+                                                ->title('Carga finalizada correctamente')
+                                                ->send();
+                                        })
+                                        ->color('danger');
+                                }
+
+                                if ($ultimaCarga && $ultimaCarga->fecha_hora_fin_carga) {
+                                    $acciones[] = Action::make('Iniciar descarga')
+                                        ->label('Iniciar descarga')
+                                        ->button()
+                                        ->size('xl')
+                                        ->modalHeading('Iniciar descarga')
+                                        ->modalSubmitActionLabel('Guardar descarga')
+                                        ->modalWidth('xl')
+                                        ->extraAttributes(['class' => 'w-full']) // Hace que el botón ocupe todo el ancho disponible
+                                        ->form([
+                                            Select::make('cliente_id')
+                                                ->relationship('cliente', 'razon_social')
+                                                ->searchable()
+                                                ->preload()
+                                                ->required(),
+
+                                            Select::make('tipo_biomasa')
+                                                ->options([
+                                                    'pino' => 'Pino',
+                                                    'eucalipto' => 'Eucalipto',
+                                                    'acacia' => 'Acacia',
+                                                    'frondosa' => 'Frondosa',
+                                                    'otros' => 'Otros',
+                                                ])
+                                                ->searchable()
+                                                ->required(),
+
+                                            TextInput::make('cantidad_total')
+                                                ->label('Cantidad total (m³)')
+                                                ->numeric()
+                                                ->disabled()
+                                                ->helperText('Valor calculado automáticamente.')
+                                                ->default(fn($record) => $record?->cargas?->sum('cantidad') ?? 0),
+
+                                            FileUpload::make('albaran')
+                                                ->label('Foto del ticket de pesado')
+                                                ->disk('public')
+                                                ->directory('albaranes')
+                                                ->required(),
+                                        ])
+                                        ->action(function (array $data, $record) {
+                                            $record->update([
+                                                'cliente_id' => $data['cliente_id'],
+                                                'tipo_biomasa' => $data['tipo_biomasa'],
+                                                'albaran' => $data['albaran'],
+                                            ]);
+
+                                            Notification::make()
+                                                ->success()
+                                                ->title('Descarga registrada correctamente')
+                                                ->send();
+                                        })
+                                        ->color('primary');
+                                }
+
+                                return [
+                                    Actions::make($acciones)
+                                ];
+                            }),
+                    ])
+                    ->columns(1),
+
+                Section::make('Datos de la descarga')
+                    ->visible(fn($record) => $record && $record->cliente_id !== null)
                     ->schema([
-                        Select::make('cliente_id')
-                            ->relationship('cliente', 'razon_social')
-                            ->searchable()
-                            ->preload(),
+                        Placeholder::make('cliente')
+                            ->label('Cliente')
+                            ->content(fn($record) => $record->cliente->razon_social ?? '-'),
 
-                        Select::make('tipo_biomasa')
-                            ->options([
-                                'pino' => 'Pino',
-                                'eucalipto' => 'Eucalipto',
-                                'acacia' => 'Acacia',
-                                'frondosa' => 'Frondosa',
-                                'otros' => 'Otros',
-                            ])
-                            ->searchable(),
+                        Placeholder::make('tipo_biomasa')
+                            ->label('Tipo de biomasa')
+                            ->content(fn($record) => ucfirst($record->tipo_biomasa) ?? '-'),
 
-                        TextInput::make('cantidad_total')
+                        Placeholder::make('cantidad_total')
                             ->label('Cantidad total (m³)')
-                            ->numeric()
-                            ->disabled()
-                            ->helperText('Se calculará automáticamente sumando las cargas.'),
+                            ->content(fn($record) => $record->cantidad_total ?? '-'),
 
                         FileUpload::make('albaran')
-                            ->label('Foto del albarán')
+                            ->label('Foto del ticket de pesado')
                             ->disk('public')
-                            ->directory('albaranes'),
+                            ->directory('albaranes')
+                            ->imageEditor()
+                            ->openable()
+                            ->required(),
                     ])
                     ->columns([
                         'default' => 1,
@@ -173,7 +303,29 @@ class ParteTrabajoSuministroTransporteResource extends Resource
     {
         return $table
             ->columns([
-                //
+                TextColumn::make('usuario')
+                    ->label('Usuario')
+                    ->formatStateUsing(function ($state, $record) {
+                        $nombre = $record->usuario?->name ?? '';
+                        $apellido = $record->usuario?->apellidos ?? '';
+                        $inicialApellido = $apellido ? strtoupper(substr($apellido, 0, 1)) . '.' : '';
+                        return trim("$nombre $inicialApellido");
+                    })
+                    ->weight(FontWeight::Bold)
+                    ->searchable(),
+
+                TextColumn::make('camion')
+                    ->label('Camión')
+                    ->formatStateUsing(function ($state, $record) {
+                        $marca = $record->camion?->marca ?? '';
+                        $modelo = $record->camion?->modelo ?? '';
+                        $matricula_cabeza = $record->camion?->matricula_cabeza ?? '';
+                        return trim("[$matricula_cabeza] - $marca $modelo");
+                    })
+                    ->searchable(),
+
+                TextColumn::make('cantidad_total')
+                    ->label('Cantidad total'),
             ])
             ->filters([
                 Tables\Filters\TrashedFilter::make(),
@@ -194,7 +346,9 @@ class ParteTrabajoSuministroTransporteResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            RelationGroup::make('Cargas', [
+                CargasRelationManager::class,
+            ]),
         ];
     }
 

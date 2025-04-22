@@ -224,6 +224,7 @@ class PedidoResource extends Resource
             'index' => Pages\ListPedidos::route('/'),
             'create' => Pages\CreatePedido::route('/create'),
             'view' => Pages\ViewPedido::route('/{record}'),
+            'activities' => Pages\ListPedidosActivities::route('/{record}/activities'),
             'edit' => Pages\EditPedido::route('/{record}/edit'),
         ];
     }
