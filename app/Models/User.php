@@ -11,12 +11,14 @@ use Illuminate\Notifications\Notifiable;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasRoles, HasFactory, Notifiable, SoftDeletes;
+    use HasRoles, HasFactory, Notifiable, SoftDeletes, LogsActivity;
 
     /**
      * The attributes that are mass assignable.
@@ -42,6 +44,15 @@ class User extends Authenticatable
         'password',
         'remember_token',
     ];
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logAll()
+            ->useLogName('user')
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs();
+    }
 
     /**
      * Get the attributes that should be cast.

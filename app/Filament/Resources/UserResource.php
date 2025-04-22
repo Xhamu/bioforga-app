@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\UserResource\Pages;
+use App\Filament\Resources\UserResource\Pages\ListUserActivities;
 use App\Models\User;
 use Filament\Forms;
 use Filament\Forms\Components\Checkbox;
@@ -12,6 +13,7 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Support\Enums\FontWeight;
 use Filament\Tables;
+use Filament\Tables\Actions\Action;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\Layout\Grid;
 use Filament\Tables\Columns\Layout\Panel;
@@ -195,6 +197,12 @@ class UserResource extends Resource
                     \STS\FilamentImpersonate\Tables\Actions\Impersonate::make(),
                     Tables\Actions\EditAction::make(),
                     Tables\Actions\DeleteAction::make(),
+                    Action::make('activities')
+                        ->label('Actividad')
+                        ->icon('heroicon-o-clock')
+                        ->url(fn($record) => static::getUrl('activities', ['record' => $record]))
+                        ->openUrlInNewTab()
+                        ->visible(fn() => auth()->user()?->hasRole('superadmin')),
                 ])
                 ->bulkActions([
                     Tables\Actions\BulkActionGroup::make([
@@ -217,6 +225,7 @@ class UserResource extends Resource
             'index' => Pages\ListUsers::route('/'),
             'create' => Pages\CreateUser::route('/create'),
             'edit' => Pages\EditUser::route('/{record}/edit'),
+            'activities' => ListUserActivities::route('/{record}/activities'),
         ];
     }
 }

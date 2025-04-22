@@ -1,6 +1,7 @@
 <div>
-    <select id="referencia-select" class="referencia-select"
-        style="width: 100%; padding: 12px 20px; font-size: 16px; font-weight: bold; border: 2px solid #218838; border-radius: 10px; background-color: #28a745; color: white;">
+
+    <select id="referencia-select"
+        class="w-full px-3 py-2 text-sm font-medium border-gray-300 rounded-lg shadow-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500 focus:outline-none">
         <option value="">Selecciona una opción</option>
         <option value="suministro">SUMINISTRO</option>
         <option value="servicio">SERVICIO</option>

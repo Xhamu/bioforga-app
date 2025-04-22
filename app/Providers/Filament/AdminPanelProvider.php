@@ -42,10 +42,7 @@ class AdminPanelProvider extends PanelProvider
 
             ->darkMode(false)
 
-            ->renderHook(
-                'panels::body.end',
-                fn() => view('footer'),
-            )
+            ->renderHook('panels::body.end', fn () => view('components.gps-global-script'))
 
             ->plugins([
                 FilamentShieldPlugin::make()
