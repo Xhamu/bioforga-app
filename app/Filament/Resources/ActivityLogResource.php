@@ -51,7 +51,7 @@ class ActivityLogResource extends Resource
                         $changes = $record->properties['attributes'] ?? [];
                         $old = $record->properties['old'] ?? [];
 
-                        unset($changes['updated_at'], $old['updated_at']);
+                        unset($changes['updated_at'], $old['updat ed_at']);
 
                         if (empty($changes)) {
                             return '—';

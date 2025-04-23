@@ -6,6 +6,9 @@
         const inicioTrabajoBtn = e.target.closest('#location-inicio-trabajo');
         const finTrabajoBtn = e.target.closest('#location-fin-trabajo');
 
+        const inicioDesplazamientoBtn = e.target.closest('#location-inicio-desplazamiento');
+        const finDesplazamientoBtn = e.target.closest('#location-fin-desplazamiento');
+
         // SUMINISTROS DEL TRANSPORTISTA
         // GPS de inicio
         if (inicioBtn) {
@@ -32,6 +35,21 @@
         // GPS de fin trabajo
         if (finTrabajoBtn) {
             const gpsInput = document.querySelector('input[id$="gps_fin_trabajo"]');
+            if (gpsInput) requestLocationAndFill(gpsInput);
+            return;
+        }
+
+        // DESPLAZAMIENTOS
+        // GPS de inicio trabajo
+        if (inicioDesplazamientoBtn) {
+            const gpsInput = document.querySelector('input[id$="gps_inicio_desplazamiento"]');
+            if (gpsInput) requestLocationAndFill(gpsInput);
+            return;
+        }
+
+        // GPS de fin trabajo
+        if (finDesplazamientoBtn) {
+            const gpsInput = document.querySelector('input[id$="gps_fin_desplazamiento"]');
             if (gpsInput) requestLocationAndFill(gpsInput);
             return;
         }

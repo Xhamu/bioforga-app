@@ -117,7 +117,7 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
 
                 Section::make('')
                     ->schema([
-                        Placeholder::make('estado_trabajo')
+                        Placeholder::make('')
                             ->content(function ($record) {
                                 if (!$record || !$record->fecha_hora_inicio_trabajo) {
                                     return new HtmlString('<p>Estado actual: <strong>Sin iniciar</strong></p>');
