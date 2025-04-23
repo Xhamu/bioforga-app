@@ -3,8 +3,12 @@
 namespace App\Filament\Resources\ParteTrabajoSuministroOperacionMaquinaResource\Pages;
 
 use App\Filament\Resources\ParteTrabajoSuministroOperacionMaquinaResource;
+use App\Models\Referencia;
+use Auth;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\View;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
 
@@ -23,13 +27,33 @@ class CreateParteTrabajoSuministroOperacionMaquina extends CreateRecord
                 ->form([
                     Select::make('referencia_id')
                         ->label('Referencia')
-                        ->relationship('referencia', 'referencia')
+                        ->options(function () {
+                            $usuario = Auth::user();
+
+                            $referenciasIds = \DB::table('referencias_users')
+                                ->where('user_id', $usuario->id)
+                                ->pluck('referencia_id');
+
+                            // Si tiene referencias asignadas, filtramos por ellas
+                            $referencias = $referenciasIds->isNotEmpty()
+                                ? Referencia::whereIn('id', $referenciasIds)->with('proveedor')->get()
+                                : Referencia::with('proveedor')->get();
+
+                            return $referencias->mapWithKeys(function ($referencia) {
+                                return [
+                                    $referencia->id => "{$referencia->referencia} | {$referencia->proveedor->razon_social} ({$referencia->monte_parcela}, {$referencia->ayuntamiento})"
+                                ];
+                            });
+                        })
                         ->searchable()
                         ->preload()
-                        ->required()
-                        ->getOptionLabelFromRecordUsing(function ($record) {
-                            return "{$record->referencia} | {$record->proveedor->razon_social} ({$record->monte_parcela}, {$record->ayuntamiento})";
-                        }),
+                        ->required(),
+
+                    TextInput::make('gps_inicio_trabajo')
+                        ->label('GPS')
+                        ->required(),
+
+                    View::make('livewire.location-inicio-trabajo'),
                 ])
                 ->action(function (array $data) {
                     $this->form->fill(); // rellena lo que ya hay en el formulario
@@ -39,7 +63,7 @@ class CreateParteTrabajoSuministroOperacionMaquina extends CreateRecord
                         [
                             'referencia_id' => $data['referencia_id'],
                             'fecha_hora_inicio_trabajo' => now(),
-                            'gps_inicio_trabajo' => '0.0000, 0.0000',
+                            'gps_inicio_trabajo' => $data['gps_inicio_trabajo'] ?? '0.0000, 0.0000',
                         ]
                     );
 

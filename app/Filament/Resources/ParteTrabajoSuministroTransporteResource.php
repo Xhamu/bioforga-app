@@ -7,6 +7,7 @@ use App\Filament\Resources\ParteTrabajoSuministroTransporteResource\RelationMana
 use App\Filament\Resources\ParteTrabajoSuministroTransporteResource\RelationManagers\CargasRelationManager;
 use App\Models\Camion;
 use App\Models\ParteTrabajoSuministroTransporte;
+use App\Models\Referencia;
 use Awcodes\TableRepeater\Components\TableRepeater;
 use Awcodes\TableRepeater\Header;
 use Filament\Facades\Filament;
@@ -124,14 +125,27 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                         ->form([
                                             Select::make('referencia_id')
                                                 ->label('Referencia')
-                                                ->relationship('referencia', 'referencia')
+                                                ->options(function () {
+                                                    $usuario = Auth::user();
+
+                                                    $referenciasIds = \DB::table('referencias_users')
+                                                        ->where('user_id', $usuario->id)
+                                                        ->pluck('referencia_id');
+
+                                                    // Si tiene referencias asignadas, filtramos por ellas
+                                                    $referencias = $referenciasIds->isNotEmpty()
+                                                        ? Referencia::whereIn('id', $referenciasIds)->with('proveedor')->get()
+                                                        : Referencia::with('proveedor')->get();
+
+                                                    return $referencias->mapWithKeys(function ($referencia) {
+                                                        return [
+                                                            $referencia->id => "{$referencia->referencia} | {$referencia->proveedor->razon_social} ({$referencia->monte_parcela}, {$referencia->ayuntamiento})"
+                                                        ];
+                                                    });
+                                                })
                                                 ->searchable()
                                                 ->preload()
-                                                ->required()
-                                                ->getOptionLabelFromRecordUsing(function ($record) {
-                                                    return "{$record->referencia} | {$record->proveedor->razon_social} ({$record->monte_parcela}, {$record->ayuntamiento})";
-                                                })
-                                                ->columnSpanFull(),
+                                                ->required(),
 
                                             TextInput::make('gps_inicio_carga')
                                                 ->label('GPS')

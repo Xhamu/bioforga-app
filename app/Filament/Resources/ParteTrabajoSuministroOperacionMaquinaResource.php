@@ -12,11 +12,13 @@ use Filament\Forms;
 use Filament\Forms\Components\Actions;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\View;
 use Filament\Forms\Form;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
@@ -166,39 +168,43 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                                     default => '❓',
                                 };
 
-                                $tabla = '
-                                    <div class="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
-                                        <table class="w-full text-sm text-left text-gray-700 dark:text-gray-200">
-                                            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-                                                <tr class="bg-gray-50 dark:bg-gray-800">
-                                                    <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Estado actual</th>
-                                                    <td class="px-4 py-3 font-semibold text-gray-900 dark:text-white">' . $emoji . ' ' . $estado . '</td>
-                                                </tr>
-                                                <tr>
-                                                    <th class="px-4 py-3">Hora de inicio</th>
-                                                    <td class="px-4 py-3">' . $inicio->format('H:i') . '</td>
-                                                </tr>
-                                                <tr>
-                                                    <th class="px-4 py-3">Hora de pausa</th>
-                                                    <td class="px-4 py-3">' . ($parada ? $parada->format('H:i') : '-') . '</td>
-                                                </tr>
-                                                <tr>
-                                                    <th class="px-4 py-3">Hora de reanudación</th>
-                                                    <td class="px-4 py-3">' . ($reanudacion ? $reanudacion->format('H:i') : '-') . '</td>
-                                                </tr>
-                                                <tr>
-                                                    <th class="px-4 py-3">Hora de finalización</th>
-                                                    <td class="px-4 py-3">' . ($fin ? $fin->format('H:i') : '-') . '</td>
-                                                </tr>
-                                                <tr class="bg-gray-50 dark:bg-gray-800 border-t">
-                                                    <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Tiempo total</th>
-                                                    <td class="px-4 py-3 font-semibold">' . $horas . 'h ' . $minutos . 'min</td>
-                                                </tr>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                ';
+                                $gpsInicio = $record->gps_inicio_trabajo ? ' (<a href="https://maps.google.com/?q=' . $record->gps_inicio_trabajo . '" target="_blank" class="text-blue-600 underline">📍 Ver ubicación</a>)' : '';
+                                $gpsPausa = $record->gps_parada_trabajo ? ' (<a href="https://maps.google.com/?q=' . $record->gps_parada_trabajo . '" target="_blank" class="text-blue-600 underline">📍 Ver ubicación</a>)' : '';
+                                $gpsReanudar = $record->gps_reanudacion_trabajo ? ' (<a href="https://maps.google.com/?q=' . $record->gps_reanudacion_trabajo . '" target="_blank" class="text-blue-600 underline">📍 Ver ubicación</a>)' : '';
+                                $gpsFin = $record->gps_fin_trabajo ? ' (<a href="https://maps.google.com/?q=' . $record->gps_fin_trabajo . '" target="_blank" class="text-blue-600 underline">📍 Ver ubicación</a>)' : '';
 
+                                $tabla = '
+                                <div class="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
+                                    <table class="w-full text-sm text-left text-gray-700 dark:text-gray-200">
+                                        <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                                            <tr class="bg-gray-50 dark:bg-gray-800">
+                                                <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Estado actual</th>
+                                                <td class="px-4 py-3 font-semibold text-gray-900 dark:text-white">' . $emoji . ' ' . $estado . '</td>
+                                            </tr>
+                                            <tr>
+                                                <th class="px-4 py-3">Hora de inicio</th>
+                                                <td class="px-4 py-3">' . $inicio->format('H:i') . $gpsInicio . '</td>
+                                            </tr>
+                                            <tr>
+                                                <th class="px-4 py-3">Hora de pausa</th>
+                                                <td class="px-4 py-3">' . ($parada ? $parada->format('H:i') . $gpsPausa : '-') . '</td>
+                                            </tr>
+                                            <tr>
+                                                <th class="px-4 py-3">Hora de reanudación</th>
+                                                <td class="px-4 py-3">' . ($reanudacion ? $reanudacion->format('H:i') . $gpsReanudar : '-') . '</td>
+                                            </tr>
+                                            <tr>
+                                                <th class="px-4 py-3">Hora de finalización</th>
+                                                <td class="px-4 py-3">' . ($fin ? $fin->format('H:i') . $gpsFin : '-') . '</td>
+                                            </tr>
+                                            <tr class="bg-gray-50 dark:bg-gray-800 border-t">
+                                                <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Tiempo total</th>
+                                                <td class="px-4 py-3 font-semibold">' . $horas . 'h ' . $minutos . 'min</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            ';
                                 return new HtmlString($tabla);
                             })
                             ->columnSpanFull(),
@@ -224,7 +230,7 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                                 ->label('Parar trabajo')
                                 ->color('warning')
                                 ->button()
-                                ->extraAttributes(['class' => 'w-full']) // Hace que el botón ocupe todo el ancho disponible
+                                ->extraAttributes(['id' => 'btn-parar-trabajo', 'class' => 'w-full'])
                                 ->visible(
                                     fn($record) =>
                                     $record &&
@@ -233,22 +239,25 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                                     !$record->fecha_hora_fin_trabajo
                                 )
                                 ->requiresConfirmation()
-                                ->action(function ($record) {
+                                ->form([
+                                    Hidden::make('gps_parada_trabajo'),
+                                ])
+                                ->action(function (array $data, $record) {
                                     $record->update([
                                         'fecha_hora_parada_trabajo' => now(),
-                                        'gps_parada_trabajo' => '0.0000, 0.0000',
+                                        'gps_parada_trabajo' => $data['gps_parada_trabajo'],
                                     ]);
 
                                     Notification::make()
                                         ->info()
-                                        ->title('Trabajo pausado')
+                                        ->title('Trabajo pausado con ubicación')
                                         ->send();
                                 }),
 
                             Action::make('Reanudar')
                                 ->label('Reanudar trabajo')
                                 ->color('info')
-                                ->extraAttributes(['class' => 'w-full']) // Hace que el botón ocupe todo el ancho disponible
+                                ->extraAttributes(['id' => 'btn-reanudar-trabajo', 'class' => 'w-full'])
                                 ->visible(
                                     fn($record) =>
                                     $record &&
@@ -258,10 +267,13 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                                 )
                                 ->button()
                                 ->requiresConfirmation()
-                                ->action(function ($record) {
+                                ->form([
+                                    Hidden::make('gps_reanudacion_trabajo'),
+                                ])
+                                ->action(function (array $data, $record) {
                                     $record->update([
                                         'fecha_hora_reanudacion_trabajo' => now(),
-                                        'gps_reanudacion_trabajo' => '0.0000, 0.0000',
+                                        'gps_reanudacion_trabajo' => $data['gps_reanudacion_trabajo'],
                                     ]);
 
                                     Notification::make()
@@ -299,6 +311,12 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                                         ->disk('public')
                                         ->directory('horometros')
                                         ->required(),
+
+                                    TextInput::make('gps_fin_trabajo')
+                                        ->label('GPS')
+                                        ->required(),
+
+                                    View::make('livewire.location-fin-trabajo'),
                                 ])
                                 ->action(function (array $data, $record) {
                                     $record->update([
@@ -311,7 +329,7 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                                         'consumo_cuchillas' => $data['consumo_cuchillas'],
                                         'consumo_muelas' => $data['consumo_muelas'],
                                         'fecha_hora_fin_trabajo' => now(),
-                                        'gps_fin_trabajo' => '0.0000, 0.0000',
+                                        'gps_fin_trabajo' => $data['gps_fin_trabajo'],
                                     ]);
 
                                     Notification::make()

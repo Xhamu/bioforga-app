@@ -51,20 +51,25 @@ class ActivityLogResource extends Resource
                         $changes = $record->properties['attributes'] ?? [];
                         $old = $record->properties['old'] ?? [];
 
-                        // Quitamos el campo 'updated_at' para no mostrarlo
                         unset($changes['updated_at'], $old['updated_at']);
 
                         if (empty($changes)) {
                             return '—';
                         }
 
-                        return collect($changes)->map(function ($new, $key) use ($old) {
+                        $formatDate = function ($val) {
+                            try {
+                                if (is_string($val) && preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/', $val)) {
+                                    return \Carbon\Carbon::parse($val)->format('d/m/Y H:i');
+                                }
+                            } catch (\Exception $e) {
+                            }
+
+                            return is_string($val) ? $val : json_encode($val);
+                        };
+
+                        return collect($changes)->map(function ($new, $key) use ($old, $formatDate) {
                             $oldValue = $old[$key] ?? '—';
-
-                            $formatDate = fn($val) => str_contains($val, 'T')
-                                ? \Carbon\Carbon::parse($val)->format('d/m/Y H:i')
-                                : $val;
-
                             return "• <strong>{$key}</strong>: \"" . $formatDate($oldValue) . "\" → \"" . $formatDate($new) . "\"";
                         })->implode('<br>');
                     })

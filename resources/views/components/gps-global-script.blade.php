@@ -3,6 +3,10 @@
         const inicioBtn = e.target.closest('#location-inicio-carga');
         const finBtn = e.target.closest('#location-fin-carga');
 
+        const inicioTrabajoBtn = e.target.closest('#location-inicio-trabajo');
+        const finTrabajoBtn = e.target.closest('#location-fin-trabajo');
+
+        // SUMINISTROS DEL TRANSPORTISTA
         // GPS de inicio
         if (inicioBtn) {
             const gpsInput = document.querySelector('input[id$="gps_inicio_carga"]');
@@ -13,6 +17,21 @@
         // GPS de fin
         if (finBtn) {
             const gpsInput = document.querySelector('input[id$="gps_fin_carga"]');
+            if (gpsInput) requestLocationAndFill(gpsInput);
+            return;
+        }
+
+        // OPERACIONES MAQUINA
+        // GPS de inicio trabajo
+        if (inicioTrabajoBtn) {
+            const gpsInput = document.querySelector('input[id$="gps_inicio_trabajo"]');
+            if (gpsInput) requestLocationAndFill(gpsInput);
+            return;
+        }
+
+        // GPS de fin trabajo
+        if (finTrabajoBtn) {
+            const gpsInput = document.querySelector('input[id$="gps_fin_trabajo"]');
             if (gpsInput) requestLocationAndFill(gpsInput);
             return;
         }
@@ -31,10 +50,9 @@
                 input.dispatchEvent(new Event('input', {
                     bubbles: true
                 }));
-                console.log('📍 Coordenadas insertadas:', coords);
             },
             (error) => {
-                alert("❌ Error al obtener ubicación: " + error.message);
+                //alert("Error al obtener ubicación: " + error.message);
             }
         );
     }
