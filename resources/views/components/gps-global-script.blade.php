@@ -39,3 +39,10 @@
         );
     }
 </script>
+
+<footer
+    class="w-full border-t border-gray-200 bg-white shadow p-4 dark:bg-gray-800 dark:border-gray-600 flex flex-col items-center justify-center md:flex-row md:justify-between md:p-6">
+    <a class="link-default" target="_blank" href="https://www.quadralia.com/">
+        <img src="{{ asset('images/powered-by-quadralia.svg') }}" alt="Powered by Quadralia" class="h-6 mt-2 md:mt-0">
+    </a>
+</footer>

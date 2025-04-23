@@ -94,6 +94,7 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                     ]),
 
                 Section::make()
+                    ->visible(fn($record) => static::hasCargasActions($record))
                     ->schema([
                         Grid::make([
                             'default' => 1,
@@ -102,6 +103,10 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                             ->schema(function ($record) {
                                 if (!$record)
                                     return [];
+
+                                if ($record->cliente_id && $record->albaran) {
+                                    return [];
+                                }
 
                                 $ultimaCarga = $record->cargas()->latest()->first();
 
@@ -222,10 +227,18 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                                     'eucalipto' => 'Eucalipto',
                                                     'acacia' => 'Acacia',
                                                     'frondosa' => 'Frondosa',
+                                                    'mezcla' => 'Mezcla',
                                                     'otros' => 'Otros',
                                                 ])
+                                                ->multiple()
                                                 ->searchable()
                                                 ->required(),
+
+                                            TextInput::make('peso_neto')
+                                                ->label('Peso neto')
+                                                ->numeric()
+                                                ->required()
+                                                ->minValue(0),
 
                                             TextInput::make('cantidad_total')
                                                 ->label('Cantidad total (m³)')
@@ -235,7 +248,7 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                                 ->default(fn($record) => $record?->cargas?->sum('cantidad') ?? 0),
 
                                             FileUpload::make('albaran')
-                                                ->label('Foto del ticket de pesado')
+                                                ->label('Foto del ticket de pesada')
                                                 ->disk('public')
                                                 ->directory('albaranes')
                                                 ->required(),
@@ -244,6 +257,7 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                             $record->update([
                                                 'cliente_id' => $data['cliente_id'],
                                                 'tipo_biomasa' => $data['tipo_biomasa'],
+                                                'peso_neto' => $data['peso_neto'],
                                                 'albaran' => $data['albaran'],
                                             ]);
 
@@ -271,19 +285,32 @@ class ParteTrabajoSuministroTransporteResource extends Resource
 
                         Placeholder::make('tipo_biomasa')
                             ->label('Tipo de biomasa')
-                            ->content(fn($record) => ucfirst($record->tipo_biomasa) ?? '-'),
+                            ->content(function ($record) {
+                                $biomasa = $record->tipo_biomasa;
+
+                                if (is_array($biomasa)) {
+                                    return implode(', ', array_map('ucfirst', $biomasa));
+                                }
+
+                                return ucfirst($biomasa ?? '-');
+                            }),
+
+                        Placeholder::make('peso_neto')
+                            ->label('Peso neto')
+                            ->content(fn($record) => $record->peso_neto ?? '-'),
 
                         Placeholder::make('cantidad_total')
                             ->label('Cantidad total (m³)')
                             ->content(fn($record) => $record->cantidad_total ?? '-'),
 
                         FileUpload::make('albaran')
-                            ->label('Foto del ticket de pesado')
+                            ->label('Foto del ticket de pesada')
                             ->disk('public')
                             ->directory('albaranes')
                             ->imageEditor()
                             ->openable()
-                            ->required(),
+                            ->required()
+                            ->columnSpanFull(),
                     ])
                     ->columns([
                         'default' => 1,
@@ -303,6 +330,11 @@ class ParteTrabajoSuministroTransporteResource extends Resource
     {
         return $table
             ->columns([
+                TextColumn::make('created_at')
+                    ->label('Fecha y hora')
+                    ->weight(FontWeight::Bold)
+                    ->dateTime(),
+
                 TextColumn::make('usuario')
                     ->label('Usuario')
                     ->formatStateUsing(function ($state, $record) {
@@ -340,7 +372,8 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                     Tables\Actions\ForceDeleteBulkAction::make(),
                     Tables\Actions\RestoreBulkAction::make(),
                 ]),
-            ]);
+            ])
+            ->defaultSort('created_at', 'desc');
     }
 
     public static function getRelations(): array
@@ -368,5 +401,21 @@ class ParteTrabajoSuministroTransporteResource extends Resource
             ->withoutGlobalScopes([
                 SoftDeletingScope::class,
             ]);
+    }
+
+    public static function hasCargasActions($record): bool
+    {
+        if (!$record || ($record->cliente_id && $record->albaran)) {
+            return false;
+        }
+
+        $ultimaCarga = $record->cargas()->latest()->first();
+
+        return
+            !$ultimaCarga || $ultimaCarga->fecha_hora_fin_carga ||
+
+            ($ultimaCarga && !$ultimaCarga->fecha_hora_fin_carga) ||
+
+            ($ultimaCarga && $ultimaCarga->fecha_hora_fin_carga);
     }
 }

@@ -29,6 +29,7 @@ class ParteTrabajoSuministroTransporte extends Model
         'cantidad',
         'cliente_id',
         'tipo_biomasa',
+        'peso_neto',
         'cantidad_total',
         'albaran',
         'observaciones'
@@ -37,6 +38,7 @@ class ParteTrabajoSuministroTransporte extends Model
     protected $casts = [
         'fecha_hora_inicio_carga' => 'date',
         'fecha_hora_fin_carga' => 'date',
+        'tipo_biomasa' => 'array',
     ];
 
     /**
