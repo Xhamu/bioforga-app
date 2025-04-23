@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Filament\Resources\ProveedorResource\Pages;
+namespace App\Filament\Resources\TallerResource\Pages;
 
 use App\Filament\Resources\TallerResource;
 use Filament\Actions;
