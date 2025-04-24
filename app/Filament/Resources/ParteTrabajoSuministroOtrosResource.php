@@ -2,9 +2,9 @@
 
 namespace App\Filament\Resources;
 
-use App\Filament\Resources\ParteTrabajoSuministroAveriaResource\Pages;
-use App\Filament\Resources\ParteTrabajoSuministroAveriaResource\RelationManagers;
-use App\Models\ParteTrabajoSuministroAveria;
+use App\Filament\Resources\ParteTrabajoSuministroOtrosResource\Pages;
+use App\Filament\Resources\ParteTrabajoSuministroOtrosResource\RelationManagers;
+use App\Models\ParteTrabajoSuministroOtros;
 use Carbon\Carbon;
 use Filament\Facades\Filament;
 use Filament\Forms;
@@ -24,25 +24,23 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\HtmlString;
 
-class ParteTrabajoSuministroAveriaResource extends Resource
+class ParteTrabajoSuministroOtrosResource extends Resource
 {
-    protected static ?string $model = ParteTrabajoSuministroAveria::class;
+    protected static ?string $model = ParteTrabajoSuministroOtros::class;
     protected static ?string $navigationIcon = 'heroicon-o-clock';
     protected static ?string $navigationGroup = 'Partes de trabajo';
     protected static ?int $navigationSort = 2;
-    protected static ?string $slug = 'partes-trabajo-suministro-averia';
-    public static ?string $label = 'avería / mantenimiento';
-    public static ?string $pluralLabel = 'Averías / Mantenimientos';
+    protected static ?string $slug = 'partes-trabajo-suministro-otros';
+    public static ?string $label = 'otro';
+    public static ?string $pluralLabel = 'Otros';
     public static function form(Form $form): Form
     {
         return $form
             ->schema([
                 Section::make('Datos generales')
                     ->schema([
-                        // Usuario actual (solo lectura)
                         Select::make('usuario_id')
                             ->label('Usuario')
                             ->searchable()
@@ -52,80 +50,40 @@ class ParteTrabajoSuministroAveriaResource extends Resource
                             ])
                             ->required()
                             ->columnSpanFull(),
-
-                        // Tipo: Avería o Mantenimiento
-                        Select::make('tipo')
-                            ->label('Tipo')
-                            ->reactive()
-                            ->searchable()
-                            ->options([
-                                'averia' => 'Avería',
-                                'mantenimiento' => 'Mantenimiento',
-                            ])
-                            ->required(),
-
-                        // Máquina (todas)
-                        Select::make('maquina_id')
-                            ->label('Máquina')
-                            ->reactive()
-                            ->options(function () {
-                                return \App\Models\Maquina::all()->mapWithKeys(function ($maquina) {
-                                    return [$maquina->id => "{$maquina->marca} {$maquina->modelo}"];
-                                })->toArray();
-                            })
-                            ->searchable()
-                            ->required(),
-
-                        // Trabajo realizado (se rellena según máquina y tipo)
-                        Select::make('trabajo_realizado')
-                            ->label('Trabajo realizado')
-                            ->required()
-                            ->options(function (callable $get) {
-                                $maquinaId = $get('maquina_id');
-                                $tipo = $get('tipo');
-
-                                if (!$maquinaId || !$tipo) {
-                                    return [];
-                                }
-
-                                $maquina = \App\Models\Maquina::find($maquinaId);
-                                if (!$maquina) {
-                                    return [];
-                                }
-
-                                $ids = [];
-
-                                if ($tipo === 'averia') {
-                                    $ids = is_array($maquina->averias) ? $maquina->averias : [];
-                                    return \App\Models\PosibleAveria::whereIn('id', $ids)->pluck('nombre', 'id')->toArray();
-                                }
-
-                                if ($tipo === 'mantenimiento') {
-                                    $ids = is_array($maquina->mantenimientos) ? $maquina->mantenimientos : [];
-                                    return \App\Models\PosibleMantenimiento::whereIn('id', $ids)->pluck('nombre', 'id')->toArray();
-                                }
-
-                                return [];
-                            })
-                            ->reactive()
-                            ->searchable()
-                            ->disabled(fn(callable $get) => !$get('maquina_id') || !$get('tipo')),
                     ])
                     ->columns(3),
 
                 Section::make('')
                     ->schema([
                         Placeholder::make('')
+                            ->visible(fn($record) => $record && filled($record->descripcion))
                             ->content(function ($record) {
-                                if (!$record || !$record->fecha_hora_inicio_averia) {
+                                return new HtmlString('
+                                <div class="mb-6">
+                                    <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2 flex items-center gap-1">
+                                        Descripción del trabajo
+                                    </h3>
+                                    <div class="px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm">
+                                        <p class="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+                                            ' . nl2br(e($record->descripcion)) . '
+                                        </p>
+                                    </div>
+                                </div>
+                            ');
+                            })
+                            ->columnSpanFull(),
+
+                        Placeholder::make('')
+                            ->content(function ($record) {
+                                if (!$record || !$record->fecha_hora_inicio_otros) {
                                     return new HtmlString('<p>Estado actual: <strong>Sin iniciar</strong></p>');
                                 }
 
-                                $estado = $record->fecha_hora_fin_averia ? 'Finalizado' : 'Trabajando';
-                                $totalMinutos = Carbon::parse($record->getRawOriginal('fecha_hora_inicio_averia'))
+                                $estado = $record->fecha_hora_fin_otros ? 'Finalizado' : 'Trabajando';
+                                $totalMinutos = Carbon::parse($record->getRawOriginal('fecha_hora_inicio_otros'))
                                     ->diffInMinutes(
-                                        $record->fecha_hora_fin_averia
-                                        ? Carbon::parse($record->getRawOriginal('fecha_hora_fin_averia'))
+                                        $record->fecha_hora_fin_otros
+                                        ? Carbon::parse($record->getRawOriginal('fecha_hora_fin_otros'))
                                         : now()
                                     );
 
@@ -138,15 +96,15 @@ class ParteTrabajoSuministroAveriaResource extends Resource
                                     default => '❓',
                                 };
 
-                                $inicio = Carbon::parse($record->getRawOriginal('fecha_hora_inicio_averia'));
-                                $fin = $record->fecha_hora_fin_averia ? Carbon::parse($record->getRawOriginal('fecha_hora_fin_averia')) : null;
+                                $inicio = Carbon::parse($record->getRawOriginal('fecha_hora_inicio_otros'));
+                                $fin = $record->fecha_hora_fin_otros ? Carbon::parse($record->getRawOriginal('fecha_hora_fin_otros')) : null;
 
-                                $gpsInicio = $record->gps_inicio_averia
-                                    ? ' (<a href="https://maps.google.com/?q=' . $record->gps_inicio_averia . '" target="_blank" class="text-blue-600 underline">📍 Ver ubicación</a>)'
+                                $gpsInicio = $record->gps_inicio_otros
+                                    ? ' (<a href="https://maps.google.com/?q=' . $record->gps_inicio_otros . '" target="_blank" class="text-blue-600 underline">📍 Ver ubicación</a>)'
                                     : '';
 
-                                $gpsFin = $record->gps_fin_averia
-                                    ? ' (<a href="https://maps.google.com/?q=' . $record->gps_fin_averia . '" target="_blank" class="text-blue-600 underline">📍 Ver ubicación</a>)'
+                                $gpsFin = $record->gps_fin_otros
+                                    ? ' (<a href="https://maps.google.com/?q=' . $record->gps_fin_otros . '" target="_blank" class="text-blue-600 underline">📍 Ver ubicación</a>)'
                                     : '';
 
                                 $tabla = '
@@ -186,7 +144,7 @@ class ParteTrabajoSuministroAveriaResource extends Resource
                             return false;
 
                         return (
-                            $record->fecha_hora_inicio_averia && !$record->fecha_hora_fin_averia
+                            $record->fecha_hora_inicio_otros && !$record->fecha_hora_fin_otros
                         );
                     })
                     ->schema([
@@ -198,24 +156,24 @@ class ParteTrabajoSuministroAveriaResource extends Resource
                                 ->visible(
                                     fn($record) =>
                                     $record &&
-                                    $record->fecha_hora_inicio_averia &&
-                                    !$record->fecha_hora_fin_averia
+                                    $record->fecha_hora_inicio_otros &&
+                                    !$record->fecha_hora_fin_otros
                                 )
                                 ->button()
                                 ->modalHeading('Finalizar trabajo')
                                 ->modalSubmitActionLabel('Finalizar')
                                 ->modalWidth('xl')
                                 ->form([
-                                    TextInput::make('gps_fin_averia')
+                                    TextInput::make('gps_fin_otros')
                                         ->label('GPS')
                                         ->required(),
 
-                                    View::make('livewire.location-fin-averia'),
+                                    View::make('livewire.location-fin-otros'),
                                 ])
                                 ->action(function (array $data, $record) {
                                     $record->update([
-                                        'fecha_hora_fin_averia' => now(),
-                                        'gps_fin_averia' => $data['gps_fin_averia'],
+                                        'fecha_hora_fin_otros' => now(),
+                                        'gps_fin_otros' => $data['gps_fin_otros'],
                                     ]);
 
                                     Notification::make()
@@ -248,17 +206,6 @@ class ParteTrabajoSuministroAveriaResource extends Resource
                     })
                     ->weight(FontWeight::Bold)
                     ->searchable(),
-
-                TextColumn::make('tipo')
-                    ->label('Tipo')
-                    ->formatStateUsing(function ($state) {
-                        return match ($state) {
-                            'averia' => 'Avería',
-                            'mantenimiento' => 'Mantenimiento',
-                            default => ucfirst($state),
-                        };
-                    })
-                    ->searchable(),
             ])
             ->filters([
                 Tables\Filters\TrashedFilter::make(),
@@ -287,10 +234,10 @@ class ParteTrabajoSuministroAveriaResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListParteTrabajoSuministroAverias::route('/'),
-            'create' => Pages\CreateParteTrabajoSuministroAveria::route('/create'),
-            'view' => Pages\ViewParteTrabajoSuministroAveria::route('/{record}'),
-            'edit' => Pages\EditParteTrabajoSuministroAveria::route('/{record}/edit'),
+            'index' => Pages\ListParteTrabajoSuministroOtros::route('/'),
+            'create' => Pages\CreateParteTrabajoSuministroOtros::route('/create'),
+            'view' => Pages\ViewParteTrabajoSuministroOtros::route('/{record}'),
+            'edit' => Pages\EditParteTrabajoSuministroOtros::route('/{record}/edit'),
         ];
     }
 

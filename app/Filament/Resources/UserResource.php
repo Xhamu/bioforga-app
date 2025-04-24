@@ -170,7 +170,8 @@ class UserResource extends Resource
                     Tables\Actions\BulkActionGroup::make([
                         Tables\Actions\DeleteBulkAction::make(),
                     ]),
-                ]);
+                ])
+                ->defaultSort('created_at', 'desc');
         } else {
             return $table
                 ->defaultGroup('proveedor.razon_social')
@@ -208,7 +209,8 @@ class UserResource extends Resource
                     Tables\Actions\BulkActionGroup::make([
                         Tables\Actions\DeleteBulkAction::make(),
                     ]),
-                ]);
+                ])
+                ->defaultSort('created_at', 'desc');
         }
     }
 

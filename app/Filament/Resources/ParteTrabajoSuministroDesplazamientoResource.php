@@ -144,7 +144,7 @@ class ParteTrabajoSuministroDesplazamientoResource extends Resource
                                 ->button()
                                 ->modalHeading('Finalizar desplazamiento')
                                 ->modalSubmitActionLabel('Finalizar')
-                                ->modalWidth('3xl')
+                                ->modalWidth('xl')
                                 ->form([
                                     TextInput::make('gps_fin_desplazamiento')
                                         ->label('GPS')

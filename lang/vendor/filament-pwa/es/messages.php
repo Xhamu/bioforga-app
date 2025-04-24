@@ -1,0 +1,48 @@
+<?php
+
+return [
+    "sections" => [
+        "general" => "General",
+        "style" => "Estilo",
+        "icons" => "Iconos",
+        "splash" => "Pantallas de inicio",
+        "shortcuts" => "Atajos",
+    ],
+    "settings" => [
+        "title" => "Aplicación Web Progresiva",
+        "description" => "Configura tu aplicación web progresiva",
+    ],
+    "form" => [
+        "pwa_app_name" => "Nombre de la aplicación",
+        "pwa_short_name" => "Nombre corto",
+        "pwa_start_url" => "URL de inicio",
+        "pwa_background_color" => "Color de fondo",
+        "pwa_theme_color" => "Color del tema",
+        "pwa_status_bar" => "Barra de estado",
+        "pwa_display" => "Visualización",
+        "pwa_orientation" => "Orientación",
+        "pwa_icons_72x72" => "Icono 72x72",
+        "pwa_icons_96x96" => "Icono 96x96",
+        "pwa_icons_128x128" => "Icono 128x128",
+        "pwa_icons_144x144" => "Icono 144x144",
+        "pwa_icons_152x152" => "Icono 152x152",
+        "pwa_icons_192x192" => "Icono 192x192",
+        "pwa_icons_384x384" => "Icono 384x384",
+        "pwa_icons_512x512" => "Icono 512x512",
+        "pwa_splash_640x1136" => "Pantalla 640x1136",
+        "pwa_splash_750x1334" => "Pantalla 750x1334",
+        "pwa_splash_828x1792" => "Pantalla 828x1792",
+        "pwa_splash_1125x2436" => "Pantalla 1125x2436",
+        "pwa_splash_1242x2208" => "Pantalla 1242x2208",
+        "pwa_splash_1242x2688" => "Pantalla 1242x2688",
+        "pwa_splash_1536x2048" => "Pantalla 1536x2048",
+        "pwa_splash_1668x2224" => "Pantalla 1668x2224",
+        "pwa_splash_1668x2388" => "Pantalla 1668x2388",
+        "pwa_splash_2048x2732" => "Pantalla 2048x2732",
+        "pwa_shortcuts" => "Atajos",
+        "pwa_shortcuts_name" => "Nombre",
+        "pwa_shortcuts_description" => "Descripción",
+        "pwa_shortcuts_url" => "URL",
+        "pwa_shortcuts_icon" => "Icono",
+    ]
+];

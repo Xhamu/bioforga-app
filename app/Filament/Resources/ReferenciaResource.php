@@ -266,7 +266,8 @@ class ReferenciaResource extends Resource
                         Tables\Actions\ForceDeleteBulkAction::make(),
                         Tables\Actions\RestoreBulkAction::make(),
                     ]),
-                ]);
+                ])
+                ->defaultSort('created_at', 'desc');
         } else {
             return $table
                 ->columns([
@@ -293,7 +294,8 @@ class ReferenciaResource extends Resource
                         Tables\Actions\ForceDeleteBulkAction::make(),
                         Tables\Actions\RestoreBulkAction::make(),
                     ]),
-                ]);
+                ])
+                ->defaultSort('created_at', 'desc');
         }
     }
 

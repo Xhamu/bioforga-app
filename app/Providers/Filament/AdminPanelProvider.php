@@ -42,9 +42,10 @@ class AdminPanelProvider extends PanelProvider
 
             ->darkMode(false)
 
-            ->renderHook('panels::body.end', fn () => view('components.gps-global-script'))
+            ->renderHook('panels::body.end', fn() => view('components.gps-global-script'))
 
             ->plugins([
+                \TomatoPHP\FilamentPWA\FilamentPWAPlugin::make(),
                 FilamentShieldPlugin::make()
                     ->gridColumns([
                         'default' => 1,

@@ -295,7 +295,7 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                                 ->button()
                                 ->modalHeading('Finalizar trabajo')
                                 ->modalSubmitActionLabel('Finalizar')
-                                ->modalWidth('3xl')
+                                ->modalWidth('xl')
                                 ->form([
                                     TextInput::make('horas_encendido')->numeric()->required(),
                                     TextInput::make('horas_rotor')->numeric()->required(),
