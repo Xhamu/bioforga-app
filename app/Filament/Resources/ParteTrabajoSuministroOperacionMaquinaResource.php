@@ -101,7 +101,7 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                             ->searchable()
                             ->afterStateHydrated(function (callable $get, callable $set, $state) {
                                 if ($state)
-                                    return; // ya tiene valor, no hacemos nada
+                                    return;
                     
                                 $maquinaId = $get('maquina_id');
 

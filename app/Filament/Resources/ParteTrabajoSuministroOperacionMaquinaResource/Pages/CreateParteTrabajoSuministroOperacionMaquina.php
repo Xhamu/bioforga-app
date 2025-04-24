@@ -34,14 +34,15 @@ class CreateParteTrabajoSuministroOperacionMaquina extends CreateRecord
                                 ->where('user_id', $usuario->id)
                                 ->pluck('referencia_id');
 
-                            // Si tiene referencias asignadas, filtramos por ellas
                             $referencias = $referenciasIds->isNotEmpty()
                                 ? Referencia::whereIn('id', $referenciasIds)->with('proveedor')->get()
                                 : Referencia::with('proveedor')->get();
 
                             return $referencias->mapWithKeys(function ($referencia) {
                                 return [
-                                    $referencia->id => "{$referencia->referencia} | {$referencia->proveedor->razon_social} ({$referencia->monte_parcela}, {$referencia->ayuntamiento})"
+                                    $referencia->id => "{$referencia->referencia} | " .
+                                        ($referencia->proveedor?->razon_social ?? $referencia->cliente?->razon_social ?? 'Sin razón social') .
+                                        " ({$referencia->monte_parcela}, {$referencia->ayuntamiento})"
                                 ];
                             });
                         })
@@ -56,7 +57,7 @@ class CreateParteTrabajoSuministroOperacionMaquina extends CreateRecord
                     View::make('livewire.location-inicio-trabajo'),
                 ])
                 ->action(function (array $data) {
-                    $this->form->fill(); // rellena lo que ya hay en el formulario
+                    $this->form->fill();
         
                     $formData = array_merge(
                         $this->form->getState(),
