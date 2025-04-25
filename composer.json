@@ -17,7 +17,8 @@
         "laravel/tinker": "^2.9",
         "pxlrbt/filament-activity-log": "^1.1",
         "spatie/laravel-activitylog": "^4.10",
-        "stechstudio/filament-impersonate": "^3.15"
+        "stechstudio/filament-impersonate": "^3.15",
+        "tomatophp/filament-pwa": "^1.0"
     },
     "require-dev": {
         "doctrine/dbal": "^4.2",

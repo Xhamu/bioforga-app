@@ -156,7 +156,8 @@ class PedidoResource extends Resource
                         Tables\Actions\ForceDeleteBulkAction::make(),
                         Tables\Actions\RestoreBulkAction::make(),
                     ]),
-                ]);
+                ])
+                ->defaultSort('created_at', 'desc');
         } else {
             return $table
                 ->columns([
@@ -207,7 +208,8 @@ class PedidoResource extends Resource
                         Tables\Actions\ForceDeleteBulkAction::make(),
                         Tables\Actions\RestoreBulkAction::make(),
                     ]),
-                ]);
+                ])
+                ->defaultSort('created_at', 'desc');
         }
     }
 

@@ -40,73 +40,76 @@
             const ubicacionInput = document.querySelector('input[id="data.ubicacion_gps"]');
             const provinciaInput = document.querySelector('input[id="data.provincia"]');
             const ayuntamientoInput = document.querySelector('input[id="data.ayuntamiento"]');
-
             const referenciaInput = document.querySelector('input[id="data.referencia"]');
+            const tipoSelect = document.getElementById('referencia-select'); // SUMINISTRO o SERVICIO
 
             locationButton.addEventListener('click', function() {
-                if (navigator.geolocation) {
-                    navigator.geolocation.getCurrentPosition(function(position) {
+                if (!navigator.geolocation) {
+                    alert("La geolocalización no es compatible con este navegador.");
+                    return;
+                }
+
+                navigator.geolocation.getCurrentPosition(
+                    function(position) {
                         const lat = position.coords.latitude;
                         const lon = position.coords.longitude;
                         const ubicacion = `${lat}, ${lon}`;
 
+                        if (ubicacionInput) {
+                            ubicacionInput.value = ubicacion;
+                            ubicacionInput.dispatchEvent(new Event('input', {
+                                bubbles: true
+                            }));
+                        }
+
                         fetch(
-                                `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&addressdetails=1`
-                            )
+                                `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&addressdetails=1`)
                             .then(response => response.json())
                             .then(data => {
-                                if (data) {
-                                    const provincia = data.address.province ||
-                                        'Provincia desconocida';
-                                    const ayuntamiento = data.address.town ||
-                                        'Ayuntamiento desconocido';
+                                const provincia = data?.address?.province ??
+                                'Provincia desconocida';
+                                const ayuntamiento = data?.address?.town ??
+                                    'Ayuntamiento desconocido';
 
-                                    if (referenciaInput) {
-                                        if (!referenciaInput.value.includes('SU')) {
-                                            const provinciaAbrev = provincia.slice(0, 2)
-                                                .toUpperCase();
-                                            const ayuntamientoAbrev = ayuntamiento.slice(0, 2)
-                                                .toUpperCase();
+                                if (provinciaInput) {
+                                    provinciaInput.value = provincia;
+                                    provinciaInput.dispatchEvent(new Event('input', {
+                                        bubbles: true
+                                    }));
+                                }
 
-                                            referenciaInput.value = referenciaInput.value +
-                                                provinciaAbrev + ayuntamientoAbrev;
-                                            referenciaInput.dispatchEvent(new Event('input', {
-                                                bubbles: true
-                                            }));
-                                        }
-                                    }
+                                if (ayuntamientoInput) {
+                                    ayuntamientoInput.value = ayuntamiento;
+                                    ayuntamientoInput.dispatchEvent(new Event('input', {
+                                        bubbles: true
+                                    }));
+                                }
 
-                                    if (provinciaInput) {
-                                        provinciaInput.value = provincia;
-                                        provinciaInput.dispatchEvent(new Event('input', {
-                                            bubbles: true
-                                        }));
-                                    }
+                                if (referenciaInput && tipoSelect?.value === 'servicio') {
+                                    const fecha = new Date();
+                                    const formatted = fecha.getFullYear().toString().slice(-2) +
+                                        (fecha.getMonth() + 1).toString().padStart(2, '0') +
+                                        fecha.getDate().toString().padStart(2, '0');
 
-                                    if (ayuntamientoInput) {
-                                        ayuntamientoInput.value = ayuntamiento;
-                                        ayuntamientoInput.dispatchEvent(new Event('input', {
-                                            bubbles: true
-                                        }));
-                                    }
+                                    const provinciaAbrev = provincia.slice(0, 2).toUpperCase();
+                                    const ayuntamientoAbrev = ayuntamiento.slice(0, 2)
+                                .toUpperCase();
 
-                                    if (ubicacionInput) {
-                                        ubicacionInput.value = ubicacion;
-                                        ubicacionInput.dispatchEvent(new Event('input', {
-                                            bubbles: true
-                                        }));
-                                    }
+                                    referenciaInput.value =
+                                        `${ayuntamientoAbrev}${provinciaAbrev}${formatted}`;
+                                    referenciaInput.dispatchEvent(new Event('input', {
+                                        bubbles: true
+                                    }));
                                 }
                             })
                             .catch(error => {
-                                console.error(error);
+                                console.error("Error al obtener datos de ubicación:", error);
                             });
-                    }, function() {
+                    },
+                    function() {
                         alert("No se ha podido obtener la ubicación.");
-                    });
-                } else {
-                    alert("La geolocalización no es compatible con este navegador.");
-                }
+                    }
+                );
             });
         });
     </script>

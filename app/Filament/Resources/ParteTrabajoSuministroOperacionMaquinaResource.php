@@ -101,7 +101,7 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                             ->searchable()
                             ->afterStateHydrated(function (callable $get, callable $set, $state) {
                                 if ($state)
-                                    return; // ya tiene valor, no hacemos nada
+                                    return;
                     
                                 $maquinaId = $get('maquina_id');
 
@@ -295,7 +295,7 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                                 ->button()
                                 ->modalHeading('Finalizar trabajo')
                                 ->modalSubmitActionLabel('Finalizar')
-                                ->modalWidth('3xl')
+                                ->modalWidth('xl')
                                 ->form([
                                     TextInput::make('horas_encendido')->numeric()->required(),
                                     TextInput::make('horas_rotor')->numeric()->required(),

@@ -9,6 +9,12 @@
         const inicioDesplazamientoBtn = e.target.closest('#location-inicio-desplazamiento');
         const finDesplazamientoBtn = e.target.closest('#location-fin-desplazamiento');
 
+        const inicioAveriaBtn = e.target.closest('#location-inicio-averia');
+        const finAveriaBtn = e.target.closest('#location-fin-averia');
+
+        const inicioOtrosBtn = e.target.closest('#location-inicio-otros');
+        const finOtrosBtn = e.target.closest('#location-fin-otros');
+
         // SUMINISTROS DEL TRANSPORTISTA
         // GPS de inicio
         if (inicioBtn) {
@@ -50,6 +56,34 @@
         // GPS de fin trabajo
         if (finDesplazamientoBtn) {
             const gpsInput = document.querySelector('input[id$="gps_fin_desplazamiento"]');
+            if (gpsInput) requestLocationAndFill(gpsInput);
+            return;
+        }
+
+        // AVERIAS MANTENIMIENTOS
+        if (inicioAveriaBtn) {
+            const gpsInput = document.querySelector('input[id$="gps_inicio_averia"]');
+            if (gpsInput) requestLocationAndFill(gpsInput);
+            return;
+        }
+
+        // GPS de fin trabajo
+        if (finAveriaBtn) {
+            const gpsInput = document.querySelector('input[id$="gps_fin_averia"]');
+            if (gpsInput) requestLocationAndFill(gpsInput);
+            return;
+        }
+
+        // OTROS
+        if (inicioOtrosBtn) {
+            const gpsInput = document.querySelector('input[id$="gps_inicio_otros"]');
+            if (gpsInput) requestLocationAndFill(gpsInput);
+            return;
+        }
+
+        // GPS de fin trabajo
+        if (finOtrosBtn) {
+            const gpsInput = document.querySelector('input[id$="gps_fin_otros"]');
             if (gpsInput) requestLocationAndFill(gpsInput);
             return;
         }

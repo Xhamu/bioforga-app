@@ -22,7 +22,8 @@ class Camion extends Model
         'modelo',
         'matricula_cabeza',
         'matricula_remolque',
-        'proveedor_id'
+        'proveedor_id',
+        'es_propio'
     ];
 
     /**
