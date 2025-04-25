@@ -79,23 +79,21 @@ class ReferenciaResource extends Resource
                     ->afterStateUpdated(function ($state, callable $set, callable $get) {
                         if ($state) {
                             $referencia = $get('referencia') ?? '';
-
-                            $referencia = preg_replace('/\b(CA|SA|EX|OT)\b/', '', $referencia);
-
-                            if (!str_starts_with($referencia, 'SU')) {
-                                $referencia = 'SU';
-                            }
-
-                            preg_match('/(\d{6})$/', $referencia, $matches);
-                            $fecha = $matches[1] ?? '';
-
-                            $nuevaReferencia = 'SU' . $state . $fecha;
-
+                    
+                            // Separar partes con regex (sector + 'SU' + formato anterior + fecha + contador)
+                            preg_match('/^(?<sector>\d{2})SU(?:CA|SA|EX|OT)?(?<fecha>\d{6})(?<contador>\d{3})$/', $referencia, $matches);
+                    
+                            $sector = $matches['sector'] ?? '01'; // Valor por defecto si no hay sector
+                            $fecha = $matches['fecha'] ?? now()->format('dmy');
+                            $contador = $matches['contador'] ?? '001';
+                    
+                            $nuevaReferencia = $sector . 'SU' . $state . $fecha . $contador;
+                    
                             $set('referencia', $nuevaReferencia);
                         } else {
                             $set('referencia', '');
                         }
-                    })
+                    })                    
                     ->visible(function ($get) {
                         return str_contains($get('referencia'), 'SU');
                     }),
@@ -110,8 +108,7 @@ class ReferenciaResource extends Resource
                             ->label('Monte / Parcela')
                             ->required(),
                         Forms\Components\TextInput::make('ubicacion_gps')
-                            ->label('GPS')
-                            ->required(),
+                            ->label('GPS'),
                         View::make('livewire.get-location-button')
                             ->visible(function ($state) {
                                 return !isset($state['id']);
@@ -119,6 +116,30 @@ class ReferenciaResource extends Resource
                             ->columnSpanFull(),
                     ])
                     ->columns(2),
+
+                Forms\Components\Select::make('sector')
+                    ->label('Sector')
+                    ->searchable()
+                    ->options([
+                        '01' => 'Zona Norte',
+                        '02' => 'Zona Sur',
+                        '03' => 'Andalucía',
+                        '04' => 'Huelva',
+                        '05' => 'Otros',
+                    ])
+                    ->required()
+                    ->columnSpanFull()
+                    ->live()
+                    ->afterStateUpdated(function ($state, callable $set, callable $get) {
+                        $referencia = $get('referencia') ?? '';
+
+                        $referencia = preg_replace('/^(01|02|03|04|05)/', '', $referencia);
+
+                        $set('referencia', $state . $referencia);
+                    })
+                    ->visible(function ($get) {
+                        return !empty($get('referencia'));  // Se muestra solo si hay referencia
+                    }),
 
                 Forms\Components\Section::make('Intervinientes')
                     ->schema([
@@ -176,6 +197,21 @@ class ReferenciaResource extends Resource
                         return !empty($get('referencia'));  // Se muestra solo si hay referencia
                     }),
 
+                Forms\Components\Section::make('Tarifa')
+                    ->schema([
+                        Forms\Components\Select::make('tarifa')
+                            ->label('')
+                            ->options([
+                                'toneladas' => 'Toneladas',
+                                'm3' => 'Metros cúbicos',
+                            ])
+                            ->searchable()
+                            ->nullable(),
+                    ])->columns(1)
+                    ->visible(function ($get) {
+                        return !empty($get('referencia'));  // Se muestra solo si hay referencia
+                    }),
+
                 Forms\Components\Section::make('Contacto')
                     ->schema([
                         Forms\Components\TextInput::make('contacto_nombre')
@@ -218,6 +254,16 @@ class ReferenciaResource extends Resource
                                 'en_proceso' => 'En proceso',
                             ])
                             ->required(),
+
+                        Forms\Components\Select::make('en_negociacion')
+                            ->label('En negociación')
+                            ->searchable()
+                            ->options([
+                                'confirmado' => 'Confirmado',
+                                'sin_confirmar' => 'Sin confirmar',
+                            ])
+                            ->required(),
+
                         Forms\Components\Textarea::make('observaciones')
                             ->nullable(),
                     ])->columns(1)

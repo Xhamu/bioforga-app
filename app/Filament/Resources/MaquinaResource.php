@@ -250,6 +250,21 @@ class MaquinaResource extends Resource
                                     'required' => 'El :attribute es obligatorio.',
                                 ])
                                 ->columnSpan(['default' => 2, 'lg' => 1]),
+
+                            Select::make('tipo_consumo')
+                                ->label(__('Tipo de consumo'))
+                                ->required()
+                                ->rules('required')
+                                ->searchable()
+                                ->options([
+                                    'gasoil' => 'Gasoil',
+                                    'muela' => 'Muela',
+                                    'cuchilla' => 'Cuchilla',
+                                ])
+                                ->validationMessages([
+                                    'required' => 'El :attribute es obligatorio.',
+                                ])
+                                ->columnSpan(['default' => 1, 'lg' => 2]),
                         ])
                         ->columns(2)
                         ->columnSpan(2),

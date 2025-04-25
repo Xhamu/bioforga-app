@@ -1,5 +1,4 @@
 <div>
-
     <select id="referencia-select"
         class="w-full px-3 py-2 text-sm font-medium border-gray-300 rounded-lg shadow-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500 focus:outline-none">
         <option value="">Selecciona una opción</option>
@@ -15,24 +14,40 @@
             if (referenciaSelect && referenciaInput) {
                 referenciaSelect.addEventListener('change', function() {
                     const today = new Date();
-                    const formattedDate = today.getFullYear().toString().slice(-2) +
-                        (today.getMonth() + 1).toString().padStart(2, '0') +
-                        today.getDate().toString().padStart(2, '0');
+                    const formattedDate =
+                        today.getDate().toString().padStart(2, '0') + // DD
+                        (today.getMonth() + 1).toString().padStart(2, '0') + // MM
+                        today.getFullYear().toString().slice(-2); // YY
 
+                    let base = '';
                     if (referenciaSelect.value === 'suministro') {
-                        referenciaInput.value = 'SU' + formattedDate;
+                        base = 'SU' + formattedDate;
                     } else if (referenciaSelect.value === 'servicio') {
-                        referenciaInput.value = formattedDate;
+                        base = formattedDate;
                     } else {
                         referenciaInput.value = '';
+                        return;
                     }
 
-                    referenciaInput.dispatchEvent(new Event('input', {
-                        bubbles: true
-                    }));
+                    fetch('/contador-referencias-hoy')
+                        .then(res => res.json())
+                        .then(data => {
+                            const contador = String(data.total + 1).padStart(3, '0');
+                            referenciaInput.value = base + contador;
+                            referenciaInput.dispatchEvent(new Event('input', {
+                                bubbles: true
+                            }));
+                        })
+                        .catch(error => {
+                            console.error('Error al obtener el contador de referencias:', error);
+                            referenciaInput.value = base + '001';
+                            referenciaInput.dispatchEvent(new Event('input', {
+                                bubbles: true
+                            }));
+                        });
                 });
             } else {
-                console.error('El campo de referencia o el select no se encontraron.');
+                console.error('No se encontraron el select o el input de referencia.');
             }
         });
     </script>

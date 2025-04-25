@@ -6,6 +6,7 @@ use App\Filament\Resources\CamionResource\Pages;
 use App\Filament\Resources\CamionResource\RelationManagers;
 use App\Models\Camion;
 use Filament\Forms;
+use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -80,16 +81,18 @@ class CamionResource extends Resource
 
                         Select::make('proveedor_id')
                             ->label(__('Proveedor'))
-                            ->required()
-                            ->rules('required')
+                            ->required(fn(callable $get) => !$get('es_propio'))
                             ->searchable()
-                            ->options(function () {
-                                return \App\Models\Proveedor::all()->pluck('razon_social', 'id')->toArray();
-                            })
+                            ->options(fn() => \App\Models\Proveedor::all()->pluck('razon_social', 'id')->toArray())
                             ->validationMessages([
                                 'required' => 'El :attribute es obligatorio.',
                             ])
                             ->columnSpan(['default' => 2, 'lg' => 2]),
+
+                        Checkbox::make('es_propio')
+                            ->label('Propio (Vehículo de la empresa)')
+                            ->reactive(),
+
                     ])
                     ->columns(2)
                     ->columnSpan(2),

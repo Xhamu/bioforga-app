@@ -2,9 +2,9 @@
 
 namespace App\Filament\Resources;
 
-use App\Filament\Resources\ParteTrabajoTallerMaquinariaResource\Pages;
-use App\Filament\Resources\ParteTrabajoTallerMaquinariaResource\RelationManagers;
-use App\Models\ParteTrabajoTallerMaquinaria;
+use App\Filament\Resources\ParteTrabajoTallerVehiculosResource\Pages;
+use App\Filament\Resources\ParteTrabajoTallerVehiculosResource\RelationManagers;
+use App\Models\ParteTrabajoTallerVehiculos;
 use Carbon\Carbon;
 use Filament\Facades\Filament;
 use Filament\Forms;
@@ -25,15 +25,15 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\HtmlString;
 
-class ParteTrabajoTallerMaquinariaResource extends Resource
+class ParteTrabajoTallerVehiculosResource extends Resource
 {
-    protected static ?string $model = ParteTrabajoTallerMaquinaria::class;
+    protected static ?string $model = ParteTrabajoTallerVehiculos::class;
     protected static ?string $navigationIcon = 'heroicon-o-clock';
     protected static ?string $navigationGroup = 'Partes de trabajo';
     protected static ?int $navigationSort = 2;
-    protected static ?string $slug = 'partes-trabajo-taller-maquinaria';
-    public static ?string $label = 'taller (maquinaria)';
-    public static ?string $pluralLabel = 'Taller (Maquinaria)';
+    protected static ?string $slug = 'partes-trabajo-taller-vehiculos';
+    public static ?string $label = 'taller (vehículo)';
+    public static ?string $pluralLabel = 'Taller (Vehículos)';
     public static function form(Form $form): Form
     {
         return $form
@@ -53,65 +53,65 @@ class ParteTrabajoTallerMaquinariaResource extends Resource
                     ->columns(1),
 
                 Section::make('Datos del trabajo')
-                    ->visible(fn($record) => $record && $record->fecha_hora_inicio_taller_maquinaria)
+                    ->visible(fn($record) => $record && $record->fecha_hora_inicio_taller_vehiculos)
                     ->schema([
                         Placeholder::make('')
                             ->content(function ($record) {
                                 if (
                                     !$record ||
                                     !$record->taller ||
-                                    !$record->maquina_id ||
-                                    !$record->horas_servicio
+                                    !$record->vehiculo_id ||
+                                    !$record->kilometros
                                 ) {
                                     return null;
                                 }
 
                                 $tallerNombre = $record->taller?->nombre ?? '-';
-                                $maquina = $record->maquina;
-                                $maquinaLabel = $maquina ? "{$maquina->marca} {$maquina->modelo}" : '-';
-                                $horas = $record->horas_servicio;
+                                $vehiculo = $record->vehiculo;
+                                $vehiculoLabel = $vehiculo ? "{$vehiculo->marca} {$vehiculo->modelo}" : '-';
+                                $kilometros = $record->kilometros;
                                 $tipoActuacion = $record->tipo_actuacion ?? '-';
                                 $trabajoRealizado = $record->trabajo_realizado ?? '-';
                                 $recambiosUtilizados = $record->recambios_utilizados ?? '-';
 
                                 $tabla = '
-                                    <div class="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
-                                        <table class="w-full text-sm text-left text-gray-700 dark:text-gray-200">
-                                            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-                                                <tr class="bg-gray-50 dark:bg-gray-800">
-                                                    <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Taller</th>
-                                                    <td class="px-4 py-3 font-semibold text-gray-900 dark:text-white">' . e($tallerNombre) . '</td>
-                                                </tr>
-                                                <tr>
-                                                    <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Máquina</th>
-                                                    <td class="px-4 py-3">' . e($maquinaLabel) . '</td>
-                                                </tr>
-                                                <tr>
-                                                    <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Horas de servicio</th>
-                                                    <td class="px-4 py-3">' . e($horas) . 'h</td>
-                                                </tr>';
+                                <div class="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
+                                    <table class="w-full text-sm text-left text-gray-700 dark:text-gray-200">
+                                        <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                                            <tr class="bg-gray-50 dark:bg-gray-800">
+                                                <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Taller</th>
+                                                <td class="px-4 py-3 font-semibold text-gray-900 dark:text-white">' . e($tallerNombre) . '</td>
+                                            </tr>
+                                            <tr>
+                                                <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Máquina</th>
+                                                <td class="px-4 py-3">' . e($vehiculoLabel) . '</td>
+                                            </tr>
+                                            <tr>
+                                                <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Kilometraje</th>
+                                                <td class="px-4 py-3">' . e($kilometros) . 'km</td>
+                                            </tr>';
 
-                                if ($record->fecha_hora_fin_taller_maquinaria) {
+                                if ($record->fecha_hora_fin_taller_vehiculos) {
                                     $tabla .= '
-                                        <tr>
-                                            <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Tipo de actuación</th>
-                                            <td class="px-4 py-3">' . e(ucfirst($tipoActuacion)) . '</td>
-                                        </tr>
-                                        <tr>
-                                            <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Trabajo realizado</th>
-                                            <td class="px-4 py-3">' . e($trabajoRealizado) . '</td>
-                                        </tr>
-                                        <tr>
-                                            <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Recambios utilizados</th>
-                                            <td class="px-4 py-3">' . e($recambiosUtilizados) . '</td>
-                                        </tr>';
+                                    <tr>
+                                        <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Tipo de actuación</th>
+                                        <td class="px-4 py-3">' . e(ucfirst($tipoActuacion)) . '</td>
+                                    </tr>
+                                    <tr>
+                                        <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Trabajo realizado</th>
+                                        <td class="px-4 py-3">' . e($trabajoRealizado) . '</td>
+                                    </tr>
+                                    <tr>
+                                        <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Recambios utilizados</th>
+                                        <td class="px-4 py-3">' . e($recambiosUtilizados) . '</td>
+                                    </tr>';
                                 }
 
                                 $tabla .= '
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                ';
+                                        </tbody>
+                                    </table>
+                                </div>
+                            ';
 
                                 return new HtmlString($tabla);
                             })
@@ -123,15 +123,15 @@ class ParteTrabajoTallerMaquinariaResource extends Resource
                     ->schema([
                         Placeholder::make('')
                             ->content(function ($record) {
-                                if (!$record || !$record->fecha_hora_inicio_taller_maquinaria) {
+                                if (!$record || !$record->fecha_hora_inicio_taller_vehiculos) {
                                     return new HtmlString('<p>Estado actual: <strong>Sin iniciar</strong></p>');
                                 }
 
-                                $estado = $record->fecha_hora_fin_taller_maquinaria ? 'Finalizado' : 'Trabajando';
-                                $totalMinutos = Carbon::parse($record->getRawOriginal('fecha_hora_inicio_taller_maquinaria'))
+                                $estado = $record->fecha_hora_fin_taller_vehiculos ? 'Finalizado' : 'Trabajando';
+                                $totalMinutos = Carbon::parse($record->getRawOriginal('fecha_hora_inicio_taller_vehiculos'))
                                     ->diffInMinutes(
-                                        $record->fecha_hora_fin_taller_maquinaria
-                                        ? Carbon::parse($record->getRawOriginal('fecha_hora_fin_taller_maquinaria'))
+                                        $record->fecha_hora_fin_taller_vehiculos
+                                        ? Carbon::parse($record->getRawOriginal('fecha_hora_fin_taller_vehiculos'))
                                         : now()
                                     );
 
@@ -144,41 +144,41 @@ class ParteTrabajoTallerMaquinariaResource extends Resource
                                     default => '❓',
                                 };
 
-                                $inicio = Carbon::parse($record->getRawOriginal('fecha_hora_inicio_taller_maquinaria'));
-                                $fin = $record->fecha_hora_fin_taller_maquinaria ? Carbon::parse($record->getRawOriginal('fecha_hora_fin_taller_maquinaria')) : null;
+                                $inicio = Carbon::parse($record->getRawOriginal('fecha_hora_inicio_taller_vehiculos'));
+                                $fin = $record->fecha_hora_fin_taller_vehiculos ? Carbon::parse($record->getRawOriginal('fecha_hora_fin_taller_vehiculos')) : null;
 
-                                $gpsInicio = $record->gps_inicio_taller_maquinaria
-                                    ? ' (<a href="https://maps.google.com/?q=' . $record->gps_inicio_taller_maquinaria . '" target="_blank" class="text-blue-600 underline">📍 Ver ubicación</a>)'
+                                $gpsInicio = $record->gps_inicio_taller_vehiculos
+                                    ? ' (<a href="https://maps.google.com/?q=' . $record->gps_inicio_taller_vehiculos . '" target="_blank" class="text-blue-600 underline">📍 Ver ubicación</a>)'
                                     : '';
 
-                                $gpsFin = $record->gps_fin_taller_maquinaria
-                                    ? ' (<a href="https://maps.google.com/?q=' . $record->gps_fin_taller_maquinaria . '" target="_blank" class="text-blue-600 underline">📍 Ver ubicación</a>)'
+                                $gpsFin = $record->gps_fin_taller_vehiculos
+                                    ? ' (<a href="https://maps.google.com/?q=' . $record->gps_fin_taller_vehiculos . '" target="_blank" class="text-blue-600 underline">📍 Ver ubicación</a>)'
                                     : '';
 
                                 $tabla = '
-                                    <div class="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
-                                        <table class="w-full text-sm text-left text-gray-700 dark:text-gray-200">
-                                            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-                                                <tr class="bg-gray-50 dark:bg-gray-800">
-                                                    <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Estado actual</th>
-                                                    <td class="px-4 py-3 font-semibold text-gray-900 dark:text-white">' . $emoji . ' ' . $estado . '</td>
-                                                </tr>
-                                                <tr>
-                                                    <th class="px-4 py-3">Hora de inicio</th>
-                                                    <td class="px-4 py-3">' . $inicio->format('H:i') . $gpsInicio . '</td>
-                                                </tr>
-                                                <tr>
-                                                    <th class="px-4 py-3">Hora de finalización</th>
-                                                    <td class="px-4 py-3">' . ($fin ? $fin->format('H:i') . $gpsFin : '-') . '</td>
-                                                </tr>
-                                                <tr class="bg-gray-50 dark:bg-gray-800 border-t">
-                                                    <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Tiempo total</th>
-                                                    <td class="px-4 py-3 font-semibold">' . $horas . 'h ' . $minutos . 'min</td>
-                                                </tr>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                ';
+                                <div class="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
+                                    <table class="w-full text-sm text-left text-gray-700 dark:text-gray-200">
+                                        <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                                            <tr class="bg-gray-50 dark:bg-gray-800">
+                                                <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Estado actual</th>
+                                                <td class="px-4 py-3 font-semibold text-gray-900 dark:text-white">' . $emoji . ' ' . $estado . '</td>
+                                            </tr>
+                                            <tr>
+                                                <th class="px-4 py-3">Hora de inicio</th>
+                                                <td class="px-4 py-3">' . $inicio->format('H:i') . $gpsInicio . '</td>
+                                            </tr>
+                                            <tr>
+                                                <th class="px-4 py-3">Hora de finalización</th>
+                                                <td class="px-4 py-3">' . ($fin ? $fin->format('H:i') . $gpsFin : '-') . '</td>
+                                            </tr>
+                                            <tr class="bg-gray-50 dark:bg-gray-800 border-t">
+                                                <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Tiempo total</th>
+                                                <td class="px-4 py-3 font-semibold">' . $horas . 'h ' . $minutos . 'min</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            ';
 
                                 return new HtmlString($tabla);
                             })
@@ -192,7 +192,7 @@ class ParteTrabajoTallerMaquinariaResource extends Resource
                             return false;
 
                         return (
-                            $record->fecha_hora_inicio_taller_maquinaria && !$record->fecha_hora_fin_taller_maquinaria
+                            $record->fecha_hora_inicio_taller_vehiculos && !$record->fecha_hora_fin_taller_vehiculos
                         );
                     })
                     ->schema([
@@ -204,8 +204,8 @@ class ParteTrabajoTallerMaquinariaResource extends Resource
                                 ->visible(
                                     fn($record) =>
                                     $record &&
-                                    $record->fecha_hora_inicio_taller_maquinaria &&
-                                    !$record->fecha_hora_fin_taller_maquinaria
+                                    $record->fecha_hora_inicio_taller_vehiculos &&
+                                    !$record->fecha_hora_fin_taller_vehiculos
                                 )
                                 ->button()
                                 ->modalHeading('Finalizar trabajo')
@@ -231,7 +231,7 @@ class ParteTrabajoTallerMaquinariaResource extends Resource
                                 ])
                                 ->action(function (array $data, $record) {
                                     $record->update([
-                                        'fecha_hora_fin_taller_maquinaria' => now(),
+                                        'fecha_hora_fin_taller_vehiculos' => now(),
                                         'tipo_actuacion' => $data['tipo_actuacion'],
                                         'trabajo_realizado' => $data['trabajo_realizado'],
                                         'recambios_utilizados' => $data['recambios_utilizados'],
@@ -306,10 +306,10 @@ class ParteTrabajoTallerMaquinariaResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListParteTrabajoTallerMaquinarias::route('/'),
-            'create' => Pages\CreateParteTrabajoTallerMaquinaria::route('/create'),
-            'view' => Pages\ViewParteTrabajoTallerMaquinaria::route('/{record}'),
-            'edit' => Pages\EditParteTrabajoTallerMaquinaria::route('/{record}/edit'),
+            'index' => Pages\ListParteTrabajoTallerVehiculos::route('/'),
+            'create' => Pages\CreateParteTrabajoTallerVehiculos::route('/create'),
+            'view' => Pages\ViewParteTrabajoTallerVehiculos::route('/{record}'),
+            'edit' => Pages\EditParteTrabajoTallerVehiculos::route('/{record}/edit'),
         ];
     }
 

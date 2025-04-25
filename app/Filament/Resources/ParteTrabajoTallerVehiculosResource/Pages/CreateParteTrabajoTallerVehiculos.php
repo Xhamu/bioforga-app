@@ -1,18 +1,17 @@
 <?php
 
-namespace App\Filament\Resources\ParteTrabajoTallerMaquinariaResource\Pages;
+namespace App\Filament\Resources\ParteTrabajoTallerVehiculosResource\Pages;
 
-use App\Filament\Resources\ParteTrabajoTallerMaquinariaResource;
+use App\Filament\Resources\ParteTrabajoTallerVehiculosResource;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\View;
-use Filament\Notifications\Notification;
-use Filament\Resources\Pages\CreateRecord;
+use Filament\Notifications\Notification;use Filament\Resources\Pages\CreateRecord;
 
-class CreateParteTrabajoTallerMaquinaria extends CreateRecord
+class CreateParteTrabajoTallerVehiculos extends CreateRecord
 {
-    protected static string $resource = ParteTrabajoTallerMaquinariaResource::class;
+    protected static string $resource = ParteTrabajoTallerVehiculosResource::class;
 
     public function getFormActions(): array
     {
@@ -32,18 +31,18 @@ class CreateParteTrabajoTallerMaquinaria extends CreateRecord
                         ->required(),
 
                     // Máquina (todas)
-                    Select::make('maquina_id')
-                        ->label('Máquina')
+                    Select::make('vehiculo_id')
+                        ->label('Vehículo')
                         ->options(function () {
-                            return \App\Models\Maquina::all()->mapWithKeys(function ($maquina) {
-                                return [$maquina->id => "{$maquina->marca} {$maquina->modelo}"];
+                            return \App\Models\Vehiculo::all()->mapWithKeys(function ($vehiculo) {
+                                return [$vehiculo->id => "{$vehiculo->marca} {$vehiculo->modelo}"];
                             })->toArray();
                         })
                         ->searchable()
                         ->required(),
 
-                    TextInput::make('horas_servicio')
-                        ->label('Horas de servicio')
+                    TextInput::make('kilometros')
+                        ->label('Kilometraje')
                         ->numeric()
                         ->minValue(0)
                         ->required(),
@@ -55,9 +54,9 @@ class CreateParteTrabajoTallerMaquinaria extends CreateRecord
                         $this->form->getState(),
                         [
                             'taller_id' => $data['taller_id'] ?? null,
-                            'maquina_id' => $data['maquina_id'] ?? null,
-                            'horas_servicio' => $data['horas_servicio'] ?? null,
-                            'fecha_hora_inicio_taller_maquinaria' => now(),
+                            'vehiculo_id' => $data['vehiculo_id'] ?? null,
+                            'kilometros' => $data['kilometros'] ?? null,
+                            'fecha_hora_inicio_taller_vehiculos' => now(),
                         ]
                     );
 
@@ -68,7 +67,7 @@ class CreateParteTrabajoTallerMaquinaria extends CreateRecord
                         ->title('Trabajo iniciado correctamente')
                         ->send();
 
-                    $this->redirect(ParteTrabajoTallerMaquinariaResource::getUrl('edit', ['record' => $this->record]));
+                    $this->redirect(ParteTrabajoTallerVehiculosResource::getUrl('edit', ['record' => $this->record]));
                 }),
         ];
     }

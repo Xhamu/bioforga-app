@@ -24,7 +24,8 @@ class Maquina extends Model
         'operario_id',
         'proveedor_id',
         'averias',
-        'mantenimientos'
+        'mantenimientos',
+        'tipo_consumo'
     ];
 
     protected $casts = [
