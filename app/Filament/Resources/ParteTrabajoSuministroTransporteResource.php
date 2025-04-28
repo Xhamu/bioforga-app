@@ -139,7 +139,11 @@ class ParteTrabajoSuministroTransporteResource extends Resource
 
                                                     return $referencias->mapWithKeys(function ($referencia) {
                                                         return [
-                                                            $referencia->id => "{$referencia->referencia} | {$referencia->proveedor->razon_social} ({$referencia->monte_parcela}, {$referencia->ayuntamiento})"
+                                                            $referencia->id => "{$referencia->referencia} | " .
+                                                                ($referencia->proveedor?->razon_social
+                                                                    ?? $referencia->cliente?->razon_social
+                                                                    ?? 'Sin origen') .
+                                                                " ({$referencia->monte_parcela}, {$referencia->ayuntamiento})"
                                                         ];
                                                     });
                                                 })
@@ -164,6 +168,8 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                                 ->success()
                                                 ->title('Carga iniciada correctamente')
                                                 ->send();
+
+                                            return redirect(request()->header('Referer')); // Recargar página
                                         })
                                         ->color('success');
                                 }
@@ -215,6 +221,8 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                                 ->success()
                                                 ->title('Carga finalizada correctamente')
                                                 ->send();
+
+                                            return redirect(request()->header('Referer')); // Recargar página
                                         })
                                         ->color('danger');
                                 }
@@ -279,6 +287,8 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                                 ->success()
                                                 ->title('Descarga registrada correctamente')
                                                 ->send();
+
+                                            return redirect(request()->header('Referer')); // Recargar página
                                         })
                                         ->color('primary');
                                 }
