@@ -138,7 +138,7 @@ class ReferenciaResource extends Resource
                         $set('referencia', $state . $referencia);
                     })
                     ->visible(function ($get) {
-                        return !empty($get('referencia'));  // Se muestra solo si hay referencia
+                        return !empty($get('referencia'));
                     }),
 
                 Forms\Components\Section::make('Intervinientes')
@@ -161,7 +161,7 @@ class ReferenciaResource extends Resource
                             }),
                     ])
                     ->visible(function ($get) {
-                        return !empty($get('referencia'));  // Se muestra solo si hay referencia
+                        return !empty($get('referencia'));
                     })
                     ->columns(1),
 
@@ -194,7 +194,7 @@ class ReferenciaResource extends Resource
                             ->required(),
                     ])->columns(3)
                     ->visible(function ($get) {
-                        return !empty($get('referencia'));  // Se muestra solo si hay referencia
+                        return !empty($get('referencia'));
                     }),
 
                 Forms\Components\Section::make('Tarifa')
@@ -209,7 +209,7 @@ class ReferenciaResource extends Resource
                             ->nullable(),
                     ])->columns(1)
                     ->visible(function ($get) {
-                        return !empty($get('referencia'));  // Se muestra solo si hay referencia
+                        return !empty($get('referencia'));
                     }),
 
                 Forms\Components\Section::make('Contacto')
@@ -225,7 +225,7 @@ class ReferenciaResource extends Resource
                             ->nullable(),
                     ])->columns(3)
                     ->visible(function ($get) {
-                        return !empty($get('referencia'));  // Se muestra solo si hay referencia
+                        return !empty($get('referencia'));
                     }),
 
                 Forms\Components\Section::make('Usuarios')
@@ -240,7 +240,7 @@ class ReferenciaResource extends Resource
                             ->visible(fn($get) => !empty($get('referencia'))),
                     ])->columns(1)
                     ->visible(function ($get) {
-                        return !empty($get('referencia'));  // Se muestra solo si hay referencia
+                        return !empty($get('referencia'));
                     }),
 
                 Forms\Components\Section::make('Estado')
@@ -268,7 +268,7 @@ class ReferenciaResource extends Resource
                             ->nullable(),
                     ])->columns(1)
                     ->visible(function ($get) {
-                        return !empty($get('referencia'));  // Se muestra solo si hay referencia
+                        return !empty($get('referencia'));
                     }),
             ]);
     }
