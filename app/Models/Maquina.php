@@ -25,10 +25,13 @@ class Maquina extends Model
         'proveedor_id',
         'averias',
         'mantenimientos',
-        'tipo_consumo'
+        'tipo_consumo',
+        'tipo_horas'
     ];
 
     protected $casts = [
+        'tipo_consumo' => 'array',
+        'tipo_horas' => 'array',
         'averias' => 'array',
         'mantenimientos' => 'array',
     ];

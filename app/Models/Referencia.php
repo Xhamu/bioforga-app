@@ -41,6 +41,10 @@ class Referencia extends Authenticatable
         'contacto_nombre',
         'contacto_telefono',
         'contacto_email',
+        'tipo_certificacion',
+        'tipo_certificacion_industrial',
+        'guia_sanidad',
+        'finca',
     ];
 
     public function proveedor()
