@@ -32,7 +32,9 @@ class ParteTrabajoSuministroAveria extends Model
         'fecha_hora_fin_averia',
         'gps_fin_averia',
 
-        'observaciones'
+        'observaciones',
+        'actuacion',
+        'taller_externo'
     ];
 
     protected $casts = [

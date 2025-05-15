@@ -44,6 +44,18 @@ class AdminPanelProvider extends PanelProvider
 
             ->renderHook('panels::body.end', fn() => view('components.gps-global-script'))
 
+            ->renderHook(
+                'panels::body.start',
+                fn() => '
+        <style>
+            .fi-main {
+                max-width: 100% !important;
+                margin-left: 0 !important;
+                margin-right: 0 !important;
+            }
+        </style>'
+            )
+
             ->plugins([
                 \TomatoPHP\FilamentPWA\FilamentPWAPlugin::make(),
                 FilamentShieldPlugin::make()

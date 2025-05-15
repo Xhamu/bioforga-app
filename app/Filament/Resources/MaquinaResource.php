@@ -250,24 +250,42 @@ class MaquinaResource extends Resource
                                     'required' => 'El :attribute es obligatorio.',
                                 ])
                                 ->columnSpan(['default' => 2, 'lg' => 1]),
+                        ])
+                        ->columns(2)
+                        ->columnSpan(2),
+
+                    Section::make('Rendimiento y Consumo')
+                        ->schema([
 
                             Select::make('tipo_consumo')
                                 ->label(__('Tipo de consumo'))
                                 ->required()
                                 ->rules('required')
-                                ->searchable()
                                 ->options([
                                     'gasoil' => 'Gasoil',
                                     'muela' => 'Muela',
                                     'cuchilla' => 'Cuchilla',
                                 ])
+                                ->multiple()
                                 ->validationMessages([
                                     'required' => 'El :attribute es obligatorio.',
+                                ]),
+
+                            Select::make('tipo_horas')
+                                ->label(__('Tipo de horas'))
+                                ->required()
+                                ->rules('required')
+                                ->multiple()
+                                ->options([
+                                    'horas_encendido' => 'Horas de encendido',
+                                    'horas_rotor' => 'Horas de rotor',
+                                    'cuchilla' => 'Cuchilla',
                                 ])
-                                ->columnSpan(['default' => 1, 'lg' => 2]),
+                                ->validationMessages([
+                                    'required' => 'El :attribute es obligatorio.',
+                                ]),
                         ])
-                        ->columns(2)
-                        ->columnSpan(2),
+                        ->columns(2),
 
                     Section::make('Incidencias')
                         ->schema([

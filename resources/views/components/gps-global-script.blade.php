@@ -15,6 +15,9 @@
         const inicioOtrosBtn = e.target.closest('#location-inicio-otros');
         const finOtrosBtn = e.target.closest('#location-fin-otros');
 
+        const inicioAyudanteBtn = e.target.closest('#location-inicio-ayudante');
+        const finAyudanteBtn = e.target.closest('#location-fin-ayudante');
+
         // SUMINISTROS DEL TRANSPORTISTA
         // GPS de inicio
         if (inicioBtn) {
@@ -84,6 +87,20 @@
         // GPS de fin trabajo
         if (finOtrosBtn) {
             const gpsInput = document.querySelector('input[id$="gps_fin_otros"]');
+            if (gpsInput) requestLocationAndFill(gpsInput);
+            return;
+        }
+
+        // AYUDANTE
+        if (inicioAyudanteBtn) {
+            const gpsInput = document.querySelector('input[id$="gps_inicio_ayudante"]');
+            if (gpsInput) requestLocationAndFill(gpsInput);
+            return;
+        }
+
+        // GPS de fin trabajo
+        if (finAyudanteBtn) {
+            const gpsInput = document.querySelector('input[id$="gps_fin_ayudante"]');
             if (gpsInput) requestLocationAndFill(gpsInput);
             return;
         }

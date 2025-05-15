@@ -11,7 +11,7 @@ use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 
 
-class ParteTrabajoTallerMaquinaria extends Model
+class ParteTrabajoAyudante extends Model
 {
     use HasFactory, Notifiable, SoftDeletes, LogsActivity;
 
@@ -22,22 +22,19 @@ class ParteTrabajoTallerMaquinaria extends Model
      */
     protected $fillable = [
         'usuario_id',
-        'taller_id',
+        'vehiculo_id',
         'maquina_id',
-        'fecha_hora_inicio_taller_maquinaria',
-        'fecha_hora_fin_taller_maquinaria',
-        'horas_servicio',
-        'tipo_actuacion',
-        'trabajo_realizado',
-        'recambios_utilizados',
-        'observaciones'
+        'fecha_hora_inicio_ayudante',
+        'fecha_hora_fin_ayudante',
+        'gps_inicio_ayudante',
+        'gps_fin_ayudante',
+        'tipologia',
+        'observaciones',
     ];
 
     protected $casts = [
-        'fecha_hora_inicio_taller_maquinaria' => 'date',
-        'fecha_hora_fin_taller_maquinaria' => 'date',
-        'trabajo_realizado' => 'array',
-        'recambios_utilizados' => 'array',
+        'fecha_hora_inicio_ayudante' => 'date',
+        'fecha_hora_fin_ayudante' => 'date',
     ];
 
     public function getActivitylogOptions(): LogOptions
@@ -66,20 +63,33 @@ class ParteTrabajoTallerMaquinaria extends Model
         return [];
     }
 
-    protected $table = 'parte_trabajo_taller_maquinaria';
+    protected $table = 'parte_trabajo_ayudante';
 
     public function usuario()
     {
         return $this->belongsTo(User::class, 'usuario_id');
     }
 
-    public function taller()
-    {
-        return $this->belongsTo(Taller::class, 'taller_id');
-    }
-
     public function maquina()
     {
         return $this->belongsTo(Maquina::class, 'maquina_id');
+    }
+
+    public function vehiculo()
+    {
+        return $this->belongsTo(Vehiculo::class, 'vehiculo_id');
+    }
+
+    public function getNombreMaquinaVehiculoAttribute()
+    {
+        if ($this->vehiculo && $this->vehiculo->marca) {
+            return $this->vehiculo->marca . ' ' . $this->vehiculo->modelo;
+        }
+
+        if ($this->maquina && $this->maquina->marca) {
+            return $this->maquina->marca . ' ' . $this->maquina->modelo;
+        }
+
+        return '—';
     }
 }

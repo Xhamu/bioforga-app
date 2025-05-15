@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\ParteTrabajoSuministroOperacionMaquinaResource\Pages;
 
 use App\Filament\Resources\ParteTrabajoSuministroOperacionMaquinaResource;
+use App\Models\AlmacenIntermedio;
 use App\Models\Referencia;
 use Auth;
 use Filament\Actions\Action;
@@ -49,7 +50,6 @@ class CreateParteTrabajoSuministroOperacionMaquina extends CreateRecord
                         ->searchable()
                         ->preload()
                         ->required(),
-
                     TextInput::make('gps_inicio_trabajo')
                         ->label('GPS')
                         ->required(),
@@ -58,7 +58,7 @@ class CreateParteTrabajoSuministroOperacionMaquina extends CreateRecord
                 ])
                 ->action(function (array $data) {
                     $this->form->fill();
-        
+
                     $formData = array_merge(
                         $this->form->getState(),
                         [

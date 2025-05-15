@@ -9,7 +9,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Filament\Panel;
 
-class Referencia extends Authenticatable
+class AlmacenIntermedio extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasFactory, Notifiable, SoftDeletes;
@@ -26,40 +26,18 @@ class Referencia extends Authenticatable
         'ayuntamiento',
         'monte_parcela',
         'ubicacion_gps',
-        'sector',
-        'tarifa',
-        'en_negociacion',
-        'proveedor_id',
-        'cliente_id',
+
         'producto_especie',
         'producto_tipo',
         'formato',
         'tipo_servicio',
         'cantidad_aprox',
-        'estado',
         'observaciones',
-        'contacto_nombre',
-        'contacto_telefono',
-        'contacto_email',
-        'tipo_certificacion',
-        'tipo_certificacion_industrial',
-        'guia_sanidad',
-        'finca',
     ];
-
-    public function proveedor()
-    {
-        return $this->belongsTo(Proveedor::class);
-    }
-
-    public function cliente()
-    {
-        return $this->belongsTo(Cliente::class);
-    }
 
     public function usuarios()
     {
-        return $this->belongsToMany(User::class, 'referencias_users', 'referencia_id', 'user_id')->withTimestamps()->withTrashed();
+        return $this->belongsToMany(User::class, 'almacenes_users', 'almacen_id', 'user_id')->withTimestamps()->withTrashed();
     }
 
     public function getEstadoMostrarAttribute()
@@ -92,5 +70,5 @@ class Referencia extends Authenticatable
         return [];
     }
 
-    protected $table = 'referencias';
+    protected $table = 'almacenes_intermedios';
 }

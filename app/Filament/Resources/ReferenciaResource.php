@@ -44,7 +44,6 @@ class ReferenciaResource extends Resource
 
                 Forms\Components\TextInput::make('referencia')
                     ->required()
-                    ->unique()
                     ->reactive()
                     ->columnSpanFull(),
 
@@ -79,21 +78,21 @@ class ReferenciaResource extends Resource
                     ->afterStateUpdated(function ($state, callable $set, callable $get) {
                         if ($state) {
                             $referencia = $get('referencia') ?? '';
-                    
+
                             // Separar partes con regex (sector + 'SU' + formato anterior + fecha + contador)
                             preg_match('/^(?<sector>\d{2})SU(?:CA|SA|EX|OT)?(?<fecha>\d{6})(?<contador>\d{3})$/', $referencia, $matches);
-                    
+
                             $sector = $matches['sector'] ?? '01'; // Valor por defecto si no hay sector
                             $fecha = $matches['fecha'] ?? now()->format('dmy');
                             $contador = $matches['contador'] ?? '001';
-                    
+
                             $nuevaReferencia = $sector . 'SU' . $state . $fecha . $contador;
-                    
+
                             $set('referencia', $nuevaReferencia);
                         } else {
                             $set('referencia', '');
                         }
-                    })                    
+                    })
                     ->visible(function ($get) {
                         return str_contains($get('referencia'), 'SU');
                     }),
@@ -107,6 +106,34 @@ class ReferenciaResource extends Resource
                         Forms\Components\TextInput::make('monte_parcela')
                             ->label('Monte / Parcela')
                             ->required(),
+                        Forms\Components\Select::make('sector')
+                            ->label('Sector')
+                            ->searchable()
+                            ->options([
+                                '01' => 'Zona Norte',
+                                '02' => 'Zona Sur',
+                                '03' => 'Andalucía',
+                                '04' => 'Huelva',
+                                '05' => 'Otros',
+                            ])
+                            ->required()
+                            ->live()
+                            ->afterStateUpdated(function ($state, callable $set, callable $get) {
+                                $referencia = $get('referencia') ?? '';
+
+                                $referencia = preg_replace('/^(01|02|03|04|05)/', '', $referencia);
+
+                                $set('referencia', $state . $referencia);
+                            })
+                            ->visible(function ($get) {
+                                return !empty($get('referencia'));
+                            }),
+                        Forms\Components\TextInput::make('finca')
+                            ->label('Finca')
+                            ->required()
+                            ->visible(function ($get) {
+                                return !empty($get('referencia')) && strpos($get('referencia'), 'SU') === false;
+                            }),
                         Forms\Components\TextInput::make('ubicacion_gps')
                             ->label('GPS'),
                         View::make('livewire.get-location-button')
@@ -116,30 +143,6 @@ class ReferenciaResource extends Resource
                             ->columnSpanFull(),
                     ])
                     ->columns(2),
-
-                Forms\Components\Select::make('sector')
-                    ->label('Sector')
-                    ->searchable()
-                    ->options([
-                        '01' => 'Zona Norte',
-                        '02' => 'Zona Sur',
-                        '03' => 'Andalucía',
-                        '04' => 'Huelva',
-                        '05' => 'Otros',
-                    ])
-                    ->required()
-                    ->columnSpanFull()
-                    ->live()
-                    ->afterStateUpdated(function ($state, callable $set, callable $get) {
-                        $referencia = $get('referencia') ?? '';
-
-                        $referencia = preg_replace('/^(01|02|03|04|05)/', '', $referencia);
-
-                        $set('referencia', $state . $referencia);
-                    })
-                    ->visible(function ($get) {
-                        return !empty($get('referencia'));  // Se muestra solo si hay referencia
-                    }),
 
                 Forms\Components\Section::make('Intervinientes')
                     ->schema([
@@ -161,7 +164,7 @@ class ReferenciaResource extends Resource
                             }),
                     ])
                     ->visible(function ($get) {
-                        return !empty($get('referencia'));  // Se muestra solo si hay referencia
+                        return !empty($get('referencia'));
                     })
                     ->columns(1),
 
@@ -192,9 +195,38 @@ class ReferenciaResource extends Resource
                             ->label('Cantidad')
                             ->numeric()
                             ->required(),
+
+                        Forms\Components\Checkbox::make('certificable')
+                            ->label('¿Certificable?')
+                            ->reactive(),
+
+                        Forms\Components\Select::make('tipo_certificacion')
+                            ->label('Tipo de certificación')
+                            ->searchable()
+                            ->options([
+                                'forestal' => 'Forestal',
+                                'industrial' => 'Industrial',
+                            ])
+                            ->visible(fn($get) => $get('certificable') === true)
+                            ->reactive(),
+
+                        Forms\Components\Select::make('tipo_certificacion_industrial')
+                            ->label('Tipo de certificación industrial')
+                            ->searchable()
+                            ->options([
+                                'SURE' => 'SURE',
+                                'SBP' => 'SBP',
+                                'PEFC' => 'PEFC'
+                            ])
+                            ->visible(fn($get) => $get('tipo_certificacion') === 'industrial'),
+
+                        Forms\Components\Checkbox::make('guia_sanidad')
+                            ->label('¿Guía de sanidad?')
+                            ->reactive(),
+
                     ])->columns(3)
                     ->visible(function ($get) {
-                        return !empty($get('referencia'));  // Se muestra solo si hay referencia
+                        return !empty($get('referencia'));
                     }),
 
                 Forms\Components\Section::make('Tarifa')
@@ -209,7 +241,7 @@ class ReferenciaResource extends Resource
                             ->nullable(),
                     ])->columns(1)
                     ->visible(function ($get) {
-                        return !empty($get('referencia'));  // Se muestra solo si hay referencia
+                        return !empty($get('referencia'));
                     }),
 
                 Forms\Components\Section::make('Contacto')
@@ -225,7 +257,7 @@ class ReferenciaResource extends Resource
                             ->nullable(),
                     ])->columns(3)
                     ->visible(function ($get) {
-                        return !empty($get('referencia'));  // Se muestra solo si hay referencia
+                        return !empty($get('referencia'));
                     }),
 
                 Forms\Components\Section::make('Usuarios')
@@ -240,7 +272,7 @@ class ReferenciaResource extends Resource
                             ->visible(fn($get) => !empty($get('referencia'))),
                     ])->columns(1)
                     ->visible(function ($get) {
-                        return !empty($get('referencia'));  // Se muestra solo si hay referencia
+                        return !empty($get('referencia'));
                     }),
 
                 Forms\Components\Section::make('Estado')
@@ -268,7 +300,7 @@ class ReferenciaResource extends Resource
                             ->nullable(),
                     ])->columns(1)
                     ->visible(function ($get) {
-                        return !empty($get('referencia'));  // Se muestra solo si hay referencia
+                        return !empty($get('referencia'));
                     }),
             ]);
     }

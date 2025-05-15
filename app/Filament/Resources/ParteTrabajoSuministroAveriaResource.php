@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\ParteTrabajoSuministroAveriaResource\Pages;
 use App\Filament\Resources\ParteTrabajoSuministroAveriaResource\RelationManagers;
 use App\Models\ParteTrabajoSuministroAveria;
+use App\Models\Taller;
 use Carbon\Carbon;
 use Filament\Facades\Filament;
 use Filament\Forms;
@@ -32,7 +33,7 @@ class ParteTrabajoSuministroAveriaResource extends Resource
     protected static ?string $model = ParteTrabajoSuministroAveria::class;
     protected static ?string $navigationIcon = 'heroicon-o-clock';
     protected static ?string $navigationGroup = 'Partes de trabajo';
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 4;
     protected static ?string $slug = 'partes-trabajo-suministro-averia';
     public static ?string $label = 'avería / mantenimiento';
     public static ?string $pluralLabel = 'Averías / Mantenimientos';
@@ -110,9 +111,31 @@ class ParteTrabajoSuministroAveriaResource extends Resource
                             ->reactive()
                             ->searchable()
                             ->disabled(fn(callable $get) => !$get('maquina_id') || !$get('tipo')),
-                    ])
-                    ->columns(3),
+                        Select::make('actuacion')
+                            ->label('Actuación')
+                            ->required()
+                            ->options([
+                                'medios_propios' => 'Por medios propios',
+                                'taller_externo' => 'Taller externo'
+                            ])
+                            ->reactive()
+                            ->searchable()
+                            ->disabled(fn(callable $get) => !$get('maquina_id') || !$get('tipo')),
 
+                        Select::make('taller_externo')
+                            ->label('Taller externo')
+                            ->required()
+                            ->options(function () {
+                                return Taller::all()->pluck('nombre', 'id');
+                            })
+                            ->reactive()
+                            ->searchable()
+                            ->columnSpanFull()
+                            ->hidden(fn(callable $get) => $get('actuacion') !== 'taller_externo') // Oculta si no es 'taller_externo'
+                            ->disabled(fn(callable $get) => !$get('maquina_id') || !$get('tipo')),
+                    ])
+                    ->columns(2),
+                    
                 Section::make('')
                     ->schema([
                         Placeholder::make('')

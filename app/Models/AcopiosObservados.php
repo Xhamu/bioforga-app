@@ -9,7 +9,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Filament\Panel;
 
-class Referencia extends Authenticatable
+class AcopiosObservados extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasFactory, Notifiable, SoftDeletes;
@@ -20,60 +20,23 @@ class Referencia extends Authenticatable
      * @var list<string>
      */
     protected $fillable = [
-        'referencia',
         'area',
         'provincia',
         'ayuntamiento',
         'monte_parcela',
-        'ubicacion_gps',
-        'sector',
-        'tarifa',
-        'en_negociacion',
-        'proveedor_id',
-        'cliente_id',
+
         'producto_especie',
         'producto_tipo',
         'formato',
         'tipo_servicio',
         'cantidad_aprox',
-        'estado',
-        'observaciones',
+
         'contacto_nombre',
         'contacto_telefono',
         'contacto_email',
-        'tipo_certificacion',
-        'tipo_certificacion_industrial',
-        'guia_sanidad',
-        'finca',
+
+        'observaciones',
     ];
-
-    public function proveedor()
-    {
-        return $this->belongsTo(Proveedor::class);
-    }
-
-    public function cliente()
-    {
-        return $this->belongsTo(Cliente::class);
-    }
-
-    public function usuarios()
-    {
-        return $this->belongsToMany(User::class, 'referencias_users', 'referencia_id', 'user_id')->withTimestamps()->withTrashed();
-    }
-
-    public function getEstadoMostrarAttribute()
-    {
-        $estado = $this->estado;
-
-        if ($estado === 'abierto') {
-            return 'Abierto';
-        } else if ($estado === 'en_proceso') {
-            return 'En proceso';
-        } else if ($estado === 'cerrado') {
-            return 'Cerrado';
-        }
-    }
 
     /**
      * The attributes that should be hidden for serialization.
@@ -92,5 +55,15 @@ class Referencia extends Authenticatable
         return [];
     }
 
-    protected $table = 'referencias';
+    protected $table = 'acopios_observados';
+
+    protected function getUbicacionAttribute()
+    {
+        return $this->monte_parcela . ' (' . $this->ayuntamiento . ', ' . $this->provincia . ')';
+    }
+
+    protected function getProductoMostrarAttribute()
+    {
+        return ucfirst($this->producto_especie) . ' (' . ucfirst($this->producto_tipo) . ')';
+    }
 }
