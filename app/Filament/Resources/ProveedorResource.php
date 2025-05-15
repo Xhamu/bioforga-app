@@ -25,6 +25,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Jenssegers\Agent\Agent;
+use Illuminate\Support\Facades\File;
 
 class ProveedorResource extends Resource
 {
@@ -37,6 +38,8 @@ class ProveedorResource extends Resource
     public static ?string $pluralLabel = 'Proveedores';
     public static function form(Form $form): Form
     {
+        $ubicaciones = json_decode(File::get(resource_path('data/ubicaciones.json')), true);
+
         return $form
             ->schema([
                 Section::make('Datos')
@@ -90,8 +93,6 @@ class ProveedorResource extends Resource
                             ->label(__('País'))
                             ->options([
                                 'es' => 'España',
-                                'fr' => 'Francia',
-                                'it' => 'Italia',
                             ])
                             ->searchable()
                             ->required()
@@ -102,47 +103,44 @@ class ProveedorResource extends Resource
                             ->columnSpan(['default' => 2, 'md' => 1]),
 
                         Select::make('provincia')
-                            ->label(__('Provincia'))
-                            ->options(fn(callable $get) => match ($get('pais')) {
-                                'es' => [
-                                    'madrid' => 'Madrid',
-                                    'barcelona' => 'Barcelona',
-                                    'sevilla' => 'Sevilla',
-                                ],
-                                'fr' => [
-                                    'paris' => 'París',
-                                    'lyon' => 'Lyon',
-                                    'marseille' => 'Marsella',
-                                ],
-                                'it' => [
-                                    'rome' => 'Roma',
-                                    'milan' => 'Milán',
-                                    'naples' => 'Nápoles',
-                                ],
-                                default => [],
+                            ->label('Provincia')
+                            ->options(function () use ($ubicaciones) {
+                                return collect($ubicaciones)
+                                    ->flatMap(function ($ccaa) {
+                                        return collect($ccaa['provinces'] ?? [])
+                                            ->mapWithKeys(function ($prov) use ($ccaa) {
+                                                return [$ccaa['code'] . '-' . $prov['code'] => $prov['label']];
+                                            });
+                                    });
                             })
                             ->searchable()
                             ->required()
-                            ->reactive()
-                            ->columnSpan(['default' => 2, 'md' => 1]),
+                            ->reactive(),
 
                         Select::make('poblacion')
-                            ->label(__('Población'))
-                            ->options(fn(callable $get) => match ($get('provincia')) {
-                                'madrid' => ['centro' => 'Centro', 'chamartin' => 'Chamartín'],
-                                'barcelona' => ['eixample' => 'Eixample', 'gracia' => 'Gracia'],
-                                'sevilla' => ['nervion' => 'Nervión', 'triana' => 'Triana'],
-                                'paris' => ['louvre' => 'Louvre', 'montmartre' => 'Montmartre'],
-                                'lyon' => ['presquile' => 'Presqu\'île', 'croixrousse' => 'Croix-Rousse'],
-                                'marseille' => ['vieuxport' => 'Vieux-Port', 'laplaine' => 'La Plaine'],
-                                'rome' => ['centro' => 'Centro', 'trastevere' => 'Trastevere'],
-                                'milan' => ['duomo' => 'Duomo', 'navigli' => 'Navigli'],
-                                'naples' => ['vomero' => 'Vomero', 'chiai' => 'Chiaia'],
-                                default => [],
+                            ->label('Población')
+                            ->options(function (callable $get) use ($ubicaciones) {
+                                $provKey = $get('provincia');
+                                if (!str_contains($provKey, '-'))
+                                    return [];
+
+                                [$ccaaCode, $provCode] = explode('-', $provKey);
+
+                                foreach ($ubicaciones as $ccaa) {
+                                    if ($ccaa['code'] === $ccaaCode) {
+                                        foreach ($ccaa['provinces'] as $provincia) {
+                                            if ($provincia['code'] === $provCode) {
+                                                return collect($provincia['towns'] ?? [])
+                                                    ->mapWithKeys(fn($town) => [$town['label'] => $town['label']]);
+                                            }
+                                        }
+                                    }
+                                }
+
+                                return [];
                             })
                             ->searchable()
-                            ->required()
-                            ->columnSpan(['default' => 2, 'md' => 1]),
+                            ->required(),
 
                         TextInput::make('codigo_postal')
                             ->label(__('Código postal'))

@@ -19,6 +19,7 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Illuminate\Support\Facades\File;
 
 class ClienteResource extends Resource
 {
@@ -32,6 +33,8 @@ class ClienteResource extends Resource
 
     public static function form(Form $form): Form
     {
+        $ubicaciones = json_decode(File::get(resource_path('data/ubicaciones.json')), true);
+
         return $form
             ->schema([
                 Forms\Components\Section::make('Datos')
@@ -57,26 +60,58 @@ class ClienteResource extends Resource
                     ->schema([
                         // Dirección fiscal
                         Select::make('pais')
-                            ->label('País')
+                            ->label(__('País'))
                             ->options([
-                                'España' => 'España',
-                                'Portugal' => 'Portugal',
-                                'Francia' => 'Francia',
-                            ]),
+                                'es' => 'España',
+                            ])
+                            ->searchable()
+                            ->required()
+                            ->reactive()
+                            ->validationMessages([
+                                'required' => 'El :attribute es obligatorio.',
+                            ])
+                            ->columnSpan(['default' => 2, 'md' => 1]),
+
                         Select::make('provincia')
                             ->label('Provincia')
-                            ->options([
-                                'Madrid' => 'Madrid',
-                                'Barcelona' => 'Barcelona',
-                                'Valencia' => 'Valencia',
-                            ]),
+                            ->options(function () use ($ubicaciones) {
+                                return collect($ubicaciones)
+                                    ->flatMap(function ($ccaa) {
+                                        return collect($ccaa['provinces'] ?? [])
+                                            ->mapWithKeys(function ($prov) use ($ccaa) {
+                                                return [$ccaa['code'] . '-' . $prov['code'] => $prov['label']];
+                                            });
+                                    });
+                            })
+                            ->searchable()
+                            ->required()
+                            ->reactive(),
+
                         Select::make('poblacion')
                             ->label('Población')
-                            ->options([
-                                'Madrid' => 'Madrid',
-                                'Barcelona' => 'Barcelona',
-                                'Valencia' => 'Valencia',
-                            ]),
+                            ->options(function (callable $get) use ($ubicaciones) {
+                                $provKey = $get('provincia');
+                                if (!str_contains($provKey, '-'))
+                                    return [];
+
+                                [$ccaaCode, $provCode] = explode('-', $provKey);
+
+                                foreach ($ubicaciones as $ccaa) {
+                                    if ($ccaa['code'] === $ccaaCode) {
+                                        foreach ($ccaa['provinces'] as $provincia) {
+                                            if ($provincia['code'] === $provCode) {
+                                                return collect($provincia['towns'] ?? [])
+                                                    ->mapWithKeys(fn($town) => [$town['label'] => $town['label']]);
+                                            }
+                                        }
+                                    }
+                                }
+
+                                return [];
+                            })
+                            ->searchable()
+                            ->required(),
+
                         TextInput::make('codigo_postal')
                             ->label('Código postal'),
                         TextInput::make('direccion')
@@ -96,26 +131,58 @@ class ClienteResource extends Resource
                     ->relationship()
                     ->schema([
                         Select::make('pais')
-                            ->label('País')
+                            ->label(__('País'))
                             ->options([
-                                'España' => 'España',
-                                'Portugal' => 'Portugal',
-                                'Francia' => 'Francia',
-                            ]),
+                                'es' => 'España',
+                            ])
+                            ->searchable()
+                            ->required()
+                            ->reactive()
+                            ->validationMessages([
+                                'required' => 'El :attribute es obligatorio.',
+                            ])
+                            ->columnSpan(['default' => 2, 'md' => 1]),
+
                         Select::make('provincia')
                             ->label('Provincia')
-                            ->options([
-                                'Madrid' => 'Madrid',
-                                'Barcelona' => 'Barcelona',
-                                'Valencia' => 'Valencia',
-                            ]),
+                            ->options(function () use ($ubicaciones) {
+                                return collect($ubicaciones)
+                                    ->flatMap(function ($ccaa) {
+                                        return collect($ccaa['provinces'] ?? [])
+                                            ->mapWithKeys(function ($prov) use ($ccaa) {
+                                                return [$ccaa['code'] . '-' . $prov['code'] => $prov['label']];
+                                            });
+                                    });
+                            })
+                            ->searchable()
+                            ->required()
+                            ->reactive(),
+
                         Select::make('poblacion')
                             ->label('Población')
-                            ->options([
-                                'Madrid' => 'Madrid',
-                                'Barcelona' => 'Barcelona',
-                                'Valencia' => 'Valencia',
-                            ]),
+                            ->options(function (callable $get) use ($ubicaciones) {
+                                $provKey = $get('provincia');
+                                if (!str_contains($provKey, '-'))
+                                    return [];
+
+                                [$ccaaCode, $provCode] = explode('-', $provKey);
+
+                                foreach ($ubicaciones as $ccaa) {
+                                    if ($ccaa['code'] === $ccaaCode) {
+                                        foreach ($ccaa['provinces'] as $provincia) {
+                                            if ($provincia['code'] === $provCode) {
+                                                return collect($provincia['towns'] ?? [])
+                                                    ->mapWithKeys(fn($town) => [$town['label'] => $town['label']]);
+                                            }
+                                        }
+                                    }
+                                }
+
+                                return [];
+                            })
+                            ->searchable()
+                            ->required(),
+
                         TextInput::make('codigo_postal')
                             ->label('Código postal'),
                         TextInput::make('direccion')
