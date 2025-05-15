@@ -2,12 +2,12 @@
 
 namespace App\Filament\Resources;
 
-use App\Filament\Resources\ParteTrabajoSuministroOtrosResource\Pages;
-use App\Filament\Resources\ParteTrabajoSuministroOtrosResource\RelationManagers;
-use App\Models\ParteTrabajoSuministroOtros;
+use App\Filament\Resources\ParteTrabajoAyudanteResource\Pages;
+use App\Filament\Resources\ParteTrabajoAyudanteResource\RelationManagers;
+use App\Models\ParteTrabajoAyudante;
 use Carbon\Carbon;
-use Filament\Facades\Filament;
 use Filament\Forms;
+use Filament\Facades\Filament;
 use Filament\Forms\Components\Actions;
 use Filament\Forms\Components\Actions\Action;
 use Filament\Forms\Components\Placeholder;
@@ -26,15 +26,15 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\HtmlString;
 
-class ParteTrabajoSuministroOtrosResource extends Resource
+class ParteTrabajoAyudanteResource extends Resource
 {
-    protected static ?string $model = ParteTrabajoSuministroOtros::class;
+    protected static ?string $model = ParteTrabajoAyudante::class;
     protected static ?string $navigationIcon = 'heroicon-o-clock';
     protected static ?string $navigationGroup = 'Partes de trabajo';
-    protected static ?int $navigationSort = 8;
-    protected static ?string $slug = 'partes-trabajo-suministro-otros';
-    public static ?string $label = 'otro';
-    public static ?string $pluralLabel = 'Otros';
+    protected static ?int $navigationSort = 7;
+    protected static ?string $slug = 'partes-trabajo-ayudantes';
+    public static ?string $label = 'ayudante';
+    public static ?string $pluralLabel = 'Ayudantes';
     public static function form(Form $form): Form
     {
         return $form
@@ -56,34 +56,61 @@ class ParteTrabajoSuministroOtrosResource extends Resource
                 Section::make('')
                     ->schema([
                         Placeholder::make('')
-                            ->visible(fn($record) => $record && filled($record->descripcion))
+                            ->visible(fn($record) => $record && ($record->maquina_id || $record->vehiculo_id))
                             ->content(function ($record) {
+                                if ($record->maquina_id && $record->maquina) {
+                                    $contenido = '<strong>Máquina:</strong> ' . e($record->maquina->marca . ' ' . $record->maquina->modelo);
+                                } elseif ($record->vehiculo_id && $record->vehiculo) {
+                                    $contenido = '<strong>Vehículo:</strong> ' . e($record->vehiculo->marca . ' ' . $record->vehiculo->modelo);
+                                } else {
+                                    $contenido = '<em>No se ha seleccionado ningún vehículo o máquina.</em>';
+                                }
+
                                 return new HtmlString('
                                 <div class="mb-6">
                                     <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2 flex items-center gap-1">
-                                        Descripción del trabajo
+                                        Medio utilizado
                                     </h3>
                                     <div class="px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm">
-                                        <p class="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
-                                            ' . nl2br(e($record->descripcion)) . '
-                                        </p>
+                                        <p class="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">'
+                                    . $contenido .
+                                    '</p>
                                     </div>
                                 </div>
                             ');
                             })
                             ->columnSpanFull(),
 
+
+                        Placeholder::make('')
+                            ->visible(fn($record) => $record && filled($record->tipologia))
+                            ->content(function ($record) {
+                                return new HtmlString('
+                            <div class="mb-6">
+                                <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2 flex items-center gap-1">
+                                    Tipología
+                                </h3>
+                                <div class="px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm">
+                                    <p class="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+                                        ' . nl2br(e($record->tipologia)) . '
+                                    </p>
+                                </div>
+                            </div>
+                        ');
+                            })
+                            ->columnSpanFull(),
+
                         Placeholder::make('')
                             ->content(function ($record) {
-                                if (!$record || !$record->fecha_hora_inicio_otros) {
+                                if (!$record || !$record->fecha_hora_inicio_ayudante) {
                                     return new HtmlString('<p>Estado actual: <strong>Sin iniciar</strong></p>');
                                 }
 
-                                $estado = $record->fecha_hora_fin_otros ? 'Finalizado' : 'Trabajando';
-                                $totalMinutos = Carbon::parse($record->getRawOriginal('fecha_hora_inicio_otros'))
+                                $estado = $record->fecha_hora_fin_ayudante ? 'Finalizado' : 'Trabajando';
+                                $totalMinutos = Carbon::parse($record->getRawOriginal('fecha_hora_inicio_ayudante'))
                                     ->diffInMinutes(
-                                        $record->fecha_hora_fin_otros
-                                        ? Carbon::parse($record->getRawOriginal('fecha_hora_fin_otros'))
+                                        $record->fecha_hora_fin_ayudante
+                                        ? Carbon::parse($record->getRawOriginal('fecha_hora_fin_ayudante'))
                                         : now()
                                     );
 
@@ -96,41 +123,41 @@ class ParteTrabajoSuministroOtrosResource extends Resource
                                     default => '❓',
                                 };
 
-                                $inicio = Carbon::parse($record->getRawOriginal('fecha_hora_inicio_otros'));
-                                $fin = $record->fecha_hora_fin_otros ? Carbon::parse($record->getRawOriginal('fecha_hora_fin_otros')) : null;
+                                $inicio = Carbon::parse($record->getRawOriginal('fecha_hora_inicio_ayudante'));
+                                $fin = $record->fecha_hora_fin_ayudante ? Carbon::parse($record->getRawOriginal('fecha_hora_fin_ayudante')) : null;
 
-                                $gpsInicio = $record->gps_inicio_otros
-                                    ? ' (<a href="https://maps.google.com/?q=' . $record->gps_inicio_otros . '" target="_blank" class="text-blue-600 underline">📍 Ver ubicación</a>)'
+                                $gpsInicio = $record->gps_inicio_ayudante
+                                    ? ' (<a href="https://maps.google.com/?q=' . $record->gps_inicio_ayudante . '" target="_blank" class="text-blue-600 underline">📍 Ver ubicación</a>)'
                                     : '';
 
-                                $gpsFin = $record->gps_fin_otros
-                                    ? ' (<a href="https://maps.google.com/?q=' . $record->gps_fin_otros . '" target="_blank" class="text-blue-600 underline">📍 Ver ubicación</a>)'
+                                $gpsFin = $record->gps_fin_ayudante
+                                    ? ' (<a href="https://maps.google.com/?q=' . $record->gps_fin_ayudante . '" target="_blank" class="text-blue-600 underline">📍 Ver ubicación</a>)'
                                     : '';
 
                                 $tabla = '
-                                    <div class="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
-                                        <table class="w-full text-sm text-left text-gray-700 dark:text-gray-200">
-                                            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-                                                <tr class="bg-gray-50 dark:bg-gray-800">
-                                                    <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Estado actual</th>
-                                                    <td class="px-4 py-3 font-semibold text-gray-900 dark:text-white">' . $emoji . ' ' . $estado . '</td>
-                                                </tr>
-                                                <tr>
-                                                    <th class="px-4 py-3">Hora de inicio</th>
-                                                    <td class="px-4 py-3">' . $inicio->format('H:i') . $gpsInicio . '</td>
-                                                </tr>
-                                                <tr>
-                                                    <th class="px-4 py-3">Hora de finalización</th>
-                                                    <td class="px-4 py-3">' . ($fin ? $fin->format('H:i') . $gpsFin : '-') . '</td>
-                                                </tr>
-                                                <tr class="bg-gray-50 dark:bg-gray-800 border-t">
-                                                    <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Tiempo total</th>
-                                                    <td class="px-4 py-3 font-semibold">' . $horas . 'h ' . $minutos . 'min</td>
-                                                </tr>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                ';
+                                <div class="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
+                                    <table class="w-full text-sm text-left text-gray-700 dark:text-gray-200">
+                                        <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                                            <tr class="bg-gray-50 dark:bg-gray-800">
+                                                <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Estado actual</th>
+                                                <td class="px-4 py-3 font-semibold text-gray-900 dark:text-white">' . $emoji . ' ' . $estado . '</td>
+                                            </tr>
+                                            <tr>
+                                                <th class="px-4 py-3">Hora de inicio</th>
+                                                <td class="px-4 py-3">' . $inicio->format('H:i') . $gpsInicio . '</td>
+                                            </tr>
+                                            <tr>
+                                                <th class="px-4 py-3">Hora de finalización</th>
+                                                <td class="px-4 py-3">' . ($fin ? $fin->format('H:i') . $gpsFin : '-') . '</td>
+                                            </tr>
+                                            <tr class="bg-gray-50 dark:bg-gray-800 border-t">
+                                                <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Tiempo total</th>
+                                                <td class="px-4 py-3 font-semibold">' . $horas . 'h ' . $minutos . 'min</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            ';
 
                                 return new HtmlString($tabla);
                             })
@@ -144,7 +171,7 @@ class ParteTrabajoSuministroOtrosResource extends Resource
                             return false;
 
                         return (
-                            $record->fecha_hora_inicio_otros && !$record->fecha_hora_fin_otros
+                            $record->fecha_hora_inicio_ayudante && !$record->fecha_hora_fin_ayudante
                         );
                     })
                     ->schema([
@@ -156,24 +183,24 @@ class ParteTrabajoSuministroOtrosResource extends Resource
                                 ->visible(
                                     fn($record) =>
                                     $record &&
-                                    $record->fecha_hora_inicio_otros &&
-                                    !$record->fecha_hora_fin_otros
+                                    $record->fecha_hora_inicio_ayudante &&
+                                    !$record->fecha_hora_fin_ayudante
                                 )
                                 ->button()
                                 ->modalHeading('Finalizar trabajo')
                                 ->modalSubmitActionLabel('Finalizar')
                                 ->modalWidth('xl')
                                 ->form([
-                                    TextInput::make('gps_fin_otros')
+                                    TextInput::make('gps_fin_ayudante')
                                         ->label('GPS')
                                         ->required(),
 
-                                    View::make('livewire.location-fin-otros'),
+                                    View::make('livewire.location-fin-ayudante'),
                                 ])
                                 ->action(function (array $data, $record) {
                                     $record->update([
-                                        'fecha_hora_fin_otros' => now(),
-                                        'gps_fin_otros' => $data['gps_fin_otros'],
+                                        'fecha_hora_fin_ayudante' => now(),
+                                        'gps_fin_ayudante' => $data['gps_fin_ayudante'],
                                     ]);
 
                                     Notification::make()
@@ -206,6 +233,11 @@ class ParteTrabajoSuministroOtrosResource extends Resource
                     })
                     ->weight(FontWeight::Bold)
                     ->searchable(),
+
+                TextColumn::make('nombre_maquina_vehiculo')
+                    ->label('Medio utilizado')
+                    ->searchable(),
+
             ])
             ->filters([
                 Tables\Filters\TrashedFilter::make(),
@@ -234,10 +266,10 @@ class ParteTrabajoSuministroOtrosResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListParteTrabajoSuministroOtros::route('/'),
-            'create' => Pages\CreateParteTrabajoSuministroOtros::route('/create'),
-            'view' => Pages\ViewParteTrabajoSuministroOtros::route('/{record}'),
-            'edit' => Pages\EditParteTrabajoSuministroOtros::route('/{record}/edit'),
+            'index' => Pages\ListParteTrabajoAyudantes::route('/'),
+            'create' => Pages\CreateParteTrabajoAyudante::route('/create'),
+            'view' => Pages\ViewParteTrabajoAyudante::route('/{record}'),
+            'edit' => Pages\EditParteTrabajoAyudante::route('/{record}/edit'),
         ];
     }
 

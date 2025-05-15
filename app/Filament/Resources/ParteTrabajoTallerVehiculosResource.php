@@ -30,7 +30,7 @@ class ParteTrabajoTallerVehiculosResource extends Resource
     protected static ?string $model = ParteTrabajoTallerVehiculos::class;
     protected static ?string $navigationIcon = 'heroicon-o-clock';
     protected static ?string $navigationGroup = 'Partes de trabajo';
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 6;
     protected static ?string $slug = 'partes-trabajo-taller-vehiculos';
     public static ?string $label = 'taller (vehículo)';
     public static ?string $pluralLabel = 'Taller (Vehículos)';

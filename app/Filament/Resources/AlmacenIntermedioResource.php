@@ -9,7 +9,9 @@ use Filament\Forms;
 use Filament\Forms\Components\View;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
+use Filament\Support\Enums\FontWeight;
 use Filament\Tables;
+use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
@@ -28,18 +30,31 @@ class AlmacenIntermedioResource extends Resource
         return $form
             ->schema([
                 Forms\Components\TextInput::make('referencia')
+                    ->label('Referencia')
                     ->required()
-                    ->unique()
                     ->reactive()
                     ->default('ALM')
+                    ->afterStateHydrated(function ($component, $state) {
+                        if (empty($state)) {
+                            $component->state(self::generarReferencia('', '', now()));
+                        }
+                    })
                     ->columnSpanFull(),
 
                 Forms\Components\Section::make('Ubicación')
                     ->schema([
                         Forms\Components\TextInput::make('provincia')
-                            ->required(),
+                            ->required()
+                            ->reactive()
+                            ->afterStateUpdated(function (callable $set, $state, callable $get) {
+                                $set('referencia', self::generarReferencia($state, $get('ayuntamiento'), now()));
+                            }),
                         Forms\Components\TextInput::make('ayuntamiento')
-                            ->required(),
+                            ->required()
+                            ->reactive()
+                            ->afterStateUpdated(function (callable $set, $state, callable $get) {
+                                $set('referencia', self::generarReferencia($get('provincia'), $state, now()));
+                            }),
                         Forms\Components\TextInput::make('monte_parcela')
                             ->label('Monte / Parcela')
                             ->required(),
@@ -84,6 +99,21 @@ class AlmacenIntermedioResource extends Resource
                     ->visible(function ($get) {
                         return !empty($get('referencia'));  // Se muestra solo si hay referencia
                     }),
+
+                Forms\Components\Section::make('Usuarios')
+                    ->schema([
+                        Forms\Components\Select::make('usuarios')
+                            ->label('Usuarios relacionados')
+                            ->multiple()
+                            ->relationship('usuarios', 'name')
+                            ->preload()
+                            ->searchable()
+                            ->columnSpanFull()
+                            ->visible(fn($get) => !empty($get('referencia'))),
+                    ])->columns(1)
+                    ->visible(function ($get) {
+                        return !empty($get('referencia'));
+                    }),
             ]);
     }
 
@@ -91,7 +121,14 @@ class AlmacenIntermedioResource extends Resource
     {
         return $table
             ->columns([
-                //
+                TextColumn::make('referencia')
+                    ->label('Referencia')
+                    ->weight(FontWeight::Bold)
+                    ->searchable(),
+
+                TextColumn::make('provincia')
+                    ->label('Provincia')
+                    ->icon('heroicon-m-map-pin'),
             ])
             ->filters([
                 Tables\Filters\TrashedFilter::make(),
@@ -106,7 +143,8 @@ class AlmacenIntermedioResource extends Resource
                     Tables\Actions\ForceDeleteBulkAction::make(),
                     Tables\Actions\RestoreBulkAction::make(),
                 ]),
-            ]);
+            ])
+            ->defaultSort('created_at', 'desc');
     }
 
     public static function getRelations(): array
@@ -133,4 +171,23 @@ class AlmacenIntermedioResource extends Resource
                 SoftDeletingScope::class,
             ]);
     }
+
+    protected static function generarReferencia($provincia, $ayuntamiento, $fecha)
+    {
+        $prov = strtoupper(substr($provincia ?? '', 0, 2));
+        $ayto = strtoupper(substr($ayuntamiento ?? '', 0, 2));
+        $date = $fecha->format('y') . $fecha->format('m') . $fecha->format('d');
+
+        $base = "ALM{$prov}{$ayto}{$date}";
+
+        // Contar cuántas referencias hay hoy con este mismo prefijo
+        $count = AlmacenIntermedio::whereDate('created_at', $fecha)
+            ->where('referencia', 'like', $base . '%')
+            ->count();
+
+        $sufijo = str_pad($count + 1, 3, '0', STR_PAD_LEFT);
+
+        return "{$base}{$sufijo}";
+    }
+
 }

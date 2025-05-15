@@ -26,15 +26,6 @@ class CreateParteTrabajoSuministroOperacionMaquina extends CreateRecord
                 ->modalSubmitActionLabel('Iniciar')
                 ->modalWidth('xl')
                 ->form([
-                    Select::make('eleccion')
-                        ->label('')
-                        ->options([
-                            'referencia' => 'Referencia',
-                            'almacen' => 'Almacén intermedio',
-                        ])
-                        ->searchable()
-                        ->reactive(), // Esto es necesario para reaccionar al cambio y actualizar el otro campo
-
                     Select::make('referencia_id')
                         ->label('Referencia')
                         ->options(function () {
@@ -58,33 +49,7 @@ class CreateParteTrabajoSuministroOperacionMaquina extends CreateRecord
                         })
                         ->searchable()
                         ->preload()
-                        ->required()
-                        ->visible(fn(callable $get) => $get('eleccion') === 'referencia'), // Condición para mostrar el campo
-
-                        Select::make('almacen_id')
-                        ->label('Almacén intermedio')
-                        ->options(function () {
-                            $usuario = Auth::user();
-                    
-                            $almacenesIds = \DB::table('almacenes_users')
-                                ->where('user_id', $usuario->id)
-                                ->pluck('almacen_id');
-                    
-                            $almacenes = $almacenesIds->isNotEmpty()
-                                ? AlmacenIntermedio::whereIn('id', $almacenesIds)->get()
-                                : AlmacenIntermedio::all();
-                    
-                            return $almacenes->mapWithKeys(function ($almacen) {
-                                return [
-                                    $almacen->id => "{$almacen->referencia} ({$almacen->monte_parcela}, {$almacen->ayuntamiento})"
-                                ];
-                            });
-                        })
-                        ->searchable()
-                        ->preload()
-                        ->required()
-                        ->visible(fn (callable $get) => $get('eleccion') === 'almacen'),
-
+                        ->required(),
                     TextInput::make('gps_inicio_trabajo')
                         ->label('GPS')
                         ->required(),

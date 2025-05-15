@@ -21,7 +21,7 @@ use Filament\Forms\Components\Section;
 class AcopiosObservadosResource extends Resource
 {
     protected static ?string $model = AcopiosObservados::class;
-    protected static ?string $navigationIcon = 'heroicon-o-map-pin';
+    protected static ?string $navigationIcon = 'heroicon-o-eye';
     protected static ?string $navigationGroup = 'Parcelas';
     protected static ?int $navigationSort = 3;
     protected static ?string $slug = 'acopios-observados';

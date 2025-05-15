@@ -44,7 +44,6 @@ class ReferenciaResource extends Resource
 
                 Forms\Components\TextInput::make('referencia')
                     ->required()
-                    ->unique()
                     ->reactive()
                     ->columnSpanFull(),
 

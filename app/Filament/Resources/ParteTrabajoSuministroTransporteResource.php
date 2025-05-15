@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\ParteTrabajoSuministroTransporteResource\Pages;
 use App\Filament\Resources\ParteTrabajoSuministroTransporteResource\RelationManagers;
 use App\Filament\Resources\ParteTrabajoSuministroTransporteResource\RelationManagers\CargasRelationManager;
+use App\Models\AlmacenIntermedio;
 use App\Models\Camion;
 use App\Models\ParteTrabajoSuministroTransporte;
 use App\Models\Referencia;
@@ -46,7 +47,7 @@ class ParteTrabajoSuministroTransporteResource extends Resource
     protected static ?string $model = ParteTrabajoSuministroTransporte::class;
     protected static ?string $navigationIcon = 'heroicon-o-clock';
     protected static ?string $navigationGroup = 'Partes de trabajo';
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 1;
     protected static ?string $slug = 'partes-trabajo-suministro-transporte';
     public static ?string $label = 'suministro del transportista';
     public static ?string $pluralLabel = 'Suministros del transportista';
@@ -123,7 +124,40 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                         ->modalWidth('xl')
                                         ->extraAttributes(['class' => 'w-full']) // Hace que el botón ocupe todo el ancho disponible
                                         ->form([
-                                            Select::make('referencia_id')
+                                            Select::make('eleccion')
+                                                ->label('')
+                                                ->options([
+                                                    'referencia' => 'Referencia',
+                                                    'almacen' => 'Almacén intermedio',
+                                                ])
+                                                ->searchable()
+                                                ->reactive(), // Esto es necesario para reaccionar al cambio y actualizar el otro campo
+                    
+                                            Select::make('almacen_select')
+                                                ->label('Almacén intermedio')
+                                                ->options(function () {
+                                                    $usuario = Auth::user();
+
+                                                    $almacenesIds = \DB::table('almacenes_users')
+                                                        ->where('user_id', $usuario->id)
+                                                        ->pluck('almacen_id');
+
+                                                    $almacenes = $almacenesIds->isNotEmpty()
+                                                        ? AlmacenIntermedio::whereIn('id', $almacenesIds)->get()
+                                                        : AlmacenIntermedio::all();
+
+                                                    return $almacenes->mapWithKeys(function ($almacen) {
+                                                        return [
+                                                            $almacen->id => "{$almacen->referencia} ({$almacen->monte_parcela}, {$almacen->ayuntamiento})"
+                                                        ];
+                                                    });
+                                                })
+                                                ->searchable()
+                                                ->preload()
+                                                ->required()
+                                                ->visible(fn(callable $get) => $get('eleccion') === 'almacen'),
+
+                                            Select::make('referencia_select')
                                                 ->label('Referencia')
                                                 ->options(function () {
                                                     $usuario = Auth::user();
@@ -132,7 +166,6 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                                         ->where('user_id', $usuario->id)
                                                         ->pluck('referencia_id');
 
-                                                    // Si tiene referencias asignadas, filtramos por ellas
                                                     $referencias = $referenciasIds->isNotEmpty()
                                                         ? Referencia::whereIn('id', $referenciasIds)->with('proveedor')->get()
                                                         : Referencia::with('proveedor')->get();
@@ -140,16 +173,15 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                                     return $referencias->mapWithKeys(function ($referencia) {
                                                         return [
                                                             $referencia->id => "{$referencia->referencia} | " .
-                                                                ($referencia->proveedor?->razon_social
-                                                                    ?? $referencia->cliente?->razon_social
-                                                                    ?? 'Sin origen') .
+                                                                ($referencia->proveedor?->razon_social ?? $referencia->cliente?->razon_social ?? 'Sin razón social') .
                                                                 " ({$referencia->monte_parcela}, {$referencia->ayuntamiento})"
                                                         ];
                                                     });
                                                 })
                                                 ->searchable()
                                                 ->preload()
-                                                ->required(),
+                                                ->required()
+                                                ->visible(fn(callable $get) => $get('eleccion') === 'referencia'),
 
                                             TextInput::make('gps_inicio_carga')
                                                 ->label('GPS')
@@ -158,8 +190,12 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                             View::make('livewire.location-inicio-carga'),
                                         ])
                                         ->action(function (array $data, $record) {
+                                            $referenciaId = $data['eleccion'] === 'almacen'
+                                                ? $data['almacen_select']
+                                                : $data['referencia_select'];
+
                                             $record->cargas()->create([
-                                                'referencia_id' => $data['referencia_id'],
+                                                'referencia_id' => $referenciaId,
                                                 'fecha_hora_inicio_carga' => now(),
                                                 'gps_inicio_carga' => $data['gps_inicio_carga'] ?? '0.0000, 0.0000',
                                             ]);
@@ -235,13 +271,49 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                         ->modalHeading('Iniciar descarga')
                                         ->modalSubmitActionLabel('Guardar descarga')
                                         ->modalWidth('xl')
-                                        ->extraAttributes(['class' => 'w-full']) // Hace que el botón ocupe todo el ancho disponible
+                                        ->extraAttributes(['class' => 'w-full'])
                                         ->form([
+                                            Select::make('eleccion')
+                                                ->label('Tipo de destino')
+                                                ->searchable()
+                                                ->options([
+                                                    'cliente' => 'Cliente',
+                                                    'almacen_intermedio' => 'Almacén intermedio',
+                                                ])
+                                                ->required()
+                                                ->reactive(),
+
                                             Select::make('cliente_id')
+                                                ->label('Cliente')
                                                 ->relationship('cliente', 'razon_social')
                                                 ->searchable()
                                                 ->preload()
-                                                ->required(),
+                                                ->required()
+                                                ->visible(fn(callable $get) => $get('eleccion') === 'cliente'),
+
+                                            Select::make('almacen_select')
+                                                ->label('Almacén intermedio')
+                                                ->options(function () {
+                                                    $usuario = Auth::user();
+
+                                                    $almacenesIds = \DB::table('almacenes_users')
+                                                        ->where('user_id', $usuario->id)
+                                                        ->pluck('almacen_id');
+
+                                                    $almacenes = $almacenesIds->isNotEmpty()
+                                                        ? AlmacenIntermedio::whereIn('id', $almacenesIds)->get()
+                                                        : AlmacenIntermedio::all();
+
+                                                    return $almacenes->mapWithKeys(function ($almacen) {
+                                                        return [
+                                                            $almacen->id => "{$almacen->referencia} ({$almacen->monte_parcela}, {$almacen->ayuntamiento})"
+                                                        ];
+                                                    });
+                                                })
+                                                ->searchable()
+                                                ->preload()
+                                                ->required()
+                                                ->visible(fn(callable $get) => $get('eleccion') === 'almacen_intermedio'),
 
                                             Select::make('tipo_biomasa')
                                                 ->options([
@@ -257,7 +329,7 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                                 ->required(),
 
                                             TextInput::make('peso_neto')
-                                                ->label('Peso neto')
+                                                ->label('Peso neto (Tn)')
                                                 ->numeric()
                                                 ->required()
                                                 ->minValue(0),
@@ -276,8 +348,12 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                                 ->required(),
                                         ])
                                         ->action(function (array $data, $record) {
+                                            $clienteId = $data['eleccion'] === 'almacen_intermedio'
+                                                ? $data['almacen_select']
+                                                : $data['cliente_id'];
+
                                             $record->update([
-                                                'cliente_id' => $data['cliente_id'],
+                                                'cliente_id' => $clienteId,
                                                 'tipo_biomasa' => $data['tipo_biomasa'],
                                                 'peso_neto' => $data['peso_neto'],
                                                 'albaran' => $data['albaran'],

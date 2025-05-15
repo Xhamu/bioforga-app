@@ -31,7 +31,7 @@ class ParteTrabajoSuministroDesplazamientoResource extends Resource
     protected static ?string $model = ParteTrabajoSuministroDesplazamiento::class;
     protected static ?string $navigationIcon = 'heroicon-o-clock';
     protected static ?string $navigationGroup = 'Partes de trabajo';
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 3;
     protected static ?string $slug = 'partes-trabajo-suministro-desplazamiento';
     public static ?string $label = 'desplazamiento';
     public static ?string $pluralLabel = 'Desplazamientos';

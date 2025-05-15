@@ -30,6 +30,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\HtmlString;
+use Filament\Forms\Get;
 
 class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
 {
@@ -102,7 +103,7 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                             ->afterStateHydrated(function (callable $get, callable $set, $state) {
                                 if ($state)
                                     return;
-                    
+
                                 $maquinaId = $get('maquina_id');
 
                                 if ($maquinaId) {
@@ -296,40 +297,71 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                                 ->modalHeading('Finalizar trabajo')
                                 ->modalSubmitActionLabel('Finalizar')
                                 ->modalWidth('xl')
-                                ->form([
-                                    TextInput::make('horas_encendido')->numeric()->required(),
-                                    TextInput::make('horas_rotor')->numeric()->required(),
-                                    TextInput::make('horas_trabajo')->numeric()->required(),
-                                    TextInput::make('cantidad_producida')->numeric()->label('Cantidad producida (camiones o tn)')->required(),
+                                ->form(function (Get $get) {
+                                    $tipoHoras = \App\Models\Maquina::find($get('maquina_id'))?->tipo_horas ?? [];
+                                    $tipoConsumos = \App\Models\Maquina::find($get('maquina_id'))?->tipo_consumo ?? [];
 
-                                    TextInput::make('consumo_gasoil')->numeric()->required()->label('Gasoil (L)'),
-                                    TextInput::make('consumo_cuchillas')->numeric()->required()->label('Cuchillas usadas (ud)'),
-                                    TextInput::make('consumo_muelas')->numeric()->required()->label('Muelas usadas (ud)'),
+                                    return [
+                                        // Campos de tipo horas
+                                        ...collect($tipoHoras)->map(
+                                            fn($hora) =>
+                                            TextInput::make($hora)
+                                                ->label(ucfirst(str_replace('_', ' ', $hora)))
+                                                ->numeric()
+                                                ->required()
+                                        )->toArray(),
 
-                                    FileUpload::make('horometro')
-                                        ->label('Foto easygreen o horómetro')
-                                        ->disk('public')
-                                        ->directory('horometros')
-                                        ->required(),
+                                        Select::make('tipo_cantidad_producida')
+                                            ->label('Tipo de cantidad')
+                                            ->options([
+                                                'camiones' => 'Camiones',
+                                                'toneladas' => 'Toneladas',
+                                            ])
+                                            ->searchable()
+                                            ->reactive()
+                                            ->required(),
 
-                                    TextInput::make('gps_fin_trabajo')
-                                        ->label('GPS')
-                                        ->required(),
+                                        TextInput::make('cantidad_producida')
+                                            ->numeric()
+                                            ->label(fn(Get $get) => 'Cantidad producida (' . ($get('tipo_cantidad_producida') ?? 'camiones/tn') . ')')
+                                            ->visible(fn(Get $get) => filled($get('tipo_cantidad_producida')))
+                                            ->required(),
 
-                                    View::make('livewire.location-fin-trabajo'),
-                                ])
+                                        // Campos de tipo consumo
+                                        ...collect($tipoConsumos)->map(
+                                            fn($consumo) =>
+                                            TextInput::make($consumo)
+                                                ->label(ucfirst(str_replace('_', ' ', $consumo)))
+                                                ->numeric()
+                                                ->required()
+                                        )->toArray(),
+
+                                        FileUpload::make('horometro')
+                                            ->label('Foto easygreen o horómetro')
+                                            ->disk('public')
+                                            ->directory('horometros')
+                                            ->required(),
+
+                                        TextInput::make('gps_fin_trabajo')
+                                            ->label('GPS')
+                                            ->required(),
+
+                                        View::make('livewire.location-fin-trabajo'),
+                                    ];
+                                })
+
                                 ->action(function (array $data, $record) {
                                     $record->update([
-                                        'horas_encendido' => $data['horas_encendido'],
-                                        'horas_rotor' => $data['horas_rotor'],
-                                        'horas_trabajo' => $data['horas_trabajo'],
-                                        'cantidad_producida' => $data['cantidad_producida'],
-                                        'horometro' => $data['horometro'],
-                                        'consumo_gasoil' => $data['consumo_gasoil'],
-                                        'consumo_cuchillas' => $data['consumo_cuchillas'],
-                                        'consumo_muelas' => $data['consumo_muelas'],
+                                        'horas_encendido' => $data['horas_encendido'] ?? null,
+                                        'horas_rotor' => $data['horas_rotor'] ?? null,
+                                        'horas_trabajo' => $data['horas_trabajo'] ?? null,
+                                        'cantidad_producida' => $data['cantidad_producida'] ?? null,
+                                        'horometro' => $data['horometro'] ?? null,
+                                        'consumo_gasoil' => $data['consumo_gasoil'] ?? null,
+                                        'consumo_cuchillas' => $data['consumo_cuchillas'] ?? null,
+                                        'consumo_muelas' => $data['consumo_muelas'] ?? null,
                                         'fecha_hora_fin_trabajo' => now(),
-                                        'gps_fin_trabajo' => $data['gps_fin_trabajo'],
+                                        'gps_fin_trabajo' => $data['gps_fin_trabajo'] ?? null,
                                     ]);
 
                                     Notification::make()
