@@ -18,6 +18,7 @@ use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\TimePicker;
 use Filament\Forms\Components\View;
 use Filament\Forms\Form;
 use Filament\Notifications\Notification;
@@ -302,15 +303,6 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                                     $tipoConsumos = \App\Models\Maquina::find($get('maquina_id'))?->tipo_consumo ?? [];
 
                                     return [
-                                        // Campos de tipo horas
-                                        ...collect($tipoHoras)->map(
-                                            fn($hora) =>
-                                            TextInput::make($hora)
-                                                ->label(ucfirst(str_replace('_', ' ', $hora)))
-                                                ->numeric()
-                                                ->required()
-                                        )->toArray(),
-
                                         Select::make('tipo_cantidad_producida')
                                             ->label('Tipo de cantidad')
                                             ->options([
@@ -327,10 +319,18 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                                             ->visible(fn(Get $get) => filled($get('tipo_cantidad_producida')))
                                             ->required(),
 
+                                        // Campos de tipo horas
+                                        ...collect($tipoHoras)->map(
+                                            fn($hora) =>
+                                            TimePicker::make($hora)
+                                                ->label(ucfirst(str_replace('_', ' ', $hora)))
+                                                ->required()
+                                        )->toArray(),
+
                                         // Campos de tipo consumo
                                         ...collect($tipoConsumos)->map(
                                             fn($consumo) =>
-                                            TextInput::make($consumo)
+                                            TextInput::make('consumo_' . $consumo)
                                                 ->label(ucfirst(str_replace('_', ' ', $consumo)))
                                                 ->numeric()
                                                 ->required()
@@ -346,7 +346,7 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                                             ->label('GPS')
                                             ->required(),
 
-                                        View::make('livewire.location-fin-trabajo'),
+                                        //View::make('livewire.location-fin-trabajo'),
                                     ];
                                 })
 
@@ -356,6 +356,7 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                                         'horas_rotor' => $data['horas_rotor'] ?? null,
                                         'horas_trabajo' => $data['horas_trabajo'] ?? null,
                                         'cantidad_producida' => $data['cantidad_producida'] ?? null,
+                                        'tipo_cantidad_producida' => $data['tipo_cantidad_producida'] ?? null,
                                         'horometro' => $data['horometro'] ?? null,
                                         'consumo_gasoil' => $data['consumo_gasoil'] ?? null,
                                         'consumo_cuchillas' => $data['consumo_cuchillas'] ?? null,
@@ -401,8 +402,15 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                             ->content(fn($record) => $record->consumo_muelas ?? '-'),
 
                         Placeholder::make('cantidad_producida')
-                            ->label('Cantidad producida (camiones o tn)')
-                            ->content(fn($record) => $record->cantidad_producida ?? '-'),
+                            ->label('Cantidad producida')
+                            ->content(
+                                fn($record) => $record->cantidad_producida
+                                ? $record->cantidad_producida . ' ' . (
+                                    $record->tipo_cantidad_producida === 'camiones' ? 'camiones' :
+                                    ($record->tipo_cantidad_producida === 'toneladas' ? 'toneladas' : '')
+                                )
+                                : '-'
+                            ),
 
                         FileUpload::make('horometro')
                             ->label('Foto easygreen o horómetro')

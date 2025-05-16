@@ -83,12 +83,19 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                     $camion->id => '[' . $camion->matricula_cabeza . '] ' . $camion->marca . ' ' . $camion->modelo
                                 ])->toArray();
                             })
+                            ->default(function () {
+                                $usuario = Auth::user();
+
+                                $camiones = Camion::where('proveedor_id', $usuario->proveedor_id)->get();
+
+                                return $camiones->count() === 1 ? $camiones->first()->id : null;
+                            })
                             ->searchable()
                             ->preload()
                             ->required()
                             ->validationMessages([
                                 'required' => 'El :attribute es obligatorio.',
-                            ]),
+                            ])
                     ])
                     ->columns([
                         'default' => 1,
@@ -186,8 +193,6 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                             TextInput::make('gps_inicio_carga')
                                                 ->label('GPS')
                                                 ->required(),
-
-                                            View::make('livewire.location-inicio-carga'),
                                         ])
                                         ->action(function (array $data, $record) {
                                             $referenciaId = $data['eleccion'] === 'almacen'
@@ -228,9 +233,6 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                             TextInput::make('gps_fin_carga')
                                                 ->label('GPS')
                                                 ->required(),
-
-                                            View::make('livewire.location-fin-carga')
-                                                ->columnSpanFull(),
                                         ])
                                         ->action(function (array $data, $record) {
                                             $ultimaCarga = $record->cargas()->latest()->first();

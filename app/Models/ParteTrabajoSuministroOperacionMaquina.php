@@ -42,6 +42,7 @@ class ParteTrabajoSuministroOperacionMaquina extends Model
         'horas_rotor',
         'horas_trabajo',
         'cantidad_producida',
+        'tipo_cantidad_producida',
 
         'consumo_gasoil',
         'consumo_cuchillas',

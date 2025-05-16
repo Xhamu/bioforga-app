@@ -125,6 +125,22 @@
             }
         );
     }
+
+    const observer = new MutationObserver(() => {
+        const inputs = document.querySelectorAll('input[id*="gps_"]');
+
+        inputs.forEach((input) => {
+            if (!input.dataset.filled) {
+                requestLocationAndFill(input);
+                input.dataset.filled = "true"; // Evita múltiples ejecuciones
+            }
+        });
+    });
+
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+    });
 </script>
 
 <footer

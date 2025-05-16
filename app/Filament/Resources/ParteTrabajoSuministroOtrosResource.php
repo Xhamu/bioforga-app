@@ -167,8 +167,6 @@ class ParteTrabajoSuministroOtrosResource extends Resource
                                     TextInput::make('gps_fin_otros')
                                         ->label('GPS')
                                         ->required(),
-
-                                    View::make('livewire.location-fin-otros'),
                                 ])
                                 ->action(function (array $data, $record) {
                                     $record->update([

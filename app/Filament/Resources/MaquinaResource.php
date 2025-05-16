@@ -279,7 +279,7 @@ class MaquinaResource extends Resource
                                 ->options([
                                     'horas_encendido' => 'Horas de encendido',
                                     'horas_rotor' => 'Horas de rotor',
-                                    'cuchilla' => 'Cuchilla',
+                                    'horas_trabajo' => 'Horas de trabajo',
                                 ])
                                 ->validationMessages([
                                     'required' => 'El :attribute es obligatorio.',

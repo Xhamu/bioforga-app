@@ -204,21 +204,13 @@ class ReferenciaResource extends Resource
                             ->label('Tipo de certificación')
                             ->searchable()
                             ->options([
-                                'forestal' => 'Forestal',
-                                'industrial' => 'Industrial',
+                                'sure_induestrial' => 'SURE - Industrial',
+                                'sure_foresal' => 'SURE - Forestal',
+                                'sbp' => 'SBP',
+                                'pefc' => 'PEFC',
                             ])
                             ->visible(fn($get) => $get('certificable') === true)
                             ->reactive(),
-
-                        Forms\Components\Select::make('tipo_certificacion_industrial')
-                            ->label('Tipo de certificación industrial')
-                            ->searchable()
-                            ->options([
-                                'SURE' => 'SURE',
-                                'SBP' => 'SBP',
-                                'PEFC' => 'PEFC'
-                            ])
-                            ->visible(fn($get) => $get('tipo_certificacion') === 'industrial'),
 
                         Forms\Components\Checkbox::make('guia_sanidad')
                             ->label('¿Guía de sanidad?')
