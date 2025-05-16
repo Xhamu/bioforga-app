@@ -27,11 +27,12 @@ class CreateParteTrabajoAyudante extends CreateRecord
                 ->modalWidth('xl')
                 ->form([
                     Select::make('eleccion')
-                        ->label('Tipo')
+                        ->label('Medio utilizado')
                         ->options([
                             'maquina' => 'Máquina',
                             'vehiculo' => 'Vehículo',
                         ])
+                        ->searchable()
                         ->reactive()
                         ->required(),
 
@@ -61,8 +62,6 @@ class CreateParteTrabajoAyudante extends CreateRecord
                     TextInput::make('gps_inicio_ayudante')
                         ->label('GPS')
                         ->required(),
-
-                    View::make('livewire.location-inicio-ayudante'),
                 ])
                 ->action(function (array $data) {
                     $formData = array_merge(

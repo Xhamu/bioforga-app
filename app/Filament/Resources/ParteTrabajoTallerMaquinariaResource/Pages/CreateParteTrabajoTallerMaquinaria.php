@@ -6,6 +6,7 @@ use App\Filament\Resources\ParteTrabajoTallerMaquinariaResource;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\TimePicker;
 use Filament\Forms\Components\View;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
@@ -42,10 +43,8 @@ class CreateParteTrabajoTallerMaquinaria extends CreateRecord
                         ->searchable()
                         ->required(),
 
-                    TextInput::make('horas_servicio')
+                    TimePicker::make('horas_servicio')
                         ->label('Horas de servicio')
-                        ->numeric()
-                        ->minValue(0)
                         ->required(),
                 ])
                 ->action(function (array $data) {

@@ -232,8 +232,6 @@ class ParteTrabajoSuministroAveriaResource extends Resource
                                     TextInput::make('gps_fin_averia')
                                         ->label('GPS')
                                         ->required(),
-
-                                    View::make('livewire.location-fin-averia'),
                                 ])
                                 ->action(function (array $data, $record) {
                                     $record->update([

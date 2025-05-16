@@ -149,8 +149,6 @@ class ParteTrabajoSuministroDesplazamientoResource extends Resource
                                     TextInput::make('gps_fin_desplazamiento')
                                         ->label('GPS')
                                         ->required(),
-
-                                    View::make('livewire.location-fin-desplazamiento'),
                                 ])
                                 ->action(function (array $data, $record) {
                                     $record->update([
