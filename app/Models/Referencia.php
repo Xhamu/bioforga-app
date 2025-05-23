@@ -62,6 +62,16 @@ class Referencia extends Authenticatable
         return $this->belongsToMany(User::class, 'referencias_users', 'referencia_id', 'user_id')->withTimestamps()->withTrashed();
     }
 
+    public function partesTransporte()
+    {
+        return $this->hasMany(\App\Models\ParteTrabajoSuministroTransporte::class, 'referencia_id');
+    }
+
+    public function partesMaquina()
+    {
+        return $this->hasMany(\App\Models\ParteTrabajoSuministroOperacionMaquina::class, 'referencia_id');
+    }
+
     public function getEstadoMostrarAttribute()
     {
         $estado = $this->estado;

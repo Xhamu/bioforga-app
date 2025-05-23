@@ -7,6 +7,8 @@ use App\Filament\Resources\ReferenciaResource\RelationManagers;
 use App\Models\Referencia;
 use Filament\Forms;
 use Filament\Forms\Components\Livewire;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Support\Enums\FontWeight;
@@ -21,6 +23,13 @@ use Filament\Forms\Components\View;
 use Filament\Tables\Columns\Layout\Grid;
 use Filament\Tables\Columns\Layout\Panel;
 use Jenssegers\Agent\Agent;
+use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
+use pxlrbt\FilamentExcel\Actions\Tables\ExportAction;
+use pxlrbt\FilamentExcel\Actions\Tables\ExportBulkAction;
+use pxlrbt\FilamentExcel\Columns\Column;
+use pxlrbt\FilamentExcel\Exports\ExcelExport;
+use Filament\Tables\Actions\Action;
+use Filament\Forms\Components\Radio;
 
 class ReferenciaResource extends Resource
 {
@@ -355,6 +364,38 @@ class ReferenciaResource extends Resource
                 ->filters([
                     Tables\Filters\TrashedFilter::make(),
                 ])
+                ->headerActions([
+
+                    Action::make('exportar_excel')
+                        ->label('Exportar a Excel')
+                        ->modalWidth('xl')
+                        ->modalSubmitActionLabel('Exportar')
+                        ->modalCancelActionLabel('Cerrar')
+                        ->form([
+                            Select::make('tipo_exportacion')
+                                ->label('Selecciona una opción')
+                                ->options([
+                                    'suministro' => 'Suministro',
+                                    'servicio' => 'Servicio',
+                                ])
+                                ->searchable()
+                                ->required(),
+
+                            TextInput::make('nombre_archivo')
+                                ->label('Nombre del archivo')
+                                ->default('referencias-' . now()->format('Y-m-d'))
+                                ->required(),
+                        ])
+                        ->action(function (array $data) {
+                            $tipo = $data['tipo_exportacion'];
+                            $nombre = $data['nombre_archivo'] . '.xlsx';
+
+                            return redirect()->route('referencias.export', [
+                                'tipo' => $tipo,
+                                'nombre' => $nombre,
+                            ]);
+                        })
+                ])
                 ->actions([
                     Tables\Actions\EditAction::make(),
                 ])
@@ -392,4 +433,269 @@ class ReferenciaResource extends Resource
                 SoftDeletingScope::class,
             ]);
     }
+
+    public static function generalFormSchema(): array
+    {
+        return [
+            View::make('livewire.tipo-select')
+                ->visible(function ($state) {
+                    return !isset($state['id']);
+                })
+                ->columnSpanFull(),
+
+            Forms\Components\TextInput::make('referencia')
+                ->required()
+                ->reactive()
+                ->columnSpanFull(),
+
+            Forms\Components\Select::make('tipo_servicio')
+                ->required()
+                ->searchable()
+                ->options([
+                    'Astillado Suelo' => 'Astillado Suelo',
+                    'Astillado Camión' => 'Astillado Camión',
+                    'Triturado Suelo' => 'Triturado Suelo',
+                    'Triturado Camión' => 'Triturado Camión',
+                    'Saca autocargador' => 'Saca autocargador',
+                ])
+                ->columnSpanFull()
+                ->visible(function ($get) {
+                    return !empty($get('referencia')) && strpos($get('referencia'), 'SU') === false;
+                }),
+
+            Forms\Components\Select::make('formato')
+                ->nullable()
+                ->options([
+                    'CA' => 'Cargadero',
+                    'SA' => 'Saca',
+                    'EX' => 'Explotación',
+                    'OT' => 'Otros',
+                ])
+                ->searchable()
+                ->preload()
+                ->required()
+                ->columnSpanFull()
+                ->live()
+                ->afterStateUpdated(function ($state, callable $set, callable $get) {
+                    if ($state) {
+                        $referencia = $get('referencia') ?? '';
+
+                        // Separar partes con regex (sector + 'SU' + formato anterior + fecha + contador)
+                        preg_match('/^(?<sector>\d{2})SU(?:CA|SA|EX|OT)?(?<fecha>\d{6})(?<contador>\d{3})$/', $referencia, $matches);
+
+                        $sector = $matches['sector'] ?? '01'; // Valor por defecto si no hay sector
+                        $fecha = $matches['fecha'] ?? now()->format('dmy');
+                        $contador = $matches['contador'] ?? '001';
+
+                        $nuevaReferencia = $sector . 'SU' . $state . $fecha . $contador;
+
+                        $set('referencia', $nuevaReferencia);
+                    } else {
+                        $set('referencia', '');
+                    }
+                })
+                ->visible(function ($get) {
+                    return str_contains($get('referencia'), 'SU');
+                }),
+
+            Forms\Components\Section::make('Ubicación')
+                ->schema([
+                    Forms\Components\TextInput::make('provincia')
+                        ->required(),
+                    Forms\Components\TextInput::make('ayuntamiento')
+                        ->required(),
+                    Forms\Components\TextInput::make('monte_parcela')
+                        ->label('Monte / Parcela')
+                        ->required(),
+                    Forms\Components\Select::make('sector')
+                        ->label('Sector')
+                        ->searchable()
+                        ->options([
+                            '01' => 'Zona Norte',
+                            '02' => 'Zona Sur',
+                            '03' => 'Andalucía',
+                            '04' => 'Huelva',
+                            '05' => 'Otros',
+                        ])
+                        ->required()
+                        ->live()
+                        ->afterStateUpdated(function ($state, callable $set, callable $get) {
+                            $referencia = $get('referencia') ?? '';
+
+                            $referencia = preg_replace('/^(01|02|03|04|05)/', '', $referencia);
+
+                            $set('referencia', $state . $referencia);
+                        })
+                        ->visible(function ($get) {
+                            return !empty($get('referencia'));
+                        }),
+                    Forms\Components\TextInput::make('finca')
+                        ->label('Finca')
+                        ->required()
+                        ->visible(function ($get) {
+                            return !empty($get('referencia')) && strpos($get('referencia'), 'SU') === false;
+                        }),
+                    Forms\Components\TextInput::make('ubicacion_gps')
+                        ->label('GPS'),
+                    View::make('livewire.get-location-button')
+                        ->visible(function ($state) {
+                            return !isset($state['id']);
+                        })
+                        ->columnSpanFull(),
+                ])
+                ->columns(2),
+
+            Forms\Components\Section::make('Intervinientes')
+                ->schema([
+                    Forms\Components\Select::make('proveedor_id')
+                        ->nullable()
+                        ->searchable()
+                        ->preload()
+                        ->relationship('proveedor', 'razon_social')
+                        ->visible(function ($get) {
+                            return strpos($get('referencia'), 'SU') !== false;
+                        }),
+                    Forms\Components\Select::make('cliente_id')
+                        ->nullable()
+                        ->searchable()
+                        ->preload()
+                        ->relationship('cliente', 'razon_social')
+                        ->visible(function ($get) {
+                            return strpos($get('referencia'), 'SU') === false;
+                        }),
+                ])
+                ->visible(function ($get) {
+                    return !empty($get('referencia'));
+                })
+                ->columns(1),
+
+            Forms\Components\Section::make('Producto')
+                ->schema([
+                    Forms\Components\Select::make('producto_especie')
+                        ->label('Especie')
+                        ->searchable()
+                        ->options([
+                            'pino' => 'Pino',
+                            'eucalipto' => 'Eucalipto',
+                            'acacia' => 'Acacia',
+                            'frondosa' => 'Frondosa',
+                            'otros' => 'Otros',
+                        ])
+                        ->required(),
+                    Forms\Components\Select::make('producto_tipo')
+                        ->label('Tipo')
+                        ->searchable()
+                        ->options([
+                            'troza' => 'Troza',
+                            'tacos' => 'Tacos',
+                            'puntal' => 'Puntal',
+                        ])
+                        ->required(),
+
+                    Forms\Components\TextInput::make('cantidad_aprox')
+                        ->label('Cantidad')
+                        ->numeric()
+                        ->required(),
+
+                    Forms\Components\Checkbox::make('certificable')
+                        ->label('¿Certificable?')
+                        ->reactive(),
+
+                    Forms\Components\Select::make('tipo_certificacion')
+                        ->label('Tipo de certificación')
+                        ->searchable()
+                        ->options([
+                            'sure_induestrial' => 'SURE - Industrial',
+                            'sure_foresal' => 'SURE - Forestal',
+                            'sbp' => 'SBP',
+                            'pefc' => 'PEFC',
+                        ])
+                        ->visible(fn($get) => $get('certificable') === true)
+                        ->reactive(),
+
+                    Forms\Components\Checkbox::make('guia_sanidad')
+                        ->label('¿Guía de sanidad?')
+                        ->reactive(),
+
+                ])->columns(3)
+                ->visible(function ($get) {
+                    return !empty($get('referencia'));
+                }),
+
+            Forms\Components\Section::make('Tarifa')
+                ->schema([
+                    Forms\Components\Select::make('tarifa')
+                        ->label('')
+                        ->options([
+                            'toneladas' => 'Toneladas',
+                            'm3' => 'Metros cúbicos',
+                        ])
+                        ->searchable()
+                        ->nullable(),
+                ])->columns(1)
+                ->visible(function ($get) {
+                    return !empty($get('referencia'));
+                }),
+
+            Forms\Components\Section::make('Contacto')
+                ->schema([
+                    Forms\Components\TextInput::make('contacto_nombre')
+                        ->label('Nombre')
+                        ->nullable(),
+                    Forms\Components\TextInput::make('contacto_telefono')
+                        ->label('Teléfono')
+                        ->nullable(),
+                    Forms\Components\TextInput::make('contacto_email')
+                        ->label('Correo electrónico')
+                        ->nullable(),
+                ])->columns(3)
+                ->visible(function ($get) {
+                    return !empty($get('referencia'));
+                }),
+
+            Forms\Components\Section::make('Usuarios')
+                ->schema([
+                    Forms\Components\Select::make('usuarios')
+                        ->label('Usuarios relacionados')
+                        ->multiple()
+                        ->relationship('usuarios', 'name')
+                        ->preload()
+                        ->searchable()
+                        ->columnSpanFull()
+                        ->visible(fn($get) => !empty($get('referencia'))),
+                ])->columns(1)
+                ->visible(function ($get) {
+                    return !empty($get('referencia'));
+                }),
+
+            Forms\Components\Section::make('Estado')
+                ->schema([
+                    Forms\Components\Select::make('estado')
+                        ->label('Estado')
+                        ->searchable()
+                        ->options([
+                            'abierto' => 'Abierto',
+                            'cerrado' => 'Cerrado',
+                            'en_proceso' => 'En proceso',
+                        ])
+                        ->required(),
+
+                    Forms\Components\Select::make('en_negociacion')
+                        ->label('En negociación')
+                        ->searchable()
+                        ->options([
+                            'confirmado' => 'Confirmado',
+                            'sin_confirmar' => 'Sin confirmar',
+                        ])
+                        ->required(),
+
+                    Forms\Components\Textarea::make('observaciones')
+                        ->nullable(),
+                ])->columns(1)
+                ->visible(function ($get) {
+                    return !empty($get('referencia'));
+                }),
+        ];
+    }
+
 }

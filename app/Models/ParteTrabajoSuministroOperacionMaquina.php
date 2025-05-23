@@ -54,10 +54,10 @@ class ParteTrabajoSuministroOperacionMaquina extends Model
     ];
 
     protected $casts = [
-        'fecha_hora_inicio_trabajo' => 'date',
-        'fecha_hora_parada_trabajo' => 'date',
-        'fecha_hora_reanudacion_trabajo' => 'date',
-        'fecha_hora_fin_trabajo' => 'date',
+        'fecha_hora_inicio_trabajo' => 'datetime',
+        'fecha_hora_parada_trabajo' => 'datetime',
+        'fecha_hora_reanudacion_trabajo' => 'datetime',
+        'fecha_hora_fin_trabajo' => 'datetime',
     ];
 
     public function getActivitylogOptions(): LogOptions

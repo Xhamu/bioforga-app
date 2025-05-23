@@ -17,6 +17,11 @@ class CargaTransporte extends Model
         'cantidad',
     ];
 
+    protected $casts = [
+        'fecha_hora_inicio_carga' => 'datetime',
+        'fecha_hora_fin_carga' => 'datetime',
+    ];
+
     public function parteTrabajoSuministroTransporte(): BelongsTo
     {
         return $this->belongsTo(ParteTrabajoSuministroTransporte::class, 'parte_trabajo_suministro_transporte_id');
