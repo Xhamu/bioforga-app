@@ -15,7 +15,9 @@
         "jenssegers/agent": "^2.6",
         "laravel/framework": "^11.31",
         "laravel/tinker": "^2.9",
+        "psr/simple-cache": "^2.0",
         "pxlrbt/filament-activity-log": "^1.1",
+        "pxlrbt/filament-excel": "^2.4",
         "spatie/laravel-activitylog": "^4.10",
         "stechstudio/filament-impersonate": "^3.15",
         "tomatophp/filament-pwa": "^1.0"

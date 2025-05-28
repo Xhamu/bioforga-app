@@ -6,7 +6,9 @@ use App\Filament\Resources\AcopiosObservadosResource\Pages;
 use App\Filament\Resources\AcopiosObservadosResource\RelationManagers;
 use App\Models\AcopiosObservados;
 use Filament\Forms;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Form;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Columns\TextColumn;
@@ -85,6 +87,31 @@ class AcopiosObservadosResource extends Resource
                             ->label('Correo electrónico')
                             ->nullable(),
                     ])->columns(3),
+
+                Section::make('Estado')
+                    ->schema([
+                        Select::make('estado')
+                            ->label('Estado')
+                            ->searchable()
+                            ->options([
+                                'captado' => 'Captado',
+                                'no_captado' => 'No captado',
+                                'descartado' => 'Descartado',
+                            ])
+                            ->required()
+                            ->afterStateUpdated(function ($state, $set, $record) {
+                                if ($state === 'descartado' && $record) {
+                                    $record->delete();
+                                    Notification::make()
+                                        ->title('Registro descartado y eliminado')
+                                        ->success()
+                                        ->send();
+
+                                    redirect(request()->header('Referer') ?? '/');
+                                }
+                            }),
+                    ])
+                    ->columns(1),
 
                 Section::make('Observaciones')
                     ->schema([

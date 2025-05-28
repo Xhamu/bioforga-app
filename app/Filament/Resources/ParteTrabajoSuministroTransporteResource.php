@@ -348,6 +348,12 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                                 ->disk('public')
                                                 ->directory('albaranes')
                                                 ->required(),
+
+                                            FileUpload::make('carta_porte')
+                                                ->label('Carta de porte')
+                                                ->disk('public')
+                                                ->directory('albaranes')
+                                                ->required(),
                                         ])
                                         ->action(function (array $data, $record) {
                                             $clienteId = $data['eleccion'] === 'almacen_intermedio'
@@ -359,6 +365,7 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                                 'tipo_biomasa' => $data['tipo_biomasa'],
                                                 'peso_neto' => $data['peso_neto'],
                                                 'albaran' => $data['albaran'],
+                                                'carta_porte' => $data['carta_porte'],
                                             ]);
 
                                             Notification::make()
@@ -398,7 +405,7 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                             }),
 
                         Placeholder::make('peso_neto')
-                            ->label('Peso neto')
+                            ->label('Peso neto (Tn)')
                             ->content(fn($record) => $record->peso_neto ?? '-'),
 
                         Placeholder::make('cantidad_total')
@@ -407,6 +414,15 @@ class ParteTrabajoSuministroTransporteResource extends Resource
 
                         FileUpload::make('albaran')
                             ->label('Foto del ticket de pesada')
+                            ->disk('public')
+                            ->directory('albaranes')
+                            ->imageEditor()
+                            ->openable()
+                            ->required()
+                            ->columnSpanFull(),
+
+                        FileUpload::make('carta_porte')
+                            ->label('Carta de porte')
                             ->disk('public')
                             ->directory('albaranes')
                             ->imageEditor()

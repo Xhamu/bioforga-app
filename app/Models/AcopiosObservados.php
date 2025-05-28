@@ -36,6 +36,7 @@ class AcopiosObservados extends Authenticatable
         'contacto_email',
 
         'observaciones',
+        'estado',
     ];
 
     /**
