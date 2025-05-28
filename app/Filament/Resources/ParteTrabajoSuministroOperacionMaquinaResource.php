@@ -324,6 +324,7 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                                             fn($hora) =>
                                             TimePicker::make($hora)
                                                 ->label(ucfirst(str_replace('_', ' ', $hora)))
+                                                ->withoutSeconds()
                                                 ->required()
                                         )->toArray(),
 

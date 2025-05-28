@@ -15,6 +15,7 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
+use Illuminate\Support\Collection;
 
 class ReferenciasExport implements FromCollection, WithHeadings, WithMapping, WithEvents, WithStyles, ShouldAutoSize
 {
@@ -24,19 +25,87 @@ class ReferenciasExport implements FromCollection, WithHeadings, WithMapping, Wi
     {
         $this->tipo = $tipo;
     }
-
     public function collection()
     {
-        $esSuministro = $this->tipo === 'suministro';
         $filtros = ['SUSA', 'SUEX', 'SUOT', 'SUCA'];
 
-        return Referencia::where(function ($query) use ($filtros, $esSuministro) {
-            foreach ($filtros as $filtro) {
-                $esSuministro
-                    ? $query->orWhere('referencia', 'LIKE', "%$filtro%")
-                    : $query->where('referencia', 'NOT LIKE', "%$filtro%");
+        if ($this->tipo === 'servicio') {
+            return Referencia::where(function ($query) use ($filtros) {
+                foreach ($filtros as $filtro) {
+                    $query->where('referencia', 'NOT LIKE', "%$filtro%");
+                }
+            })->get();
+        }
+
+        // Si es suministro, agrupamos en bloques por filtro
+        $bloques = collect();
+
+        foreach ($filtros as $tipo) {
+            $datos = Referencia::where('referencia', 'LIKE', "%$tipo%")->get();
+
+            if ($datos->isNotEmpty()) {
+                $nombreMapeado = match ($tipo) {
+                    'SUSA' => 'SACA',
+                    'SUEX' => 'EXPLOTACIÓN',
+                    'SUCA' => 'CARGADOR',
+                    'SUOT' => 'OTROS',
+                    default => $tipo,
+                };
+
+                // Fila de título de grupo
+                $bloques->push((object) [
+                    'created_at' => null,
+                    'referencia' => "=== {$nombreMapeado} ===",
+                    'proveedor_id' => null,
+                    'contacto_nombre' => null,
+                    'monte_parcela' => null,
+                    'ayuntamiento' => null,
+                    'ubicacion_gps' => null,
+                    'cantidad_aprox' => null,
+                    'producto_tipo' => null,
+                    'observaciones' => null,
+                    'estado' => null,
+                ]);
+
+                // Fila de encabezado personalizada
+                $bloques->push((object) [
+                    'created_at' => 'FECHA',
+                    'referencia' => 'REFERENCIA',
+                    'proveedor_id' => 'PROVEEDOR',
+                    'contacto_nombre' => 'CONTACTO',
+                    'monte_parcela' => 'MONTE',
+                    'ayuntamiento' => 'MUNICIPIO',
+                    'ubicacion_gps' => 'UBICACION',
+                    'cantidad_aprox' => 'CANTIDAD',
+                    'producto_tipo' => 'TIPO-CLASIFICACIÓN',
+                    'observaciones' => 'OBSERVACIONES',
+                    'referencia_precio' => 'PRECIO',
+                    'estado' => 'ESTADO',
+                ]);
+
+                // Datos reales
+                foreach ($datos as $d) {
+                    $bloques->push($d);
+                }
+
+                // Separador visual
+                $bloques->push((object) [
+                    'created_at' => null,
+                    'referencia' => null,
+                    'proveedor_id' => null,
+                    'contacto_nombre' => null,
+                    'monte_parcela' => null,
+                    'ayuntamiento' => null,
+                    'ubicacion_gps' => null,
+                    'cantidad_aprox' => null,
+                    'producto_tipo' => null,
+                    'observaciones' => null,
+                    'estado' => null,
+                ]);
             }
-        })->get();
+        }
+
+        return $bloques;
     }
 
     public function headings(): array
@@ -59,6 +128,47 @@ class ReferenciasExport implements FromCollection, WithHeadings, WithMapping, Wi
 
     public function map($row): array
     {
+        // Fila de grupo (título tipo "=== SACA ===")
+        if ($row->created_at === null && str_starts_with($row->referencia, '=== ')) {
+            return [
+                "'" . $row->referencia,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
+            ];
+        }
+
+        // Fila de encabezados personalizados para cada grupo
+        if ($row->created_at === 'FECHA') {
+            return [
+                'FECHA',
+                'REFERENCIA',
+                'PROVEEDOR',
+                'CONTACTO',
+                'MONTE',
+                'MUNICIPIO',
+                'UBICACION',
+                'CANTIDAD',
+                'TIPO-CLASIFICACIÓN',
+                'OBSERVACIONES',
+                'PRECIO',
+                'ESTADO'
+            ];
+        }
+
+        // Fila separadora vacía
+        if ($row->created_at === null && $row->referencia === null) {
+            return array_fill(0, 12, null);
+        }
+
         return [
             $row->created_at?->format('d/m/Y'),
             $row->referencia,
@@ -66,11 +176,13 @@ class ReferenciasExport implements FromCollection, WithHeadings, WithMapping, Wi
             $row->contacto_nombre,
             $row->monte_parcela,
             $row->ayuntamiento,
-            '=HYPERLINK("https://maps.google.com/?q=' . $row->ubicacion_gps . '")',
+            $row->ubicacion_gps
+            ? '=HYPERLINK("https://maps.google.com/?q=' . $row->ubicacion_gps . '")'
+            : null,
             $row->cantidad_aprox,
             $row->producto_tipo,
             $row->observaciones,
-            $row->referencia, // Asumo que aquí hay que ajustar si quieres otro campo
+            $row->referencia,
             $row->estado,
         ];
     }

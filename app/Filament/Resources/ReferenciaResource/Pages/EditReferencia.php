@@ -4,6 +4,7 @@ namespace App\Filament\Resources\ReferenciaResource\Pages;
 
 use App\Filament\Resources\ReferenciaResource;
 use Filament\Actions;
+use Filament\Forms\Components\Repeater;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Forms;
 use Filament\Forms\Components\Tabs;
@@ -61,24 +62,33 @@ class EditReferencia extends EditRecord
 
                 Tabs\Tab::make('Facturación')
                     ->schema([
-                        Forms\Components\TextInput::make('factura_numero')
-                            ->label('Número de factura')
-                            ->nullable(),
+                        Repeater::make('facturas')
+                            ->relationship()
+                            ->label('Facturas')
+                            ->schema([
+                                Forms\Components\TextInput::make('numero')
+                                    ->label('Número de factura')
+                                    ->nullable(),
 
-                        Forms\Components\DatePicker::make('fecha_factura')
-                            ->label('Fecha')
-                            ->nullable(),
+                                Forms\Components\DatePicker::make('fecha')
+                                    ->label('Fecha')
+                                    ->default(now())
+                                    ->nullable(),
 
-                        Forms\Components\TextInput::make('importe')
-                            ->label('Importe / Tn (€)')
-                            ->numeric()
-                            ->prefix('€')
-                            ->nullable(),
+                                Forms\Components\TextInput::make('importe')
+                                    ->label('Importe / Tn (€)')
+                                    ->numeric()
+                                    ->prefix('€')
+                                    ->nullable(),
 
-                        Forms\Components\Textarea::make('notas_factura')
-                            ->label('Notas')
-                            ->nullable(),
-                    ]),
+                                Forms\Components\Textarea::make('notas')
+                                    ->label('Notas')
+                                    ->nullable(),
+                            ])
+                            ->columns(2) // Opcional: puedes poner en columnas si quieres ahorrar espacio
+                            ->defaultItems(1) // Opcional: cuántas facturas se muestran por defecto
+                            ->createItemButtonLabel('Añadir factura'),
+                    ])
             ])
                 ->columnSpanFull(),
         ]);

@@ -72,6 +72,11 @@ class Referencia extends Authenticatable
         return $this->hasMany(\App\Models\ParteTrabajoSuministroOperacionMaquina::class, 'referencia_id');
     }
 
+    public function facturas()
+    {
+        return $this->hasMany(Factura::class);
+    }
+
     public function getEstadoMostrarAttribute()
     {
         $estado = $this->estado;
