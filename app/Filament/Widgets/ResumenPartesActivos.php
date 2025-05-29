@@ -3,17 +3,15 @@
 namespace App\Filament\Widgets;
 
 use Filament\Widgets\Widget;
-use Illuminate\Support\Facades\Auth;
 
-class PartesTrabajoActivos extends Widget
+class ResumenPartesActivos extends Widget
 {
-    protected static string $view = 'filament.widgets.partes-trabajo-activos';
+    protected static string $view = 'filament.widgets.resumen-partes-activos';
+
     protected int|string|array $columnSpan = 'full';
 
     public function getViewData(): array
     {
-        $userId = Auth::id();
-
         $modelos = [
             \App\Models\ParteTrabajoAyudante::class => ['campo_fin' => 'fecha_hora_fin_ayudante', 'campo_inicio' => 'fecha_hora_inicio_ayudante'],
             \App\Models\ParteTrabajoSuministroAveria::class => ['campo_fin' => 'fecha_hora_fin_averia', 'campo_inicio' => 'fecha_hora_inicio_averia'],
@@ -46,57 +44,53 @@ class PartesTrabajoActivos extends Widget
             \App\Models\ParteTrabajoTallerMaquinaria::class => 'Taller - Maquinaria',
             \App\Models\ParteTrabajoTallerVehiculos::class => 'Taller - Vehículos',
         ];
-
-        $totalActivos = 0;
         $partesActivos = [];
 
         foreach ($modelos as $modelo => $campos) {
-            if ($modelo === \App\Models\ParteTrabajoSuministroTransporte::class) {
-                // Cargas relacionadas con partes sin finalizar
+            if (isset($campos['especial']) && $modelo === \App\Models\ParteTrabajoSuministroTransporte::class) {
                 $cargas = \App\Models\CargaTransporte::whereNull('fecha_hora_fin_carga')
-                    ->whereHas('parteTrabajoSuministroTransporte', function ($query) use ($userId) {
-                        $query->where('usuario_id', $userId);
-                    })
-                    ->with('parteTrabajoSuministroTransporte')
+                    ->with('parteTrabajoSuministroTransporte.usuario') // OJO: cadena de relaciones
                     ->get();
 
                 foreach ($cargas as $carga) {
                     $parte = $carga->parteTrabajoSuministroTransporte;
+                    if (!$parte)
+                        continue;
 
                     $partesActivos[] = [
                         'id' => $parte->id,
-                        'modelo' => \App\Models\ParteTrabajoSuministroTransporte::class,
                         'label' => $labels[\App\Models\ParteTrabajoSuministroTransporte::class],
                         'slug' => $slugs[\App\Models\ParteTrabajoSuministroTransporte::class],
                         'inicio' => $carga->fecha_hora_inicio_carga,
+                        'usuario_nombre' => $parte->usuario?->name ?? 'Desconocido',
                     ];
                 }
 
-                $totalActivos += $cargas->count();
-
-                continue; // Saltamos al siguiente modelo
+                continue;
             }
 
-            // Resto de modelos normales
-            $query = $modelo::whereNull($campos['campo_fin'])->where('usuario_id', $userId);
+            $activos = $modelo::whereNull($campos['campo_fin'])
+                ->with('usuario') // Añade esto
+                ->get();
 
-            foreach ($query->get() as $parte) {
+            foreach ($activos as $parte) {
                 $partesActivos[] = [
                     'id' => $parte->id,
-                    'modelo' => $modelo,
-                    'label' => $labels[$modelo] ?? class_basename($modelo),
-                    'slug' => $slugs[$modelo] ?? null,
+                    'label' => $labels[$modelo],
+                    'slug' => $slugs[$modelo],
                     'inicio' => $parte->{$campos['campo_inicio']} ?? null,
+                    'usuario_nombre' => $parte->usuario?->name ?? 'Desconocido',
                 ];
             }
-
-            $totalActivos += $query->count();
         }
 
+        // Ordenar por inicio descendente
+        usort($partesActivos, fn($a, $b) => strtotime($b['inicio']) <=> strtotime($a['inicio']));
+
         return [
-            'activos' => $totalActivos,
-            'parte' => $partesActivos[0] ?? null,
+            'total' => count($partesActivos),
             'partesActivos' => $partesActivos,
         ];
     }
+
 }
