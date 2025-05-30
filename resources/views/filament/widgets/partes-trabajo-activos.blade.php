@@ -1,18 +1,17 @@
 <x-filament-widgets::widget>
     <x-filament::card class="space-y-4">
-        <h2 class="text-xl font-bold">Partes de trabajo activos</h2>
-
         @php
             $slug = $parte['slug'] ?? null;
             $nombreModelo = $parte['label'] ?? null;
         @endphp
 
         @if ($activos > 0)
-            <p class="mt-2 text-green-600">
-                Tienes <strong>{{ $activos }}</strong> parte(s) de trabajo sin finalizar.
+            <p class="text-l">
+                Tienes <strong>{{ $activos }}</strong> parte{{ $activos === 1 ? '' : 's' }} de trabajo sin
+                finalizar.
             </p>
         @else
-            <p class="mt-2 text-gray-500">No hay partes de trabajo activos para ti.</p>
+            <p class="mt-2 text-gray-500">No tienes partes de trabajo activos.</p>
         @endif
 
         @if (!empty($partesActivos))
