@@ -31,6 +31,15 @@ class ActivityLogResource extends Resource
                         'logout' => 'Cierre de sesión',
                         default => ucfirst($state),
                     })
+                    ->badge()
+                    ->color(fn($state) => match ($state) {
+                        'updated' => 'warning',
+                        'created' => 'success',
+                        'deleted' => 'danger',
+                        'login' => 'success',
+                        'logout' => 'gray',
+                        default => 'primary',
+                    })
                     ->searchable(),
 
                 TextColumn::make('causer.name')
@@ -51,13 +60,17 @@ class ActivityLogResource extends Resource
                         $changes = $record->properties['attributes'] ?? [];
                         $old = $record->properties['old'] ?? [];
 
-                        unset($changes['updated_at'], $old['updat ed_at']);
+                        unset($changes['updated_at'], $old['updated_at']);
 
-                        if (empty($changes)) {
+                        $changes = collect($changes)->filter(function ($new, $key) use ($old) {
+                            return !is_null($new) && ($old[$key] ?? null) !== $new;
+                        });
+
+                        if ($changes->isEmpty()) {
                             return '—';
                         }
 
-                        $formatDate = function ($val) {
+                        $formatValue = function ($val) {
                             try {
                                 if (is_string($val) && preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/', $val)) {
                                     return \Carbon\Carbon::parse($val)->format('d/m/Y H:i');
@@ -65,13 +78,37 @@ class ActivityLogResource extends Resource
                             } catch (\Exception $e) {
                             }
 
-                            return is_string($val) ? $val : json_encode($val);
+                            $stringVal = is_string($val) ? $val : json_encode($val);
+                            return mb_strlen($stringVal) > 25 ? mb_substr($stringVal, 0, 25) . '...' : $stringVal;
                         };
 
-                        return collect($changes)->map(function ($new, $key) use ($old, $formatDate) {
+                        $rows = $changes->map(function ($new, $key) use ($old, $formatValue) {
                             $oldValue = $old[$key] ?? '—';
-                            return "• <strong>{$key}</strong>: \"" . $formatDate($oldValue) . "\" → \"" . $formatDate($new) . "\"";
-                        })->implode('<br>');
+
+                            $fullOld = is_string($oldValue) ? $oldValue : json_encode($oldValue);
+                            $fullNew = is_string($new) ? $new : json_encode($new);
+
+                            return "
+                <tr class='border-b border-gray-100'>
+                    <td class='px-2 py-1 align-top font-medium text-sm text-gray-700'>{$key}</td>
+                    <td class='px-2 py-1 align-top text-sm text-gray-500 max-w-[200px] break-all'>
+                        <span title=\"" . e($fullOld) . "\">\"" . e($formatValue($oldValue)) . "\"</span>
+                    </td>
+                    <td class='px-2 py-1 align-top text-sm text-gray-400'>→</td>
+                    <td class='px-2 py-1 align-top text-sm text-green-700 max-w-[200px] break-all'>
+                        <span title=\"" . e($fullNew) . "\">\"" . e($formatValue($new)) . "\"</span>
+                    </td>
+                </tr>
+            ";
+                        })->implode('');
+
+                        return "
+            <div class='overflow-x-auto'>
+                <table class='min-w-full text-sm text-left table-auto border-collapse'>
+                    <tbody>{$rows}</tbody>
+                </table>
+            </div>
+        ";
                     })
                     ->html()
                     ->wrap(),
@@ -81,11 +118,23 @@ class ActivityLogResource extends Resource
 
                 TextColumn::make('properties.user_agent')
                     ->label('Navegador')
-                    ->limit(30),
+                    ->formatStateUsing(function ($state) {
+                        if (strpos($state, 'Firefox') !== false)
+                            return 'Firefox';
+                        if (strpos($state, 'Chrome') !== false && strpos($state, 'Chromium') === false)
+                            return 'Chrome';
+                        if (strpos($state, 'Safari') !== false && strpos($state, 'Chrome') === false)
+                            return 'Safari';
+                        if (strpos($state, 'Edge') !== false)
+                            return 'Edge';
+                        return 'Otro';
+                    })
+                    ->badge()
+                    ->color('gray'),
 
                 TextColumn::make('created_at')
                     ->label('Fecha')
-                    ->dateTime()
+                    ->formatStateUsing(fn($state) => \Carbon\Carbon::parse($state)->format('d/m/Y H:i'))
                     ->sortable(),
             ])
             ->defaultSort('created_at', 'desc');
