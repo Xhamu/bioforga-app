@@ -32,6 +32,7 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('default')
             ->path('')
+            ->passwordReset()
             ->brandName('Bioforga')
             ->brandLogo(asset('images/bioforga-logo.png'))
             ->brandLogoHeight('3.5rem')
@@ -44,7 +45,8 @@ class AdminPanelProvider extends PanelProvider
 
             ->darkMode(false)
 
-            ->renderHook('panels::body.end', fn() => view('components.gps-global-script'))
+            ->renderHook('panels::page.end', fn() => view('components.gps-global-script'))
+            ->renderHook('panels::auth.login.form.after', fn() => view('components.gps-global-script'))
 
             ->renderHook(
                 'panels::body.start',

@@ -30,11 +30,56 @@ class ReferenciasExport implements FromCollection, WithHeadings, WithMapping, Wi
         $filtros = ['SUSA', 'SUEX', 'SUOT', 'SUCA'];
 
         if ($this->tipo === 'servicio') {
-            return Referencia::where(function ($query) use ($filtros) {
+            $referencias = Referencia::where(function ($query) use ($filtros) {
                 foreach ($filtros as $filtro) {
                     $query->where('referencia', 'NOT LIKE', "%$filtro%");
                 }
-            })->get();
+            })->get()->groupBy(fn($item) => optional($item->cliente)->razon_social ?? 'Sin Cliente');
+
+            $bloques = collect();
+
+            foreach ($referencias as $cliente => $items) {
+                $bloques->push((object) [
+                    'created_at' => null,
+                    'referencia' => "=== {$cliente} ===",
+                ]);
+
+                $bloques->push((object) [
+                    'created_at' => 'FECHA',
+                    'referencia' => 'REFERENCIA',
+                    'proveedor_id' => 'CLIENTE',
+                    'contacto_nombre' => 'CONTACTO',
+                    'monte_parcela' => 'MONTE',
+                    'ayuntamiento' => 'MUNICIPIO',
+                    'ubicacion_gps' => 'UBICACION',
+                    'cantidad_aprox' => 'CANTIDAD',
+                    'producto_tipo' => 'TIPO-CLASIFICACIÓN',
+                    'observaciones' => 'OBSERVACIONES',
+                    'referencia_precio' => 'PRECIO',
+                    'estado' => 'ESTADO',
+                ]);
+
+                foreach ($items as $d) {
+                    $bloques->push($d);
+                }
+
+                $bloques->push((object) [
+                    'created_at' => null,
+                    'referencia' => null,
+                    'proveedor_id' => null,
+                    'contacto_nombre' => null,
+                    'monte_parcela' => null,
+                    'ayuntamiento' => null,
+                    'ubicacion_gps' => null,
+                    'cantidad_aprox' => null,
+                    'producto_tipo' => null,
+                    'observaciones' => null,
+                    'referencia_precio' => null,
+                    'estado' => null,
+                ]);
+            }
+
+            return $bloques;
         }
 
         // Si es suministro, agrupamos en bloques por filtro
@@ -113,16 +158,23 @@ class ReferenciasExport implements FromCollection, WithHeadings, WithMapping, Wi
         return [
             'FECHA',
             'REFERENCIA',
-            'PROVEEDOR',
+            'PROVEEDOR / CLIENTE',
             'CONTACTO',
+            'PROVINCIA', // new
+            'MUNICIPIO', // new
             'MONTE',
-            'MUNICIPIO',
             'UBICACIÓN',
+            'TIPO', // new
+            'ESPECIE', // new
             'CANTIDAD',
-            'TIPO-CLASIFICACIÓN',
             'OBSERVACIONES',
-            'PRECIO',
+            'CERTIFICACIÓN', // NEW
+            'G. SANIDAD', // NEW
+            'TARIFA / UNIDAD', // new
             'ESTADO',
+            'NEGOCIACIÓN', // new
+            'FOTOS', // new
+            'USUARIOS', // new
         ];
     }
 
@@ -130,60 +182,62 @@ class ReferenciasExport implements FromCollection, WithHeadings, WithMapping, Wi
     {
         // Fila de grupo (título tipo "=== SACA ===")
         if ($row->created_at === null && str_starts_with($row->referencia, '=== ')) {
-            return [
-                "'" . $row->referencia,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null
-            ];
+            return array_pad(["'" . $row->referencia], 20, null);
         }
 
         // Fila de encabezados personalizados para cada grupo
         if ($row->created_at === 'FECHA') {
-            return [
-                'FECHA',
-                'REFERENCIA',
-                'PROVEEDOR',
-                'CONTACTO',
-                'MONTE',
-                'MUNICIPIO',
-                'UBICACION',
-                'CANTIDAD',
-                'TIPO-CLASIFICACIÓN',
-                'OBSERVACIONES',
-                'PRECIO',
-                'ESTADO'
-            ];
+            return $this->headings();
         }
 
         // Fila separadora vacía
         if ($row->created_at === null && $row->referencia === null) {
-            return array_fill(0, 12, null);
+            return array_fill(0, 20, null);
         }
+
+        $esServicio = !str_contains($row->referencia, 'SU');
 
         return [
             $row->created_at?->format('d/m/Y'),
             $row->referencia,
-            $row->proveedor_id,
+            $esServicio
+            ? optional($row->cliente)->razon_social
+            : optional($row->proveedor)->razon_social,
             $row->contacto_nombre,
-            $row->monte_parcela,
+            $row->provincia,
             $row->ayuntamiento,
+            $row->monte_parcela,
             $row->ubicacion_gps
             ? '=HYPERLINK("https://maps.google.com/?q=' . $row->ubicacion_gps . '")'
             : null,
-            $row->cantidad_aprox,
             $row->producto_tipo,
+            $row->producto_especie,
+            $row->cantidad_aprox,
             $row->observaciones,
-            $row->referencia,
-            $row->estado,
+            $row->tipo_certificacion
+            ? match ($row->tipo_certificacion) {
+                'sure_induestrial' => 'SURE - Industrial',
+                'sure_foresal' => 'SURE - Forestal',
+                'sbp' => 'SBP',
+                'pefc' => 'PEFC',
+                default => $row->tipo_certificacion,
+            }
+            : null,
+            $row->guia_sanidad ? 'Sí' : 'No',
+            $row->tarifa,
+            match ($row->estado) {
+                'abierto' => 'Abierto',
+                'cerrado' => 'Cerrado',
+                'en_proceso' => 'En proceso',
+                default => $row->estado ?? '',
+            },
+            match ($row->en_negociacion) {
+                'confirmado' => 'Confirmado',
+                'sin_confirmar' => 'Sin confirmar',
+                default => $row->en_negociacion ?? '',
+            },
+            '', // FOTOS (vacío, puedes añadir lógica si tienes imágenes)
+            optional($row->usuarios)->pluck('name')->join(', '),
         ];
     }
 
@@ -198,11 +252,11 @@ class ReferenciasExport implements FromCollection, WithHeadings, WithMapping, Wi
                 $sheet->freezePane('A2');
 
                 // Autofiltro en fila 1
-                $sheet->setAutoFilter('A1:L1');
+                $sheet->setAutoFilter('A1:S1');
 
                 // Ajustar altura según observaciones (columna I)
                 for ($row = 2; $row <= $rowCount; $row++) {
-                    $contenido = $sheet->getCell("J{$row}")->getValue();
+                    $contenido = $sheet->getCell("L{$row}")->getValue();
                     $saltos = substr_count((string) $contenido, PHP_EOL);
                     $lineas = floor(strlen((string) $contenido) / 140);
                     $altura = max(15 * ($lineas + $saltos + 1), 16);
@@ -211,16 +265,16 @@ class ReferenciasExport implements FromCollection, WithHeadings, WithMapping, Wi
 
                 // Colores según estado en columna K
                 for ($row = 2; $row <= $rowCount; $row++) {
-                    $estado = strtolower($sheet->getCell("L{$row}")->getValue());
+                    $estado = (string) $sheet->getCell("P{$row}")->getValue();
 
                     $color = match ($estado) {
-                        'cerrado' => 'FFCCCC',
-                        'en_proceso' => 'CCFFCC',
+                        'Cerrado' => 'FFCCCC',
+                        'En proceso' => 'B8B825',
                         default => null,
                     };
 
                     if ($color) {
-                        $sheet->getStyle("A{$row}:L{$row}")
+                        $sheet->getStyle("A{$row}:T{$row}")
                             ->getFill()
                             ->setFillType(Fill::FILL_SOLID)
                             ->getStartColor()
@@ -234,21 +288,20 @@ class ReferenciasExport implements FromCollection, WithHeadings, WithMapping, Wi
     public function styles(Worksheet $sheet): array
     {
         return [
-            1 => [
+            1 => [ // Fila de encabezado
                 'font' => ['bold' => true],
-                'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
+                'alignment' => [
+                    'horizontal' => Alignment::HORIZONTAL_CENTER,
+                    'vertical' => Alignment::VERTICAL_CENTER,
+                ],
                 'borders' => [
                     'bottom' => ['borderStyle' => Border::BORDER_THIN],
                 ],
             ],
-            'A:L' => [
+            'A:T' => [ // Aplica a todas las columnas de datos
                 'alignment' => [
-                    'vertical' => Alignment::VERTICAL_CENTER,
                     'horizontal' => Alignment::HORIZONTAL_CENTER,
-                ],
-            ],
-            'J' => [
-                'alignment' => [
+                    'vertical' => Alignment::VERTICAL_CENTER,
                     'wrapText' => true,
                 ],
             ],
