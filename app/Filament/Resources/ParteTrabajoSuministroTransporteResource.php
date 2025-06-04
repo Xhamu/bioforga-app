@@ -388,29 +388,32 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                 Section::make('Datos de la descarga')
                     ->visible(fn($record) => $record && $record->cliente_id !== null)
                     ->schema([
-                        Placeholder::make('cliente')
+                        Select::make('cliente_id')
                             ->label('Cliente')
-                            ->content(fn($record) => $record->cliente->razon_social ?? '-'),
+                            ->options(fn() => \App\Models\Cliente::pluck('razon_social', 'id'))
+                            ->searchable()
+                            ->required(),
 
-                        Placeholder::make('tipo_biomasa')
+                        Select::make('tipo_biomasa')
                             ->label('Tipo de biomasa')
-                            ->content(function ($record) {
-                                $biomasa = $record->tipo_biomasa;
+                            ->options([
+                                'astilla' => 'Astilla',
+                                'pellet' => 'Pellet',
+                                'corteza' => 'Corteza',
+                                // agrega más opciones según tus necesidades
+                            ])
+                            ->multiple()
+                            ->required(),
 
-                                if (is_array($biomasa)) {
-                                    return implode(', ', array_map('ucfirst', $biomasa));
-                                }
-
-                                return ucfirst($biomasa ?? '-');
-                            }),
-
-                        Placeholder::make('peso_neto')
+                        TextInput::make('peso_neto')
                             ->label('Peso neto (Tn)')
-                            ->content(fn($record) => $record->peso_neto ?? '-'),
+                            ->numeric()
+                            ->required(),
 
-                        Placeholder::make('cantidad_total')
+                        TextInput::make('cantidad_total')
                             ->label('Cantidad total (m³)')
-                            ->content(fn($record) => $record->cantidad_total ?? '-'),
+                            ->numeric()
+                            ->required(),
 
                         FileUpload::make('albaran')
                             ->label('Foto del ticket de pesada')
@@ -436,6 +439,7 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                     ]),
 
                 Section::make('Observaciones')
+                    ->visible(fn($record) => $record && $record->cliente_id !== null)
                     ->schema([
                         Textarea::make('observaciones')
                             ->rows(4)

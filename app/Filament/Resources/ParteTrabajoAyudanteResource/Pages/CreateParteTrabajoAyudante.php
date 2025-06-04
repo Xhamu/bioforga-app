@@ -55,8 +55,12 @@ class CreateParteTrabajoAyudante extends CreateRecord
                         )->visible(fn($get) => $get('eleccion') === 'vehiculo')
                         ->searchable(),
 
-                    Textarea::make('tipologia')
+                    Select::make('tipologia')
                         ->label('Tipología')
+                        ->options(function () {
+                            return \App\Models\Tipologia::pluck('nombre', 'nombre');
+                        })
+                        ->searchable()
                         ->required(),
 
                     TextInput::make('gps_inicio_ayudante')

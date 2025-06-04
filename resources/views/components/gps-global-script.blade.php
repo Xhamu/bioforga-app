@@ -143,9 +143,16 @@
     });
 </script>
 
-<footer
-    class="w-full border-t border-gray-200 bg-white shadow p-4 dark:bg-gray-800 dark:border-gray-600 flex flex-col items-center justify-center md:flex-row md:justify-between md:p-6">
-    <a class="link-default" target="_blank" href="https://www.quadralia.com/">
-        <img src="{{ asset('images/powered-by-quadralia.svg') }}" alt="Powered by Quadralia" class="h-6 mt-2 md:mt-0">
-    </a>
-</footer>
+@php
+    $version = trim(file_get_contents(base_path('.version')));
+@endphp
+
+<div class="flex justify-center mt-10 mb-6">
+    <div class="flex flex-col items-center text-sm text-gray-500 dark:text-gray-400 space-y-1 text-center">
+        <a href="https://www.quadralia.com/" target="_blank" rel="noopener noreferrer"
+            class="hover:opacity-80 transition-opacity duration-150">
+            <img src="{{ asset('images/powered-by-quadralia.svg') }}" alt="Powered by Quadralia" class="h-6">
+        </a>
+        <span class="text-xs leading-tight">Versión {{ $version }}</span>
+    </div>
+</div>

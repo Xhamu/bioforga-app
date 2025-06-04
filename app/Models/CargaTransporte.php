@@ -10,6 +10,7 @@ class CargaTransporte extends Model
     protected $fillable = [
         'parte_trabajo_suministro_transporte_id',
         'referencia_id',
+        'almacen_id',
         'fecha_hora_inicio_carga',
         'gps_inicio_carga',
         'fecha_hora_fin_carga',
@@ -30,5 +31,10 @@ class CargaTransporte extends Model
     public function referencia(): BelongsTo
     {
         return $this->belongsTo(Referencia::class);
+    }
+
+    public function almacen(): BelongsTo
+    {
+        return $this->belongsTo(AlmacenIntermedio::class);
     }
 }

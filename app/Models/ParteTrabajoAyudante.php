@@ -80,6 +80,11 @@ class ParteTrabajoAyudante extends Model
         return $this->belongsTo(Vehiculo::class, 'vehiculo_id');
     }
 
+    public function tipologia()
+    {
+        return $this->belongsTo(Tipologia::class, 'tipologia');
+    }
+
     public function getNombreMaquinaVehiculoAttribute()
     {
         if ($this->vehiculo && $this->vehiculo->marca) {

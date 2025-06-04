@@ -12,6 +12,7 @@ use Filament\Forms;
 use Filament\Forms\Components\Actions;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Grid;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Section;
@@ -378,40 +379,65 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                 Section::make('Resumen de trabajo')
                     ->visible(fn($record) => $record && $record->fecha_hora_fin_trabajo !== null)
                     ->schema([
-                        Placeholder::make('horas_encendido')
+                        TimePicker::make('horas_encendido')
                             ->label('Horas encendido')
-                            ->content(fn($record) => $record->horas_encendido ?? '-'),
+                            ->withoutSeconds()
+                            ->visible(fn($record) => filled($record?->horas_encendido))
+                            ->columnSpan(1),
 
-                        Placeholder::make('horas_rotor')
+                        TimePicker::make('horas_rotor')
                             ->label('Horas rotor')
-                            ->content(fn($record) => $record->horas_rotor ?? '-'),
+                            ->withoutSeconds()
+                            ->visible(fn($record) => filled($record?->horas_rotor))
+                            ->columnSpan(1),
 
-                        Placeholder::make('horas_trabajo')
+                        TimePicker::make('horas_trabajo')
                             ->label('Horas trabajo')
-                            ->content(fn($record) => $record->horas_trabajo ?? '-'),
+                            ->withoutSeconds()
+                            ->visible(fn($record) => filled($record?->horas_trabajo))
+                            ->columnSpan(1),
 
-                        Placeholder::make('consumo_gasoil')
+                        TextInput::make('consumo_gasoil')
                             ->label('Consumo de gasoil (L)')
-                            ->content(fn($record) => $record->consumo_gasoil ?? '-'),
+                            ->numeric()
+                            ->visible(fn($record) => filled($record?->consumo_gasoil))
+                            ->columnSpan(1),
 
-                        Placeholder::make('consumo_cuchillas')
+                        TextInput::make('consumo_cuchillas')
                             ->label('Cuchillas usadas (ud)')
-                            ->content(fn($record) => $record->consumo_cuchillas ?? '-'),
+                            ->numeric()
+                            ->visible(fn($record) => filled($record?->consumo_cuchillas))
+                            ->columnSpan(1),
 
-                        Placeholder::make('consumo_muelas')
+                        TextInput::make('consumo_muelas')
                             ->label('Muelas usadas (ud)')
-                            ->content(fn($record) => $record->consumo_muelas ?? '-'),
+                            ->numeric()
+                            ->visible(fn($record) => filled($record?->consumo_muelas))
+                            ->columnSpan(1),
 
-                        Placeholder::make('cantidad_producida')
-                            ->label('Cantidad producida')
-                            ->content(
-                                fn($record) => $record->cantidad_producida
-                                ? $record->cantidad_producida . ' ' . (
-                                    $record->tipo_cantidad_producida === 'camiones' ? 'camiones' :
-                                    ($record->tipo_cantidad_producida === 'toneladas' ? 'toneladas' : '')
-                                )
-                                : '-'
-                            ),
+                        Select::make('tipo_cantidad_producida')
+                            ->label('Tipo cantidad')
+                            ->options([
+                                'camiones' => 'Camiones',
+                                'toneladas' => 'Toneladas',
+                            ])
+                            ->searchable()
+                            ->visible(fn($record) => filled($record?->cantidad_producida))
+                            ->columnSpan(1),
+
+                        TextInput::make('cantidad_producida')
+                            ->label(function ($get) {
+                                $tipo = $get('tipo_cantidad_producida');
+                                $unidad = match ($tipo) {
+                                    'camiones' => 'camiones',
+                                    'toneladas' => 'toneladas',
+                                    default => '',
+                                };
+
+                                return 'Cantidad producida' . ($unidad ? " ({$unidad})" : '');
+                            })
+                            ->visible(fn($record) => filled($record?->cantidad_producida))
+                            ->columnSpan(1),
 
                         FileUpload::make('horometro')
                             ->label('Foto easygreen o horómetro')
@@ -421,10 +447,10 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                             ->openable()
                             ->required()
                             ->columnSpanFull(),
-                    ])
-                    ->columns(3),
+                    ]),
 
                 Section::make('Observaciones')
+                    ->visible(fn($record) => filled($record?->usuario_id))
                     ->schema([
                         Textarea::make('observaciones')
                             ->rows(4)

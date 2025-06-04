@@ -1,10 +1,11 @@
 <x-filament-widgets::widget>
     <x-filament::card class="space-y-4">
-        <h2 class="text-xl font-bold text-red-700">Partes de trabajo activos en el sistema</h2>
+        <h2 class="text-xl font-bold text-red-700">Resumen de partes de trabajo activos</h2>
 
         @if ($total > 0)
-            <p class="mt-2 text-gray-800">Actualmente hay <strong>{{ $total }}</strong> parte(s) de trabajo
-                activos.
+            <p class="mt-2 text-gray-800">
+                Actualmente hay <strong>{{ $total }}</strong> parte{{ $total === 1 ? '' : 's' }} de trabajo
+                activo{{ $total === 1 ? '' : 's' }}.
             </p>
 
             <div class="mt-6 w-full overflow-auto rounded-xl border">

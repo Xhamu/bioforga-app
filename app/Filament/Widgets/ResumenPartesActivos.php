@@ -3,12 +3,21 @@
 namespace App\Filament\Widgets;
 
 use Filament\Widgets\Widget;
+use Illuminate\Support\Facades\Auth;
 
 class ResumenPartesActivos extends Widget
 {
     protected static string $view = 'filament.widgets.resumen-partes-activos';
 
     protected int|string|array $columnSpan = 'full';
+
+    public static function canView(): bool
+    {
+        $user = auth()->user();
+
+        return $user && $user->hasAnyRole(['superadmin', 'administracion']);
+    }
+
 
     public function getViewData(): array
     {

@@ -55,49 +55,39 @@ class ParteTrabajoAyudanteResource extends Resource
 
                 Section::make('')
                     ->schema([
-                        Placeholder::make('')
-                            ->visible(fn($record) => $record && ($record->maquina_id || $record->vehiculo_id))
-                            ->content(function ($record) {
-                                if ($record->maquina_id && $record->maquina) {
-                                    $contenido = '<strong>Máquina:</strong> ' . e($record->maquina->marca . ' ' . $record->maquina->modelo);
-                                } elseif ($record->vehiculo_id && $record->vehiculo) {
-                                    $contenido = '<strong>Vehículo:</strong> ' . e($record->vehiculo->marca . ' ' . $record->vehiculo->modelo);
-                                } else {
-                                    $contenido = '<em>No se ha seleccionado ningún vehículo o máquina.</em>';
-                                }
-
-                                return new HtmlString('
-                                <div class="mb-6">
-                                    <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2 flex items-center gap-1">
-                                        Medio utilizado
-                                    </h3>
-                                    <div class="px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm">
-                                        <p class="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">'
-                                    . $contenido .
-                                    '</p>
-                                    </div>
-                                </div>
-                            ');
+                        Select::make('maquina_id')
+                            ->label('Máquina')
+                            ->options(function () {
+                                return \App\Models\Maquina::all()->pluck('modelo', 'id')->mapWithKeys(function ($modelo, $id) {
+                                    $maquina = \App\Models\Maquina::find($id);
+                                    return [$id => "{$maquina->marca} {$maquina->modelo}"];
+                                });
                             })
+                            ->visible(fn($record) => filled($record?->fecha_hora_inicio_ayudante))
+                            ->hidden(fn($get) => filled($get('vehiculo_id')))
+                            ->searchable()
+                            ->preload(),
+
+                        Select::make('vehiculo_id')
+                            ->label('Vehículo')
+                            ->options(function () {
+                                return \App\Models\Vehiculo::all()->mapWithKeys(function ($vehiculo) {
+                                    return [$vehiculo->id => "{$vehiculo->marca} {$vehiculo->modelo}"];
+                                });
+                            })
+                            ->searchable()
+                            ->preload()
+                            ->visible(fn($record) => filled($record?->fecha_hora_inicio_ayudante))
+                            ->hidden(fn($get) => filled($get('maquina_id')))
                             ->columnSpanFull(),
 
-
-                        Placeholder::make('')
-                            ->visible(fn($record) => $record && filled($record->tipologia))
-                            ->content(function ($record) {
-                                return new HtmlString('
-                            <div class="mb-6">
-                                <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2 flex items-center gap-1">
-                                    Tipología
-                                </h3>
-                                <div class="px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm">
-                                    <p class="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
-                                        ' . nl2br(e($record->tipologia)) . '
-                                    </p>
-                                </div>
-                            </div>
-                        ');
-                            })
+                        Select::make('tipologia')
+                            ->label('Tipología')
+                            ->relationship('tipologia', 'nombre')
+                            ->searchable()
+                            ->preload()
+                            ->required()
+                            ->visible(fn($record) => filled($record?->fecha_hora_inicio_ayudante))
                             ->columnSpanFull(),
 
                         Placeholder::make('')

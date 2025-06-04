@@ -27,9 +27,23 @@ class CargasRelationManager extends RelationManager
                     ->relationship('referencia', 'referencia')
                     ->searchable()
                     ->preload()
-                    ->required()
                     ->label('Referencia')
-                    ->columnSpanFull(),
+                    ->columnSpanFull()
+                    ->reactive()
+                    ->hidden(fn($get) => filled($get('almacen_id')))
+                    ->requiredWithout('almacen_id')
+                    ->rule('prohibited_if:almacen_id,!null'),
+
+                Forms\Components\Select::make('almacen_id')
+                    ->relationship('almacen', 'referencia')
+                    ->searchable()
+                    ->preload()
+                    ->label('Almacén')
+                    ->columnSpanFull()
+                    ->reactive()
+                    ->hidden(fn($get) => filled($get('referencia_id')))
+                    ->requiredWithout('referencia_id')
+                    ->rule('prohibited_if:referencia_id,!null'),
 
                 Forms\Components\DateTimePicker::make('fecha_hora_inicio_carga')
                     ->label('Fecha/Hora inicio carga')
@@ -58,10 +72,15 @@ class CargasRelationManager extends RelationManager
     public function table(Table $table): Table
     {
         return $table
-            ->recordTitleAttribute('referencia.referencia')
+            ->recordTitle(fn($record) => $record->referencia->referencia ?? $record->almacen->referencia ?? 'Carga')
             ->columns([
                 Tables\Columns\TextColumn::make('referencia.referencia')
-                    ->label('Referencia')
+                    ->label('Referencia / Almacén')
+                    ->formatStateUsing(function ($state, $record) {
+                        return $record->referencia->referencia
+                            ?? $record->almacen->referencia
+                            ?? '—';
+                    })
                     ->sortable()
                     ->searchable(),
 
@@ -70,16 +89,10 @@ class CargasRelationManager extends RelationManager
                     ->dateTime()
                     ->sortable(),
 
-                Tables\Columns\TextColumn::make('gps_inicio_carga')
-                    ->label('GPS inicio'),
-
                 Tables\Columns\TextColumn::make('fecha_hora_fin_carga')
                     ->label('Fin carga')
                     ->dateTime()
                     ->sortable(),
-
-                Tables\Columns\TextColumn::make('gps_fin_carga')
-                    ->label('GPS fin'),
 
                 Tables\Columns\TextColumn::make('cantidad')
                     ->label('Cantidad (m³)')
