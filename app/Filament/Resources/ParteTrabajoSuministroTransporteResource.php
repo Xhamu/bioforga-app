@@ -80,7 +80,11 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                 }
 
                                 return $camiones->mapWithKeys(fn($camion) => [
-                                    $camion->id => '[' . $camion->matricula_cabeza . '] ' . $camion->marca . ' ' . $camion->modelo
+                                    $camion->id => mb_convert_encoding(
+                                        '[' . $camion->matricula_cabeza . '] ' . $camion->marca . ' ' . $camion->modelo,
+                                        'UTF-8',
+                                        'UTF-8'
+                                    )
                                 ])->toArray();
                             })
                             ->default(function () {
@@ -154,9 +158,8 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                                         : AlmacenIntermedio::all();
 
                                                     return $almacenes->mapWithKeys(function ($almacen) {
-                                                        return [
-                                                            $almacen->id => "{$almacen->referencia} ({$almacen->monte_parcela}, {$almacen->ayuntamiento})"
-                                                        ];
+                                                        $label = "{$almacen->referencia} ({$almacen->monte_parcela}, {$almacen->ayuntamiento})";
+                                                        return [$almacen->id => mb_convert_encoding($label, 'UTF-8', 'UTF-8')];
                                                     });
                                                 })
                                                 ->searchable()
