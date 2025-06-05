@@ -21,12 +21,6 @@ class ParteTrabajoSuministroTransporte extends Model
     protected $fillable = [
         'usuario_id',
         'camion_id',
-        'referencia_id',
-        'fecha_hora_inicio_carga',
-        'gps_inicio_carga',
-        'fecha_hora_fin_carga',
-        'gps_fin_carga',
-        'cantidad',
         'cliente_id',
         'tipo_biomasa',
         'peso_neto',
