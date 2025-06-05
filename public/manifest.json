@@ -1,0 +1,21 @@
+{
+    "name": "Intranet - Bioforga",
+    "short_name": "Bioforga",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#ffffff",
+    "theme_color": "#13a814",
+    "orientation": "portrait",
+    "icons": [
+        {
+            "src": "/favicons/web-app-manifest-192x192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "/favicons//web-app-manifest-512x512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ]
+}
