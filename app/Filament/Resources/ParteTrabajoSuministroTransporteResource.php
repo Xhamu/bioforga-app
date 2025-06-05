@@ -74,9 +74,7 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                 $camiones = Camion::where('proveedor_id', $usuario->proveedor_id)->get();
 
                                 if ($camiones->isEmpty()) {
-                                    return [
-                                        '' => '- No hay ningún camión vinculado -'
-                                    ];
+                                    return ['' => '- No hay ningún camión vinculado -'];
                                 }
 
                                 return $camiones->mapWithKeys(fn($camion) => [
@@ -181,11 +179,11 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                                         : Referencia::with('proveedor')->get();
 
                                                     return $referencias->mapWithKeys(function ($referencia) {
-                                                        return [
-                                                            $referencia->id => "{$referencia->referencia} | " .
-                                                                ($referencia->proveedor?->razon_social ?? $referencia->cliente?->razon_social ?? 'Sin razón social') .
-                                                                " ({$referencia->monte_parcela}, {$referencia->ayuntamiento})"
-                                                        ];
+                                                        $label = "{$referencia->referencia} | " .
+                                                            ($referencia->proveedor?->razon_social ?? $referencia->cliente?->razon_social ?? 'Sin razón social') .
+                                                            " ({$referencia->monte_parcela}, {$referencia->ayuntamiento})";
+
+                                                        return [$referencia->id => mb_convert_encoding($label, 'UTF-8', 'UTF-8')];
                                                     });
                                                 })
                                                 ->searchable()
