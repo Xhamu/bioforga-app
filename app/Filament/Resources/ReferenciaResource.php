@@ -10,6 +10,7 @@ use Filament\Forms\Components\Livewire;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Support\Enums\FontWeight;
 use Filament\Tables;
@@ -370,12 +371,31 @@ class ReferenciaResource extends Resource
                         ->icon('heroicon-m-document-arrow-down')
                         ->color('gray')
                         ->action(function () {
+                            $hayDatos = \App\Models\CargaTransporte::exists();
+
+                            if (!$hayDatos) {
+                                Notification::make()
+                                    ->title('Sin datos')
+                                    ->body('No hay cargas registradas para exportar.')
+                                    ->warning()
+                                    ->send();
+                                return;
+                            }
+
                             $filename = 'balance-de-masas-' . now()->format('Y-m-d') . '.xlsx';
                             return \Maatwebsite\Excel\Facades\Excel::download(new \App\Exports\BalanceDeMasasExport, $filename);
+                        })
+                        ->after(function () {
+                            Notification::make()
+                                ->title('Exportación iniciada')
+                                ->body('El archivo "Balance de Masas" se está descargando.')
+                                ->success()
+                                ->send();
                         }),
-                        
+
                     Action::make('exportar_excel')
                         ->label('Exportar a Excel')
+                        ->color('gray')
                         ->modalWidth('xl')
                         ->modalSubmitActionLabel('Exportar')
                         ->modalCancelActionLabel('Cerrar')
