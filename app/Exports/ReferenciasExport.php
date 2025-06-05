@@ -298,7 +298,7 @@ class ReferenciasExport implements FromCollection, WithHeadings, WithMapping, Wi
                     'bottom' => ['borderStyle' => Border::BORDER_THIN],
                 ],
             ],
-            'A:T' => [ // Aplica a todas las columnas de datos
+            'A:S' => [ // Aplica a todas las columnas de datos
                 'alignment' => [
                     'horizontal' => Alignment::HORIZONTAL_CENTER,
                     'vertical' => Alignment::VERTICAL_CENTER,

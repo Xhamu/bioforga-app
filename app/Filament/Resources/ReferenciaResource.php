@@ -365,7 +365,15 @@ class ReferenciaResource extends Resource
                     Tables\Filters\TrashedFilter::make(),
                 ])
                 ->headerActions([
-
+                    Action::make('exportar_balance_masas')
+                        ->label('Balance de Masas')
+                        ->icon('heroicon-m-document-arrow-down')
+                        ->color('gray')
+                        ->action(function () {
+                            $filename = 'balance-de-masas-' . now()->format('Y-m-d') . '.xlsx';
+                            return \Maatwebsite\Excel\Facades\Excel::download(new \App\Exports\BalanceDeMasasExport, $filename);
+                        }),
+                        
                     Action::make('exportar_excel')
                         ->label('Exportar a Excel')
                         ->modalWidth('xl')
