@@ -2,17 +2,21 @@
 
 namespace App\Filament\Resources;
 
+use App\Exports\ActivityLogExport;
 use Filament\Resources\Resource;
 use Filament\Tables;
+use Filament\Tables\Actions\ExportAction;
 use Filament\Tables\Columns\TextColumn;
+use Maatwebsite\Excel\Facades\Excel;
 use Spatie\Activitylog\Models\Activity;
 use Illuminate\Database\Eloquent\Builder;
 use App\Filament\Resources\ActivityLogResource\Pages;
 use Illuminate\Database\Eloquent\Model;
+use Filament\Tables\Actions\Action;
 
 class ActivityLogResource extends Resource
 {
-    protected static ?string $model = \Spatie\Activitylog\Models\Activity::class;
+    protected static ?string $model = Activity::class;
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-list';
     protected static ?string $navigationLabel = 'Registro de actividad';
     protected static ?string $navigationGroup = 'Sistema';
@@ -89,26 +93,26 @@ class ActivityLogResource extends Resource
                             $fullNew = is_string($new) ? $new : json_encode($new);
 
                             return "
-                <tr class='border-b border-gray-100'>
-                    <td class='px-2 py-1 align-top font-medium text-sm text-gray-700'>{$key}</td>
-                    <td class='px-2 py-1 align-top text-sm text-gray-500 max-w-[200px] break-all'>
-                        <span title=\"" . e($fullOld) . "\">\"" . e($formatValue($oldValue)) . "\"</span>
-                    </td>
-                    <td class='px-2 py-1 align-top text-sm text-gray-400'>→</td>
-                    <td class='px-2 py-1 align-top text-sm text-green-700 max-w-[200px] break-all'>
-                        <span title=\"" . e($fullNew) . "\">\"" . e($formatValue($new)) . "\"</span>
-                    </td>
-                </tr>
-            ";
+                                <tr class='border-b border-gray-100'>
+                                    <td class='px-2 py-1 align-top font-medium text-sm text-gray-700'>{$key}</td>
+                                    <td class='px-2 py-1 align-top text-sm text-gray-500 max-w-[200px] break-all'>
+                                        <span title=\"" . e($fullOld) . "\">\"" . e($formatValue($oldValue)) . "\"</span>
+                                    </td>
+                                    <td class='px-2 py-1 align-top text-sm text-gray-400'>→</td>
+                                    <td class='px-2 py-1 align-top text-sm text-green-700 max-w-[200px] break-all'>
+                                        <span title=\"" . e($fullNew) . "\">\"" . e($formatValue($new)) . "\"</span>
+                                    </td>
+                                </tr>
+                            ";
                         })->implode('');
 
                         return "
-            <div class='overflow-x-auto'>
-                <table class='min-w-full text-sm text-left table-auto border-collapse'>
-                    <tbody>{$rows}</tbody>
-                </table>
-            </div>
-        ";
+                            <div class='overflow-x-auto'>
+                                <table class='min-w-full text-sm text-left table-auto border-collapse'>
+                                    <tbody>{$rows}</tbody>
+                                </table>
+                            </div>
+                        ";
                     })
                     ->html()
                     ->wrap(),
@@ -137,7 +141,27 @@ class ActivityLogResource extends Resource
                     ->formatStateUsing(fn($state) => \Carbon\Carbon::parse($state)->format('d/m/Y H:i'))
                     ->sortable(),
             ])
-            ->defaultSort('created_at', 'desc');
+            ->defaultSort('created_at', 'desc')
+            ->headerActions([
+                Action::make('exportar')
+                    ->label('Exportar Excel')
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->action(function () {
+                        $hayDatos = \Spatie\Activitylog\Models\Activity::exists();
+
+                        if (!$hayDatos) {
+                            \Filament\Notifications\Notification::make()
+                                ->title('Sin datos')
+                                ->body('No hay registros de actividad para exportar.')
+                                ->warning()
+                                ->send();
+                            return;
+                        }
+
+                        $filename = 'registro-actividad-' . now()->format('Y-m-d') . '.xlsx';
+                        return Excel::download(new ActivityLogExport, $filename);
+                    })
+            ]);
     }
 
     public static function getPages(): array
@@ -166,6 +190,4 @@ class ActivityLogResource extends Resource
     {
         return false;
     }
-
-
 }
