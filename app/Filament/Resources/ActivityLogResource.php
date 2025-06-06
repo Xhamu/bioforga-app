@@ -138,7 +138,7 @@ class ActivityLogResource extends Resource
 
                 TextColumn::make('created_at')
                     ->label('Fecha')
-                    ->formatStateUsing(fn($state) => \Carbon\Carbon::parse($state)->format('d/m/Y H:i'))
+                    ->formatStateUsing(fn($state) => \Carbon\Carbon::parse($state)->timezone('Europe/Madrid')->format('d/m/Y H:i'))
                     ->sortable(),
             ])
             ->defaultSort('created_at', 'desc')
