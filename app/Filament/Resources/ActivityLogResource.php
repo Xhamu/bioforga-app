@@ -144,10 +144,10 @@ class ActivityLogResource extends Resource
             ->defaultSort('created_at', 'desc')
             ->headerActions([
                 Action::make('exportar')
-                    ->label('Exportar Excel')
+                    ->label('Exportar')
                     ->icon('heroicon-o-arrow-down-tray')
                     ->action(function () {
-                        $hayDatos = \Spatie\Activitylog\Models\Activity::exists();
+                        $hayDatos = Activity::exists();
 
                         if (!$hayDatos) {
                             \Filament\Notifications\Notification::make()
