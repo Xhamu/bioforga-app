@@ -122,7 +122,10 @@ class UserResource extends Resource
                             ->relationship('roles', 'name')
                             ->multiple()
                             ->preload()
-                            ->searchable(),
+                            ->searchable()
+                            ->options(
+                                \Spatie\Permission\Models\Role::where('name', '!=', 'superadmin')->pluck('name', 'id')
+                            ),
                     ])
                     ->columns(1),
             ]);
@@ -239,5 +242,11 @@ class UserResource extends Resource
             'edit' => Pages\EditUser::route('/{record}/edit'),
             'activities' => ListUserActivities::route('/{record}/activities'),
         ];
+    }
+
+    public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
+    {
+        return parent::getEloquentQuery()
+            ->whereDoesntHave('roles', fn($query) => $query->where('name', 'superadmin'));
     }
 }
