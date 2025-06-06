@@ -191,8 +191,7 @@ class UserResource extends Resource
                 ->columns([
                     TextColumn::make('nombre_apellidos')
                         ->label('Nombre')
-                        ->weight(FontWeight::Bold)
-                        ->searchable(),
+                        ->weight(FontWeight::Bold),
 
                     TextColumn::make('nif')
                         ->label('NIF')

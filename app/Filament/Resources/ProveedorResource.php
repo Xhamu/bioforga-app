@@ -15,17 +15,22 @@ use Filament\Forms\Components\View;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Support\Enums\FontWeight;
+use Filament\Support\Enums\MaxWidth;
 use Filament\Tables;
 use Filament\Tables\Columns\Layout\Grid;
 use Filament\Tables\Columns\Layout\Panel;
 use Filament\Tables\Columns\Layout\Split;
 use Filament\Tables\Columns\Layout\Stack;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Enums\FiltersLayout;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Jenssegers\Agent\Agent;
 use Illuminate\Support\Facades\File;
+use Filament\Tables\Filters\Layout;
+
 
 class ProveedorResource extends Resource
 {
@@ -235,6 +240,17 @@ class ProveedorResource extends Resource
 
     public static function table(Table $table): Table
     {
+        $ubicaciones = collect(json_decode(File::get(resource_path('data/ubicaciones.json')), true));
+
+        $provincias = $ubicaciones->flatMap(function ($region) {
+            return collect($region['provinces'] ?? []);
+        });
+
+        $provinciasOptions = $provincias->sortBy('label')->mapWithKeys(function ($provincia) {
+            return [
+                "{$provincia['parent_code']}-{$provincia['code']}" => $provincia['label'],
+            ];
+        })->toArray();
 
         $agent = new Agent();
 
@@ -258,11 +274,25 @@ class ProveedorResource extends Resource
                             ]),
                     ])->collapsed(false),
                 ])
-                ->filters([
-                    //
-                ])
+                ->filters(
+                    [
+                        SelectFilter::make('tipo_servicio')
+                            ->label('Tipo de servicio')
+                            ->options([
+                                'Logística' => 'Logística',
+                                'Servicios maquinaria' => 'Servicios maquinaria',
+                                'Combustible' => 'Combustible',
+                                'Alojamiento' => 'Alojamiento',
+                                'Otros' => 'Otros',
+                            ])
+                            ->searchable()
+                            ->placeholder('Todos'),
+                    ],
+                    layout: FiltersLayout::AboveContent
+                )
+                ->filtersFormColumns(1)
                 ->actions([
-                    //Tables\Actions\ViewAction::make(),
+                    Tables\Actions\ViewAction::make(),
                     Tables\Actions\EditAction::make(),
                 ])
                 ->bulkActions([
@@ -279,15 +309,37 @@ class ProveedorResource extends Resource
                         ->searchable()
                         ->sortable(),
                     TextColumn::make('telefono')
+                        ->searchable()
                         ->icon('heroicon-m-phone'),
                     TextColumn::make('email')
+                        ->searchable()
                         ->icon('heroicon-m-envelope'),
                 ])
-                ->filters([
-                    //
-                ])
+                ->filters(
+                    [
+                        SelectFilter::make('tipo_servicio')
+                            ->label('Tipo de servicio')
+                            ->options([
+                                'Logística' => 'Logística',
+                                'Servicios maquinaria' => 'Servicios maquinaria',
+                                'Combustible' => 'Combustible',
+                                'Alojamiento' => 'Alojamiento',
+                                'Otros' => 'Otros',
+                            ])
+                            ->searchable()
+                            ->placeholder('Todos'),
+
+                        SelectFilter::make('provincia')
+                            ->label('Provincia')
+                            ->options($provinciasOptions)
+                            ->searchable()
+                            ->placeholder('Todas'),
+                    ],
+                    layout: FiltersLayout::AboveContent
+                )
+                ->filtersFormColumns(2)
                 ->actions([
-                    //Tables\Actions\ViewAction::make(),
+                    Tables\Actions\ViewAction::make(),
                     Tables\Actions\EditAction::make(),
                 ])
                 ->bulkActions([
