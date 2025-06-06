@@ -32,7 +32,8 @@ class User extends Authenticatable
         'email',
         'password',
         'empresa_bioforga',
-        'proveedor_id'
+        'proveedor_id',
+        'telefono',
     ];
 
     /**

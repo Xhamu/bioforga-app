@@ -72,7 +72,7 @@ class ProveedorResource extends Resource
                             ->validationMessages([
                                 'required' => 'El :attribute es obligatorio.',
                             ])
-                            ->columnSpan(['default' => 2, 'lg' => 1]),
+                            ->columnSpan(['default' => 3, 'lg' => 1]),
 
                         TextInput::make('email')
                             ->label(__('Correo electrónico'))
@@ -82,7 +82,20 @@ class ProveedorResource extends Resource
                             ->validationMessages([
                                 'required' => 'El :attribute es obligatorio.',
                             ])
-                            ->columnSpan(['default' => 2, 'lg' => 1]),
+                            ->columnSpan(['default' => 3, 'lg' => 1]),
+
+                        Select::make('tipo_servicio')
+                            ->label('Tipo de servicio')
+                            ->searchable()
+                            ->options([
+                                'Logística' => 'Logística',
+                                'Servicios maquinaria' => 'Servicios maquinaria',
+                                'Combustible' => 'Combustible',
+                                'Alojamiento' => 'Alojamiento',
+                                'Otros' => 'Otros',
+                            ])
+                            ->nullable()
+                            ->columnSpanFull(),
                     ])
                     ->columns(['default' => 1, 'md' => 2])
                     ->columnSpanFull(),

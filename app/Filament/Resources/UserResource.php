@@ -39,6 +39,8 @@ class UserResource extends Resource
                         TextInput::make('name')
                             ->label(__('Nombre'))
                             ->rules('required')
+                            ->required()
+                            ->columnSpan(1)
                             ->validationMessages([
                                 'required' => 'El :attribute es obligatorio.',
                             ]),
@@ -46,6 +48,8 @@ class UserResource extends Resource
                         TextInput::make('apellidos')
                             ->label(__('Apellidos'))
                             ->rules('required')
+                            ->required()
+                            ->columnSpan(2)
                             ->validationMessages([
                                 'required' => 'Los :attribute son obligatorios.',
                             ]),
@@ -53,22 +57,28 @@ class UserResource extends Resource
                         TextInput::make('nif')
                             ->label(__('NIF'))
                             ->rules('required')
+                            ->required()
+                            ->columnSpan(1)
                             ->validationMessages([
                                 'required' => 'El NIF es obligatorio.',
                             ]),
 
                         TextInput::make('email')
                             ->label(__('Correo electrónico'))
-                            ->rules('required')
                             ->email()
+                            ->columnSpan(1)
                             ->validationMessages([
-                                'required' => 'El :attribute es obligatorio.',
-                                'email' => 'No es :attribute válido.'
+                                'email' => 'No es :attribute válido.',
                             ]),
+
+                        TextInput::make('telefono')
+                            ->label('Teléfono')
+                            ->nullable()
+                            ->columnSpan(1),
                     ])
                     ->columns([
                         'sm' => 1,
-                        'md' => 2,
+                        'md' => 3,
                     ]),
 
                 Forms\Components\Section::make('Empresa')
@@ -141,10 +151,10 @@ class UserResource extends Resource
                                         ->label('NIF')
                                         ->searchable()
                                         ->icon('heroicon-m-identification'),
-                                    TextColumn::make('email')
-                                        ->label('Correo electrónico')
+                                    TextColumn::make('telefono')
+                                        ->label('Teléfono')
                                         ->searchable()
-                                        ->icon('heroicon-m-envelope'),
+                                        ->icon('heroicon-m-phone'),
                                 ]),
 
                                 /*Stack::make([
@@ -186,10 +196,10 @@ class UserResource extends Resource
                         ->searchable()
                         ->icon('heroicon-m-identification'),
 
-                    TextColumn::make('email')
-                        ->label('Correo electrónico')
+                    TextColumn::make('telefono')
+                        ->label('Teléfono')
                         ->searchable()
-                        ->icon('heroicon-m-envelope'),
+                        ->icon('heroicon-m-phone'),
                 ])
                 ->filters([
                     //

@@ -26,6 +26,7 @@ class Taller extends Authenticatable
         'poblacion',
         'codigo_postal',
         'direccion',
+        'observaciones',
     ];
 
     /**

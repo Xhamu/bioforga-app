@@ -22,6 +22,7 @@ class ParteTrabajoSuministroTransporte extends Model
         'usuario_id',
         'camion_id',
         'cliente_id',
+        'almacen_id',
         'tipo_biomasa',
         'peso_neto',
         'cantidad_total',

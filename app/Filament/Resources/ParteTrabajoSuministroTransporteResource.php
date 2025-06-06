@@ -107,10 +107,7 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                 Section::make()
                     ->visible(fn($record) => static::hasCargasActions($record))
                     ->schema([
-                        Grid::make([
-                            'default' => 1,
-                            'md' => 1,
-                        ])
+                        Grid::make(1)
                             ->schema(function ($record) {
                                 if (!$record)
                                     return [];
@@ -123,7 +120,11 @@ class ParteTrabajoSuministroTransporteResource extends Resource
 
                                 $acciones = [];
 
-                                if (!$ultimaCarga || $ultimaCarga->fecha_hora_fin_carga) {
+                                if (
+                                    (!$ultimaCarga || $ultimaCarga->fecha_hora_fin_carga !== null)
+                                    && is_null($record->cliente_id)
+                                    && is_null($record->almacen_id)
+                                ) {
                                     $acciones[] = Action::make('Iniciar carga')
                                         ->label('Iniciar carga')
                                         ->button()
@@ -142,7 +143,7 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                                 ->searchable()
                                                 ->reactive(), // Esto es necesario para reaccionar al cambio y actualizar el otro campo
                     
-                                            Select::make('almacen_select')
+                                            Select::make('almacen_id')
                                                 ->label('Almacén intermedio')
                                                 ->options(function () {
                                                     $usuario = Auth::user();
@@ -196,15 +197,19 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                                 ->required(),
                                         ])
                                         ->action(function (array $data, $record) {
-                                            $referenciaId = $data['eleccion'] === 'almacen'
-                                                ? $data['almacen_select']
-                                                : $data['referencia_select'];
-
-                                            $record->cargas()->create([
-                                                'referencia_id' => $referenciaId,
-                                                'fecha_hora_inicio_carga' => now(),
-                                                'gps_inicio_carga' => $data['gps_inicio_carga'] ?? '0.0000, 0.0000',
-                                            ]);
+                                            if ($data['eleccion'] === 'almacen') {
+                                                $record->cargas()->create([
+                                                    'almacen_id' => $data['almacen_id'],
+                                                    'fecha_hora_inicio_carga' => now(),
+                                                    'gps_inicio_carga' => $data['gps_inicio_carga'] ?? '0.0000, 0.0000',
+                                                ]);
+                                            } else {
+                                                $record->cargas()->create([
+                                                    'referencia_id' => $data['referencia_select'],
+                                                    'fecha_hora_inicio_carga' => now(),
+                                                    'gps_inicio_carga' => $data['gps_inicio_carga'] ?? '0.0000, 0.0000',
+                                                ]);
+                                            }
 
                                             Notification::make()
                                                 ->success()
@@ -266,7 +271,12 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                         ->color('danger');
                                 }
 
-                                if ($ultimaCarga && $ultimaCarga->fecha_hora_fin_carga) {
+                                if (
+                                    $ultimaCarga &&
+                                    $ultimaCarga->fecha_hora_fin_carga !== null &&
+                                    is_null($record->cliente_id) &&
+                                    is_null($record->almacen_id)
+                                ) {
                                     $acciones[] = Action::make('Iniciar descarga')
                                         ->label('Iniciar descarga')
                                         ->button()
@@ -294,7 +304,7 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                                 ->required()
                                                 ->visible(fn(callable $get) => $get('eleccion') === 'cliente'),
 
-                                            Select::make('almacen_select')
+                                            Select::make('almacen_id')
                                                 ->label('Almacén intermedio')
                                                 ->options(function () {
                                                     $usuario = Auth::user();
@@ -315,7 +325,7 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                                 })
                                                 ->searchable()
                                                 ->preload()
-                                                ->required()
+                                                ->required(fn(callable $get) => $get('eleccion') === 'almacen_intermedio')
                                                 ->visible(fn(callable $get) => $get('eleccion') === 'almacen_intermedio'),
 
                                             Select::make('tipo_biomasa')
@@ -348,25 +358,24 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                                 ->label('Foto del ticket de pesada')
                                                 ->disk('public')
                                                 ->directory('albaranes')
-                                                ->required(),
+                                                ->required(fn(callable $get) => $get('eleccion') === 'cliente')
+                                                ->visible(fn(callable $get) => $get('eleccion') === 'cliente'),
 
                                             FileUpload::make('carta_porte')
                                                 ->label('Carta de porte')
                                                 ->disk('public')
                                                 ->directory('albaranes')
-                                                ->required(),
+                                                ->required(fn(callable $get) => $get('eleccion') === 'cliente')
+                                                ->visible(fn(callable $get) => $get('eleccion') === 'cliente'),
                                         ])
                                         ->action(function (array $data, $record) {
-                                            $clienteId = $data['eleccion'] === 'almacen_intermedio'
-                                                ? $data['almacen_select']
-                                                : $data['cliente_id'];
-
                                             $record->update([
-                                                'cliente_id' => $clienteId,
+                                                'cliente_id' => $data['eleccion'] === 'cliente' ? $data['cliente_id'] : null,
+                                                'almacen_id' => $data['eleccion'] === 'almacen_intermedio' ? $data['almacen_id'] : null,
                                                 'tipo_biomasa' => $data['tipo_biomasa'],
                                                 'peso_neto' => $data['peso_neto'],
-                                                'albaran' => $data['albaran'],
-                                                'carta_porte' => $data['carta_porte'],
+                                                'albaran' => $data['albaran'] ?? null,
+                                                'carta_porte' => $data['carta_porte'] ?? null,
                                             ]);
 
                                             Notification::make()
@@ -387,21 +396,31 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                     ->columns(1),
 
                 Section::make('Datos de la descarga')
-                    ->visible(fn($record) => $record && $record->cliente_id !== null)
+                    ->visible(fn($record) => $record && ($record->cliente_id !== null || $record->almacen_id !== null))
                     ->schema([
                         Select::make('cliente_id')
                             ->label('Cliente')
                             ->options(fn() => \App\Models\Cliente::pluck('razon_social', 'id'))
                             ->searchable()
-                            ->required(),
+                            ->preload()
+                            ->visible(fn($record) => $record?->cliente_id !== null),
+
+                        Select::make('almacen_id')
+                            ->label('Almacén intermedio')
+                            ->options(fn() => AlmacenIntermedio::pluck('referencia', 'id'))
+                            ->searchable()
+                            ->preload()
+                            ->visible(fn($record) => $record?->almacen_id !== null),
 
                         Select::make('tipo_biomasa')
                             ->label('Tipo de biomasa')
                             ->options([
-                                'astilla' => 'Astilla',
-                                'pellet' => 'Pellet',
-                                'corteza' => 'Corteza',
-                                // agrega más opciones según tus necesidades
+                                'pino' => 'Pino',
+                                'eucalipto' => 'Eucalipto',
+                                'acacia' => 'Acacia',
+                                'frondosa' => 'Frondosa',
+                                'mezcla' => 'Mezcla',
+                                'otros' => 'Otros',
                             ])
                             ->multiple()
                             ->required(),
@@ -423,7 +442,8 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                             ->imageEditor()
                             ->openable()
                             ->required()
-                            ->columnSpanFull(),
+                            ->columnSpanFull()
+                            ->visible(fn($record) => $record?->cliente_id !== null),
 
                         FileUpload::make('carta_porte')
                             ->label('Carta de porte')
@@ -432,7 +452,8 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                             ->imageEditor()
                             ->openable()
                             ->required()
-                            ->columnSpanFull(),
+                            ->columnSpanFull()
+                            ->visible(fn($record) => $record?->cliente_id !== null),
                     ])
                     ->columns([
                         'default' => 1,

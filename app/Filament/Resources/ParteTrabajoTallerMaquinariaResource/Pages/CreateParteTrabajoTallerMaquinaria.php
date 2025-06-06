@@ -45,6 +45,7 @@ class CreateParteTrabajoTallerMaquinaria extends CreateRecord
 
                     TimePicker::make('horas_servicio')
                         ->label('Horas de servicio')
+                        ->withoutSeconds()
                         ->required(),
                 ])
                 ->action(function (array $data) {
