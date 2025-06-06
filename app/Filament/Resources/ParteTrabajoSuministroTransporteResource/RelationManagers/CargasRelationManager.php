@@ -38,7 +38,7 @@ class CargasRelationManager extends RelationManager
                     ->relationship('almacen', 'referencia')
                     ->searchable()
                     ->preload()
-                    ->label('Almacén')
+                    ->label('Almacén intermedio')
                     ->columnSpanFull()
                     ->reactive()
                     ->hidden(fn($get) => filled($get('referencia_id')))
@@ -72,16 +72,14 @@ class CargasRelationManager extends RelationManager
     public function table(Table $table): Table
     {
         return $table
-            ->recordTitle(fn($record) => $record->referencia->referencia ?? $record->almacen->referencia ?? 'Carga')
+            ->recordTitle(fn($record) => $record->referencia?->referencia ?? $record->almacen?->referencia ?? 'Carga')
             ->columns([
                 Tables\Columns\TextColumn::make('referencia.referencia')
-                    ->label('Referencia / Almacén')
-                    ->formatStateUsing(function ($state, $record) {
-                        return $record->referencia->referencia
-                            ?? $record->almacen->referencia
-                            ?? '—';
-                    })
-                    ->sortable()
+                    ->label('Referencia')
+                    ->searchable(),
+
+                Tables\Columns\TextColumn::make('almacen.referencia')
+                    ->label('Almacén intermedio')
                     ->searchable(),
 
                 Tables\Columns\TextColumn::make('fecha_hora_inicio_carga')

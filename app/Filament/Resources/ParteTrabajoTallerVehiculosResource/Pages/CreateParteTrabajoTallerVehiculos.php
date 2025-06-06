@@ -7,7 +7,8 @@ use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\View;
-use Filament\Notifications\Notification;use Filament\Resources\Pages\CreateRecord;
+use Filament\Notifications\Notification;
+use Filament\Resources\Pages\CreateRecord;
 
 class CreateParteTrabajoTallerVehiculos extends CreateRecord
 {
@@ -35,7 +36,7 @@ class CreateParteTrabajoTallerVehiculos extends CreateRecord
                         ->label('Vehículo')
                         ->options(function () {
                             return \App\Models\Vehiculo::all()->mapWithKeys(function ($vehiculo) {
-                                return [$vehiculo->id => "{$vehiculo->marca} {$vehiculo->modelo}"];
+                                return [$vehiculo->id => "{$vehiculo->marca} {$vehiculo->modelo} ({$vehiculo->matricula})"];
                             })->toArray();
                         })
                         ->searchable()

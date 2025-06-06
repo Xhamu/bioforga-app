@@ -25,6 +25,7 @@ class Proveedor extends Authenticatable
         'nif',
         'telefono',
         'email',
+        'tipo_servicio',
 
         'pais',
         'provincia',

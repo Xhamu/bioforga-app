@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\ParteTrabajoSuministroDesplazamientoResource\Pages;
 use App\Filament\Resources\ParteTrabajoSuministroDesplazamientoResource\RelationManagers;
 use App\Models\ParteTrabajoSuministroDesplazamiento;
+use App\Models\Vehiculo;
 use Carbon\Carbon;
 use Filament\Facades\Filament;
 use Filament\Forms;
@@ -24,6 +25,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\HtmlString;
 
 class ParteTrabajoSuministroDesplazamientoResource extends Resource
@@ -48,13 +50,42 @@ class ParteTrabajoSuministroDesplazamientoResource extends Resource
                             ->searchable()
                             ->preload()
                             ->default(Filament::auth()->user()->id)
-                            ->required()
-                            ->columnSpanFull(),
+                            ->required(),
+
+                        Select::make('vehiculo_id')
+                            ->label('Vehículo')
+                            ->relationship(
+                                name: 'vehiculo',
+                                titleAttribute: 'marca',
+                                modifyQueryUsing: fn($query) => $query->where('conductor_habitual', Auth::id())
+                            )
+                            ->getOptionLabelFromRecordUsing(
+                                fn($record) => $record->marca . ' ' . $record->modelo . ' (' . $record->matricula . ')'
+                            )
+                            ->searchable()
+                            ->preload()
+                            ->nullable()
+                            ->default(function () {
+                                $vehiculos = Vehiculo::where('conductor_habitual', Auth::id())->get();
+                                return $vehiculos->count() === 1 ? $vehiculos->first()->id : null;
+                            }),
+
                     ])
-                    ->columns(3),
+                    ->columns(2),
 
                 Section::make('')
                     ->schema([
+                        Select::make('destino')
+                            ->label('Destino')
+                            ->searchable()
+                            ->options([
+                                'obra' => 'Obra',
+                                'trabajo' => 'Trabajo',
+                                'otro' => 'Otro',
+                            ])
+                            ->required()
+                            ->nullable(),
+
                         Placeholder::make('')
                             ->content(function ($record) {
                                 if (!$record || !$record->fecha_hora_inicio_desplazamiento) {

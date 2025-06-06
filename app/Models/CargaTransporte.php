@@ -35,6 +35,6 @@ class CargaTransporte extends Model
 
     public function almacen(): BelongsTo
     {
-        return $this->belongsTo(AlmacenIntermedio::class);
+        return $this->belongsTo(AlmacenIntermedio::class, 'almacen_id');
     }
 }

@@ -29,6 +29,9 @@ class ParteTrabajoSuministroDesplazamiento extends Model
         'fecha_hora_fin_desplazamiento',
         'gps_fin_desplazamiento',
 
+        'vehiculo_id',
+        'destino',
+
         'observaciones'
     ];
 
@@ -68,5 +71,10 @@ class ParteTrabajoSuministroDesplazamiento extends Model
     public function usuario()
     {
         return $this->belongsTo(User::class, 'usuario_id');
+    }
+
+    public function vehiculo()
+    {
+        return $this->belongsTo(Vehiculo::class);
     }
 }

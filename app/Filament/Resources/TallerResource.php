@@ -8,6 +8,7 @@ use App\Models\Taller;
 use Filament\Forms;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -129,6 +130,11 @@ class TallerResource extends Resource
                     ])
                     ->columns(['default' => 1, 'md' => 2])
                     ->columnSpanFull(),
+
+                Section::make('Observaciones')
+                    ->schema([
+                        Textarea::make('observaciones')->label('')->rows(4)->nullable(),
+                    ]),
             ])
             ->columns(1);
     }
