@@ -48,6 +48,12 @@ class EditUser extends EditRecord
             $data['empresa_bioforga'] = false;
         }
 
+        if (empty($data['password'])) {
+            unset($data['password']);
+        } else {
+            $data['password'] = bcrypt($data['password']);
+        }
+
         return $data;
     }
 }
