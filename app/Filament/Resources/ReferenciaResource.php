@@ -195,6 +195,7 @@ class ReferenciaResource extends Resource
                             ->label('Tipo')
                             ->searchable()
                             ->options([
+                                'entero' => 'Entero',
                                 'troza' => 'Troza',
                                 'tacos' => 'Tacos',
                                 'puntal' => 'Puntal',
@@ -614,6 +615,7 @@ class ReferenciaResource extends Resource
                         ->label('Tipo')
                         ->searchable()
                         ->options([
+                            'entero' => 'Entero',
                             'troza' => 'Troza',
                             'tacos' => 'Tacos',
                             'puntal' => 'Puntal',

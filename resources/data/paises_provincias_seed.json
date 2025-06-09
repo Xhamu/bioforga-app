@@ -1,0 +1,26 @@
+[
+  {
+    "nombre": "España",
+    "codigo_iso": "ES",
+    "provincias": [
+      "A Coruña", "Álava", "Albacete", "Alicante", "Almería", "Asturias",
+      "Ávila", "Badajoz", "Barcelona", "Burgos", "Cáceres", "Cádiz",
+      "Cantabria", "Castellón", "Ciudad Real", "Córdoba", "Cuenca",
+      "Girona", "Granada", "Guadalajara", "Guipúzcoa", "Huelva", "Huesca",
+      "Illes Balears", "Jaén", "La Rioja", "Las Palmas", "León", "Lleida",
+      "Lugo", "Madrid", "Málaga", "Murcia", "Navarra", "Ourense",
+      "Palencia", "Pontevedra", "Salamanca", "Santa Cruz de Tenerife",
+      "Segovia", "Sevilla", "Soria", "Tarragona", "Teruel", "Toledo",
+      "Valencia", "Valladolid", "Vizcaya", "Zamora", "Zaragoza", "Ceuta", "Melilla"
+    ]
+  },
+  {
+    "nombre": "Portugal",
+    "codigo_iso": "PT",
+    "provincias": [
+      "Aveiro", "Beja", "Braga", "Braganza", "Castelo Branco", "Coímbra",
+      "Évora", "Faro", "Guarda", "Leiria", "Lisboa", "Portalegre", "Oporto",
+      "Santarém", "Setúbal", "Viana do Castelo", "Vila Real", "Viseu"
+    ]
+  }
+]
