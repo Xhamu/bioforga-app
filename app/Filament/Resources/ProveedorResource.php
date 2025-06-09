@@ -90,11 +90,12 @@ class ProveedorResource extends Resource
                             ->columnSpan(['default' => 3, 'lg' => 1]),
 
                         Select::make('tipo_servicio')
-                            ->label('Tipo de servicio')
+                            ->label('Tipo de proveedor')
                             ->searchable()
                             ->options([
                                 'Logística' => 'Logística',
-                                'Servicios maquinaria' => 'Servicios maquinaria',
+                                'Servicios' => 'Servicios',
+                                'Suministro' => 'Suministro',
                                 'Combustible' => 'Combustible',
                                 'Alojamiento' => 'Alojamiento',
                                 'Otros' => 'Otros',
@@ -277,10 +278,11 @@ class ProveedorResource extends Resource
                 ->filters(
                     [
                         SelectFilter::make('tipo_servicio')
-                            ->label('Tipo de servicio')
+                            ->label('Tipo de proveedor')
                             ->options([
                                 'Logística' => 'Logística',
-                                'Servicios maquinaria' => 'Servicios maquinaria',
+                                'Servicios' => 'Servicios',
+                                'Suministro' => 'Suministro',
                                 'Combustible' => 'Combustible',
                                 'Alojamiento' => 'Alojamiento',
                                 'Otros' => 'Otros',
@@ -318,10 +320,11 @@ class ProveedorResource extends Resource
                 ->filters(
                     [
                         SelectFilter::make('tipo_servicio')
-                            ->label('Tipo de servicio')
+                            ->label('Tipo de proveedor')
                             ->options([
                                 'Logística' => 'Logística',
-                                'Servicios maquinaria' => 'Servicios maquinaria',
+                                'Servicios' => 'Servicios',
+                                'Suministro' => 'Suministro',
                                 'Combustible' => 'Combustible',
                                 'Alojamiento' => 'Alojamiento',
                                 'Otros' => 'Otros',
