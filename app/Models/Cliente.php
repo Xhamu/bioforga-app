@@ -25,6 +25,7 @@ class Cliente extends Model
         'nif',
         'telefono_principal',
         'correo_principal',
+        'tipo_cliente',
 
         'pais',
         'provincia',

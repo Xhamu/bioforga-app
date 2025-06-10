@@ -315,6 +315,7 @@ class ProveedorResource extends Resource
                         SelectFilter::make('provincia')
                             ->label('Provincia')
                             ->options($provinciasOptions)
+                            ->options( Provincia::orderBy('nombre')->pluck('nombre', 'id'))
                             ->searchable()
                             ->placeholder('Todas'),
                     ],
