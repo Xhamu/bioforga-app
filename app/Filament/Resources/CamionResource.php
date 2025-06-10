@@ -83,7 +83,11 @@ class CamionResource extends Resource
                             ->label(__('Proveedor'))
                             ->required(fn(callable $get) => !$get('es_propio'))
                             ->searchable()
-                            ->options(fn() => \App\Models\Proveedor::all()->pluck('razon_social', 'id')->toArray())
+                            ->options(fn() => \App\Models\Proveedor::where('tipo_servicio', 'logistica')->pluck('razon_social', 'id')->toArray())
+                            ->default(function () {
+                                $proveedores = \App\Models\Proveedor::where('tipo_servicio', 'logistica')->pluck('id');
+                                return $proveedores->count() === 1 ? $proveedores->first() : null;
+                            })
                             ->validationMessages([
                                 'required' => 'El :attribute es obligatorio.',
                             ])
