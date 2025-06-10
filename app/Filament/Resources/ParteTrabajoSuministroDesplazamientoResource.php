@@ -83,6 +83,11 @@ class ParteTrabajoSuministroDesplazamientoResource extends Resource
                                 'trabajo' => 'Trabajo',
                                 'otro' => 'Otro',
                             ])
+                            ->visible(
+                                fn($record) =>
+                                $record && 
+                                $record->fecha_hora_inicio_desplazamiento
+                            )
                             ->required()
                             ->nullable(),
 
