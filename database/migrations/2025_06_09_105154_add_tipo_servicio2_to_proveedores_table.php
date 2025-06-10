@@ -7,15 +7,19 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration {
     public function up(): void
     {
-        Schema::table('proveedores', function (Blueprint $table) {
-            $table->string('tipo_servicio')->nullable();
-        });
+        if (!Schema::hasColumn('proveedores', 'tipo_servicio')) {
+            Schema::table('proveedores', function (Blueprint $table) {
+                $table->string('tipo_servicio')->nullable();
+            });
+        }
     }
 
     public function down(): void
     {
-        Schema::table('proveedores', function (Blueprint $table) {
-            $table->dropColumn('tipo_servicio');
-        });
+        if (Schema::hasColumn('proveedores', 'tipo_servicio')) {
+            Schema::table('proveedores', function (Blueprint $table) {
+                $table->dropColumn('tipo_servicio');
+            });
+        }
     }
 };

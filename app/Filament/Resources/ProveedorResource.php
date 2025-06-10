@@ -4,7 +4,10 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\ProveedorResource\Pages;
 use App\Filament\Resources\ProveedorResource\RelationManagers;
+use App\Models\Pais;
+use App\Models\Poblacion;
 use App\Models\Proveedor;
+use App\Models\Provincia;
 use Filament\Forms;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Repeater;
@@ -108,11 +111,10 @@ class ProveedorResource extends Resource
 
                 Section::make('Dirección fiscal')
                     ->schema([
+
                         Select::make('pais')
-                            ->label(__('País'))
-                            ->options([
-                                'es' => 'España',
-                            ])
+                            ->label('País')
+                            ->options(fn() => Pais::orderBy('nombre')->pluck('nombre', 'id'))
                             ->searchable()
                             ->required()
                             ->reactive()
@@ -123,43 +125,18 @@ class ProveedorResource extends Resource
 
                         Select::make('provincia')
                             ->label('Provincia')
-                            ->options(function () use ($ubicaciones) {
-                                return collect($ubicaciones)
-                                    ->flatMap(function ($ccaa) {
-                                        return collect($ccaa['provinces'] ?? [])
-                                            ->mapWithKeys(function ($prov) use ($ccaa) {
-                                                return [$ccaa['code'] . '-' . $prov['code'] => $prov['label']];
-                                            });
-                                    });
-                            })
+                            ->options(fn(callable $get) => Provincia::where('pais_id', $get('pais'))->orderBy('nombre')->pluck('nombre', 'id'))
                             ->searchable()
                             ->required()
-                            ->reactive(),
+                            ->reactive()
+                            ->disabled(fn(callable $get) => !$get('pais')),
 
                         Select::make('poblacion')
                             ->label('Población')
-                            ->options(function (callable $get) use ($ubicaciones) {
-                                $provKey = $get('provincia');
-                                if (!str_contains($provKey, '-'))
-                                    return [];
-
-                                [$ccaaCode, $provCode] = explode('-', $provKey);
-
-                                foreach ($ubicaciones as $ccaa) {
-                                    if ($ccaa['code'] === $ccaaCode) {
-                                        foreach ($ccaa['provinces'] as $provincia) {
-                                            if ($provincia['code'] === $provCode) {
-                                                return collect($provincia['towns'] ?? [])
-                                                    ->mapWithKeys(fn($town) => [$town['label'] => $town['label']]);
-                                            }
-                                        }
-                                    }
-                                }
-
-                                return [];
-                            })
+                            ->options(fn(callable $get) => Poblacion::where('provincia_id', $get('provincia'))->orderBy('nombre')->pluck('nombre', 'id'))
                             ->searchable()
-                            ->required(),
+                            ->required()
+                            ->disabled(fn(callable $get) => !$get('provincia')),
 
                         TextInput::make('codigo_postal')
                             ->label(__('Código postal'))
