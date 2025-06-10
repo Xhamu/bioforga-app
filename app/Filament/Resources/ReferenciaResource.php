@@ -160,10 +160,15 @@ class ReferenciaResource extends Resource
                             ->nullable()
                             ->searchable()
                             ->preload()
-                            ->relationship('proveedor', 'razon_social')
+                            ->relationship(
+                                'proveedor',
+                                'razon_social',
+                                fn(\Illuminate\Database\Eloquent\Builder $query) => $query->whereIn('tipo_servicio', ['suministro', 'servicios'])
+                            )
                             ->visible(function ($get) {
                                 return strpos($get('referencia'), 'SU') !== false;
                             }),
+
                         Forms\Components\Select::make('cliente_id')
                             ->nullable()
                             ->searchable()
@@ -580,10 +585,15 @@ class ReferenciaResource extends Resource
                         ->nullable()
                         ->searchable()
                         ->preload()
-                        ->relationship('proveedor', 'razon_social')
+                        ->relationship(
+                            'proveedor',
+                            'razon_social',
+                            fn(\Illuminate\Database\Eloquent\Builder $query) => $query->whereIn('tipo_servicio', ['suministro', 'servicios'])
+                        )
                         ->visible(function ($get) {
                             return strpos($get('referencia'), 'SU') !== false;
                         }),
+
                     Forms\Components\Select::make('cliente_id')
                         ->nullable()
                         ->searchable()

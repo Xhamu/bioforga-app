@@ -53,6 +53,15 @@ class ClienteResource extends Resource
                             ->label('Teléfono'),
                         TextInput::make('correo_principal')
                             ->label('Correo electrónico'),
+
+                        Select::make('tipo_cliente')
+                            ->label('Tipo de cliente')
+                            ->searchable()
+                            ->options([
+                                'Suministro' => 'Suministro',
+                                'Servicio' => 'Servicio',
+                            ])
+                            ->columnSpanFull(),
                     ])
                     ->columns([
                         'sm' => 1,

@@ -101,6 +101,7 @@ class ProveedorResource extends Resource
                                 'Suministro' => 'Suministro',
                                 'Combustible' => 'Combustible',
                                 'Alojamiento' => 'Alojamiento',
+                                'Taller' => 'Taller',
                                 'Otros' => 'Otros',
                             ])
                             ->nullable()
@@ -262,6 +263,7 @@ class ProveedorResource extends Resource
                                 'Suministro' => 'Suministro',
                                 'Combustible' => 'Combustible',
                                 'Alojamiento' => 'Alojamiento',
+                                'Taller' => 'Taller',
                                 'Otros' => 'Otros',
                             ])
                             ->searchable()
@@ -304,6 +306,7 @@ class ProveedorResource extends Resource
                                 'Suministro' => 'Suministro',
                                 'Combustible' => 'Combustible',
                                 'Alojamiento' => 'Alojamiento',
+                                'Taller' => 'Taller',
                                 'Otros' => 'Otros',
                             ])
                             ->searchable()
@@ -312,6 +315,7 @@ class ProveedorResource extends Resource
                         SelectFilter::make('provincia')
                             ->label('Provincia')
                             ->options($provinciasOptions)
+                            ->options( Provincia::orderBy('nombre')->pluck('nombre', 'id'))
                             ->searchable()
                             ->placeholder('Todas'),
                     ],
