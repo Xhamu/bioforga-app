@@ -63,11 +63,12 @@
                         }
 
                         fetch(
-                                `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&addressdetails=1`)
+                                `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&addressdetails=1`
+                                )
                             .then(response => response.json())
                             .then(data => {
                                 const provincia = data?.address?.province ??
-                                'Provincia desconocida';
+                                    'Provincia desconocida';
                                 const ayuntamiento = data?.address?.town ??
                                     'Ayuntamiento desconocido';
 
@@ -93,7 +94,7 @@
 
                                     const provinciaAbrev = provincia.slice(0, 2).toUpperCase();
                                     const ayuntamientoAbrev = ayuntamiento.slice(0, 2)
-                                .toUpperCase();
+                                        .toUpperCase();
 
                                     referenciaInput.value =
                                         `${ayuntamientoAbrev}${provinciaAbrev}${formatted}`;
@@ -102,13 +103,7 @@
                                     }));
                                 }
                             })
-                            .catch(error => {
-                                console.error("Error al obtener datos de ubicación:", error);
-                            });
                     },
-                    function() {
-                        alert("No se ha podido obtener la ubicación.");
-                    }
                 );
             });
         });

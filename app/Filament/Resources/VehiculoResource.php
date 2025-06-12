@@ -76,16 +76,12 @@ class VehiculoResource extends Resource
                             ->columnSpan(['default' => 2, 'lg' => 2]),
 
                         Select::make('conductor_habitual')
-                            ->label(__('Conductor habitual'))
-                            ->required()
+                            ->label(__('Conductores habituales'))
                             ->searchable()
-                            ->rules('required')
+                            ->multiple()
                             ->options(function () {
                                 return \App\Models\User::all()->pluck('name', 'id')->toArray();
                             })
-                            ->validationMessages([
-                                'required' => 'El :attribute es obligatorio.',
-                            ])
                             ->columnSpan(['default' => 2, 'lg' => 2]),
                     ])
                     ->columns(2)

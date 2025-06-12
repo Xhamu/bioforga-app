@@ -126,6 +126,20 @@ class UserResource extends Resource
                             ->options(
                                 \Spatie\Permission\Models\Role::where('name', '!=', 'superadmin')->pluck('name', 'id')
                             ),
+
+                        /*Forms\Components\Select::make('sector')
+                            ->label('Sector')
+                            ->searchable()
+                            ->options([
+                                '01' => 'Zona Norte',
+                                '02' => 'Zona Sur',
+                                '03' => 'Andalucía Oriental',
+                                '04' => 'Andalucía Occidental',
+                                '05' => 'Otros',
+                            ])
+                            ->visible(function ($get) {
+                                return !empty($get('roles'));
+                            }),*/
                     ])
                     ->columns(1),
             ]);
@@ -205,6 +219,15 @@ class UserResource extends Resource
                 ])
                 ->filters([
                     //
+                ])
+                ->headerActions([
+                    Action::make('exportar_partes_trabajo')
+                        ->label('Exportar partes de trabajo')
+                        ->action(function () {
+                            return \Maatwebsite\Excel\Facades\Excel::download(new \App\Exports\PartesTrabajoPorUsuarioExport, 'partes_trabajo.xlsx');
+                        })
+                        ->icon('heroicon-m-arrow-down-tray')
+                        ->color('gray'),
                 ])
                 ->actions([
                     \STS\FilamentImpersonate\Tables\Actions\Impersonate::make(),

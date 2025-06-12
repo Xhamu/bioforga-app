@@ -120,9 +120,6 @@
                     bubbles: true
                 }));
             },
-            (error) => {
-                //alert("Error al obtener ubicación: " + error.message);
-            }
         );
     }
 
