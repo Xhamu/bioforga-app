@@ -16,6 +16,7 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
+use Filament\Support\Enums\FontWeight;
 use Filament\Tables;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
@@ -181,28 +182,19 @@ class ClienteResource extends Resource
         return $table
             ->columns([
                 TextColumn::make('razon_social')
-                    ->label('Razón Social')
+                    ->label('Razón social')
                     ->searchable()
+                    ->weight(FontWeight::Bold)
                     ->sortable(),
                 TextColumn::make('nif')
                     ->label('NIF')
-                    ->searchable(),
+                    ->searchable()
+                    ->icon('heroicon-m-identification'),
                 TextColumn::make('telefono_principal')
-                    ->label('Teléfono Principal'),
-                TextColumn::make('correo_principal')
-                    ->label('Correo Principal'),
-
-                TextColumn::make('direccion')
-                    ->label('Dirección Fiscal')
-                    ->searchable(),
+                    ->label('Teléfono')
+                    ->icon('heroicon-m-phone'),
             ])
             ->filters([
-                SelectFilter::make('pais')
-                    ->options([
-                        'España' => 'España',
-                        'Portugal' => 'Portugal',
-                        'Francia' => 'Francia',
-                    ]),
                 Tables\Filters\TrashedFilter::make(),
             ])
             ->actions([

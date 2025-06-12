@@ -40,7 +40,9 @@ class Vehiculo extends Model
      */
     protected function casts(): array
     {
-        return [];
+        return [
+            'conductor_habitual' => 'array',
+        ];
     }
 
     protected $table = 'vehiculos';

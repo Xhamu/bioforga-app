@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\ReferenciaResource\Pages;
 use App\Filament\Resources\ReferenciaResource\RelationManagers;
 use App\Models\Referencia;
+use App\Models\User;
 use Filament\Forms;
 use Filament\Forms\Components\Livewire;
 use Filament\Forms\Components\Select;
@@ -89,14 +90,22 @@ class ReferenciaResource extends Resource
                         if ($state) {
                             $referencia = $get('referencia') ?? '';
 
-                            // Separar partes con regex (sector + 'SU' + formato anterior + fecha + contador)
                             preg_match('/^(?<sector>\d{2})SU(?:CA|SA|EX|OT)?(?<fecha>\d{6})(?<contador>\d{3})$/', $referencia, $matches);
 
-                            $sector = $matches['sector'] ?? '01'; // Valor por defecto si no hay sector
+                            $sector = $matches['sector'] ?? '01';
                             $fecha = $matches['fecha'] ?? now()->format('dmy');
                             $contador = $matches['contador'] ?? '001';
 
-                            $nuevaReferencia = $sector . 'SU' . $state . $fecha . $contador;
+                            $contadorInt = (int) $contador;
+
+                            do {
+                                $contadorFormateado = str_pad($contadorInt, 3, '0', STR_PAD_LEFT);
+                                $nuevaReferencia = $sector . 'SU' . $state . $fecha . $contadorFormateado;
+
+                                $existe = Referencia::where('referencia', $nuevaReferencia)->exists();
+
+                                $contadorInt++;
+                            } while ($existe);
 
                             $set('referencia', $nuevaReferencia);
                         } else {
@@ -110,22 +119,79 @@ class ReferenciaResource extends Resource
                 Forms\Components\Section::make('Ubicación')
                     ->schema([
                         Forms\Components\TextInput::make('provincia')
-                            ->required(),
+                            ->required()
+                            ->live()
+                            ->afterStateUpdated(function ($state, callable $set, callable $get) {
+                                $referenciaActual = $get('referencia') ?? '';
+
+                                // Solo generamos si NO es tipo suministro
+                                if (str_contains($referenciaActual, 'SU')) {
+                                    return;
+                                }
+
+                                $provincia = strtoupper(substr($get('provincia') ?? '', 0, 2));
+                                $ayuntamiento = strtoupper(substr($get('ayuntamiento') ?? '', 0, 2));
+                                $fecha = now()->format('dmy');
+
+                                $contador = 1;
+                                do {
+                                    $contadorStr = str_pad($contador, 3, '0', STR_PAD_LEFT);
+                                    $nuevaReferencia = "{$provincia}{$ayuntamiento}{$fecha}{$contadorStr}";
+
+                                    $existe = Referencia::where('referencia', $nuevaReferencia)->exists();
+                                    $contador++;
+                                } while ($existe);
+
+                                $set('referencia', $nuevaReferencia);
+                            }),
+
                         Forms\Components\TextInput::make('ayuntamiento')
-                            ->required(),
+                            ->required()
+                            ->live()
+                            ->afterStateUpdated(function ($state, callable $set, callable $get) {
+                                $referenciaActual = $get('referencia') ?? '';
+
+                                if (str_contains($referenciaActual, 'SU')) {
+                                    return;
+                                }
+
+                                $provincia = strtoupper(substr($get('provincia') ?? '', 0, 2));
+                                $ayuntamiento = strtoupper(substr($get('ayuntamiento') ?? '', 0, 2));
+                                $fecha = now()->format('dmy');
+
+                                $contador = 1;
+                                do {
+                                    $contadorStr = str_pad($contador, 3, '0', STR_PAD_LEFT);
+                                    $nuevaReferencia = "{$provincia}{$ayuntamiento}{$fecha}{$contadorStr}";
+
+                                    $existe = Referencia::where('referencia', $nuevaReferencia)->exists();
+                                    $contador++;
+                                } while ($existe);
+
+                                $set('referencia', $nuevaReferencia);
+                            }),
                         Forms\Components\TextInput::make('monte_parcela')
                             ->label('Monte / Parcela')
                             ->required(),
+                        Forms\Components\TextInput::make('ubicacion_gps')
+                            ->label('GPS'),
+                        Forms\Components\TextInput::make('finca')
+                            ->label('Finca')
+                            ->visible(function ($get) {
+                                return !empty($get('referencia')) && strpos($get('referencia'), 'SU') === false;
+                            })
+                            ->columnSpanFull(),
                         Forms\Components\Select::make('sector')
                             ->label('Sector')
                             ->searchable()
                             ->options([
                                 '01' => 'Zona Norte',
                                 '02' => 'Zona Sur',
-                                '03' => 'Andalucía',
-                                '04' => 'Huelva',
+                                '03' => 'Andalucía Oriental',
+                                '04' => 'Andalucía Occidental',
                                 '05' => 'Otros',
                             ])
+                            ->columnSpanFull()
                             ->required()
                             ->live()
                             ->afterStateUpdated(function ($state, callable $set, callable $get) {
@@ -138,14 +204,6 @@ class ReferenciaResource extends Resource
                             ->visible(function ($get) {
                                 return !empty($get('referencia'));
                             }),
-                        Forms\Components\TextInput::make('finca')
-                            ->label('Finca')
-                            ->required()
-                            ->visible(function ($get) {
-                                return !empty($get('referencia')) && strpos($get('referencia'), 'SU') === false;
-                            }),
-                        Forms\Components\TextInput::make('ubicacion_gps')
-                            ->label('GPS'),
                         View::make('livewire.get-location-button')
                             ->visible(function ($state) {
                                 return !isset($state['id']);
@@ -163,7 +221,7 @@ class ReferenciaResource extends Resource
                             ->relationship(
                                 'proveedor',
                                 'razon_social',
-                                fn(\Illuminate\Database\Eloquent\Builder $query) => $query->whereIn('tipo_servicio', ['suministro', 'servicios'])
+                                fn(Builder $query) => $query->whereIn('tipo_servicio', ['suministro', 'servicios'])
                             )
                             ->visible(function ($get) {
                                 return strpos($get('referencia'), 'SU') !== false;
@@ -208,7 +266,7 @@ class ReferenciaResource extends Resource
                             ->required(),
 
                         Forms\Components\TextInput::make('cantidad_aprox')
-                            ->label('Cantidad')
+                            ->label('Cantidad (aprox.)')
                             ->numeric()
                             ->required(),
 
@@ -240,14 +298,26 @@ class ReferenciaResource extends Resource
                 Forms\Components\Section::make('Tarifa')
                     ->schema([
                         Forms\Components\Select::make('tarifa')
-                            ->label('')
+                            ->label('Tarifa')
                             ->options([
                                 'toneladas' => 'Toneladas',
                                 'm3' => 'Metros cúbicos',
                             ])
                             ->searchable()
-                            ->nullable(),
-                    ])->columns(1)
+                            ->nullable()
+                            ->reactive(), // necesario para reactividad
+
+                        Forms\Components\TextInput::make('precio')
+                            ->label('Precio')
+                            ->numeric()
+                            ->nullable()
+                            ->reactive()
+                            ->suffix(fn(callable $get) => match ($get('tarifa')) {
+                                'toneladas' => '€/tonelada',
+                                'm3' => '€/m³',
+                                default => '€',
+                            }),
+                    ])->columns(2)
                     ->visible(function ($get) {
                         return !empty($get('referencia'));
                     }),
@@ -273,7 +343,16 @@ class ReferenciaResource extends Resource
                         Forms\Components\Select::make('usuarios')
                             ->label('Usuarios relacionados')
                             ->multiple()
-                            ->relationship('usuarios', 'name')
+                            ->options(function () {
+                                return User::whereDoesntHave('roles', function ($query) {
+                                    $query->where('name', 'superadmin');
+                                })
+                                    ->whereNull('deleted_at') // Evitar usuarios eliminados
+                                    ->get()
+                                    ->mapWithKeys(function ($user) {
+                                        return [$user->id => $user->name . ' ' . $user->apellidos];
+                                    });
+                            })
                             ->preload()
                             ->searchable()
                             ->columnSpanFull()
@@ -514,14 +593,22 @@ class ReferenciaResource extends Resource
                     if ($state) {
                         $referencia = $get('referencia') ?? '';
 
-                        // Separar partes con regex (sector + 'SU' + formato anterior + fecha + contador)
                         preg_match('/^(?<sector>\d{2})SU(?:CA|SA|EX|OT)?(?<fecha>\d{6})(?<contador>\d{3})$/', $referencia, $matches);
 
-                        $sector = $matches['sector'] ?? '01'; // Valor por defecto si no hay sector
+                        $sector = $matches['sector'] ?? '01';
                         $fecha = $matches['fecha'] ?? now()->format('dmy');
                         $contador = $matches['contador'] ?? '001';
 
-                        $nuevaReferencia = $sector . 'SU' . $state . $fecha . $contador;
+                        $contadorInt = (int) $contador;
+
+                        do {
+                            $contadorFormateado = str_pad($contadorInt, 3, '0', STR_PAD_LEFT);
+                            $nuevaReferencia = $sector . 'SU' . $state . $fecha . $contadorFormateado;
+
+                            $existe = Referencia::where('referencia', $nuevaReferencia)->exists();
+
+                            $contadorInt++;
+                        } while ($existe);
 
                         $set('referencia', $nuevaReferencia);
                     } else {
@@ -535,20 +622,76 @@ class ReferenciaResource extends Resource
             Forms\Components\Section::make('Ubicación')
                 ->schema([
                     Forms\Components\TextInput::make('provincia')
-                        ->required(),
+                        ->required()
+                        ->live()
+                        ->afterStateUpdated(function ($state, callable $set, callable $get) {
+                            $referenciaActual = $get('referencia') ?? '';
+
+                            // Solo generamos si NO es tipo suministro
+                            if (str_contains($referenciaActual, 'SU')) {
+                                return;
+                            }
+
+                            $provincia = strtoupper(substr($get('provincia') ?? '', 0, 2));
+                            $ayuntamiento = strtoupper(substr($get('ayuntamiento') ?? '', 0, 2));
+                            $fecha = now()->format('dmy');
+
+                            $contador = 1;
+                            do {
+                                $contadorStr = str_pad($contador, 3, '0', STR_PAD_LEFT);
+                                $nuevaReferencia = "{$provincia}{$ayuntamiento}{$fecha}{$contadorStr}";
+
+                                $existe = Referencia::where('referencia', $nuevaReferencia)->exists();
+                                $contador++;
+                            } while ($existe);
+
+                            $set('referencia', $nuevaReferencia);
+                        }),
+
                     Forms\Components\TextInput::make('ayuntamiento')
-                        ->required(),
+                        ->required()
+                        ->live()
+                        ->afterStateUpdated(function ($state, callable $set, callable $get) {
+                            $referenciaActual = $get('referencia') ?? '';
+
+                            if (str_contains($referenciaActual, 'SU')) {
+                                return;
+                            }
+
+                            $provincia = strtoupper(substr($get('provincia') ?? '', 0, 2));
+                            $ayuntamiento = strtoupper(substr($get('ayuntamiento') ?? '', 0, 2));
+                            $fecha = now()->format('dmy');
+
+                            $contador = 1;
+                            do {
+                                $contadorStr = str_pad($contador, 3, '0', STR_PAD_LEFT);
+                                $nuevaReferencia = "{$provincia}{$ayuntamiento}{$fecha}{$contadorStr}";
+
+                                $existe = Referencia::where('referencia', $nuevaReferencia)->exists();
+                                $contador++;
+                            } while ($existe);
+
+                            $set('referencia', $nuevaReferencia);
+                        }),
                     Forms\Components\TextInput::make('monte_parcela')
                         ->label('Monte / Parcela')
                         ->required(),
+                    Forms\Components\TextInput::make('ubicacion_gps')
+                        ->label('GPS'),
+                    Forms\Components\TextInput::make('finca')
+                        ->label('Finca')
+                        ->visible(function ($get) {
+                            return !empty($get('referencia')) && strpos($get('referencia'), 'SU') === false;
+                        })
+                        ->columnSpanFull(),
                     Forms\Components\Select::make('sector')
                         ->label('Sector')
                         ->searchable()
                         ->options([
                             '01' => 'Zona Norte',
                             '02' => 'Zona Sur',
-                            '03' => 'Andalucía',
-                            '04' => 'Huelva',
+                            '03' => 'Andalucía Oriental',
+                            '04' => 'Andalucía Occidental',
                             '05' => 'Otros',
                         ])
                         ->required()
@@ -563,14 +706,6 @@ class ReferenciaResource extends Resource
                         ->visible(function ($get) {
                             return !empty($get('referencia'));
                         }),
-                    Forms\Components\TextInput::make('finca')
-                        ->label('Finca')
-                        ->required()
-                        ->visible(function ($get) {
-                            return !empty($get('referencia')) && strpos($get('referencia'), 'SU') === false;
-                        }),
-                    Forms\Components\TextInput::make('ubicacion_gps')
-                        ->label('GPS'),
                     View::make('livewire.get-location-button')
                         ->visible(function ($state) {
                             return !isset($state['id']);
@@ -588,7 +723,7 @@ class ReferenciaResource extends Resource
                         ->relationship(
                             'proveedor',
                             'razon_social',
-                            fn(\Illuminate\Database\Eloquent\Builder $query) => $query->whereIn('tipo_servicio', ['suministro', 'servicios'])
+                            fn(Builder $query) => $query->whereIn('tipo_servicio', ['suministro', 'servicios'])
                         )
                         ->visible(function ($get) {
                             return strpos($get('referencia'), 'SU') !== false;
@@ -633,7 +768,7 @@ class ReferenciaResource extends Resource
                         ->required(),
 
                     Forms\Components\TextInput::make('cantidad_aprox')
-                        ->label('Cantidad')
+                        ->label('Cantidad (aprox.)')
                         ->numeric()
                         ->required(),
 
@@ -665,14 +800,27 @@ class ReferenciaResource extends Resource
             Forms\Components\Section::make('Tarifa')
                 ->schema([
                     Forms\Components\Select::make('tarifa')
-                        ->label('')
+                        ->label('Tarifa')
                         ->options([
                             'toneladas' => 'Toneladas',
                             'm3' => 'Metros cúbicos',
                         ])
                         ->searchable()
-                        ->nullable(),
-                ])->columns(1)
+                        ->nullable()
+                        ->reactive(), // necesario para reactividad
+
+                    Forms\Components\TextInput::make('precio')
+                        ->label('Precio')
+                        ->numeric()
+                        ->nullable()
+                        ->reactive()
+                        ->suffix(fn(callable $get) => match ($get('tarifa')) {
+                            'toneladas' => '€/tonelada',
+                            'm3' => '€/m³',
+                            default => '€',
+                        }),
+                ])
+                ->columns(2)
                 ->visible(function ($get) {
                     return !empty($get('referencia'));
                 }),
@@ -698,7 +846,16 @@ class ReferenciaResource extends Resource
                     Forms\Components\Select::make('usuarios')
                         ->label('Usuarios relacionados')
                         ->multiple()
-                        ->relationship('usuarios', 'name')
+                        ->options(function () {
+                            return User::whereDoesntHave('roles', function ($query) {
+                                $query->where('name', 'superadmin');
+                            })
+                                ->whereNull('deleted_at') // Evitar usuarios eliminados
+                                ->get()
+                                ->mapWithKeys(function ($user) {
+                                    return [$user->id => $user->name . ' ' . $user->apellidos];
+                                });
+                        })
                         ->preload()
                         ->searchable()
                         ->columnSpanFull()
@@ -737,5 +894,4 @@ class ReferenciaResource extends Resource
                 }),
         ];
     }
-
 }

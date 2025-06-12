@@ -25,6 +25,11 @@ class SuperadminUserResource extends Resource
     protected static ?string $navigationGroup = 'Superadmin';
     protected static ?string $navigationLabel = 'Usuarios';
 
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->hasRole('superadmin');
+    }
+
     public static function form(Form $form): Form
     {
         return $form

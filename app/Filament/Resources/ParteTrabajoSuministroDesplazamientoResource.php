@@ -57,7 +57,7 @@ class ParteTrabajoSuministroDesplazamientoResource extends Resource
                             ->relationship(
                                 name: 'vehiculo',
                                 titleAttribute: 'marca',
-                                modifyQueryUsing: fn($query) => $query->where('conductor_habitual', Auth::id())
+                                modifyQueryUsing: fn($query) => $query->whereJsonContains('conductor_habitual', (string) Auth::id())
                             )
                             ->getOptionLabelFromRecordUsing(
                                 fn($record) => $record->marca . ' ' . $record->modelo . ' (' . $record->matricula . ')'
@@ -66,10 +66,9 @@ class ParteTrabajoSuministroDesplazamientoResource extends Resource
                             ->preload()
                             ->nullable()
                             ->default(function () {
-                                $vehiculos = Vehiculo::where('conductor_habitual', Auth::id())->get();
+                                $vehiculos = Vehiculo::whereJsonContains('conductor_habitual', (string) Auth::id())->get();
                                 return $vehiculos->count() === 1 ? $vehiculos->first()->id : null;
                             }),
-
                     ])
                     ->columns(2),
 
@@ -85,7 +84,7 @@ class ParteTrabajoSuministroDesplazamientoResource extends Resource
                             ])
                             ->visible(
                                 fn($record) =>
-                                $record && 
+                                $record &&
                                 $record->fecha_hora_inicio_desplazamiento
                             )
                             ->required()
