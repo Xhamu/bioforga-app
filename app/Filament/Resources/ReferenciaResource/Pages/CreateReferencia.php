@@ -22,4 +22,9 @@ class CreateReferencia extends CreateRecord
             ->title('Referencia creada');
     }
 
+    protected function afterCreate(): void
+    {
+        $this->record->usuarios()->sync($this->data['usuarios'] ?? []);
+    }
+
 }

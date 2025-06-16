@@ -60,7 +60,7 @@ class Referencia extends Model
 
     public function usuarios()
     {
-        return $this->belongsToMany(User::class, 'referencias_users', 'referencia_id', 'user_id')->withTimestamps()->withTrashed();
+        return $this->belongsToMany(User::class, 'referencias_users', 'referencia_id', 'user_id');
     }
 
     public function partesTransporte()
@@ -89,6 +89,13 @@ class Referencia extends Model
         } else if ($estado === 'cerrado') {
             return 'Cerrado';
         }
+    }
+
+    public function getIntervinienteAttribute(): string
+    {
+        return $this->proveedor?->razon_social
+            ?? $this->cliente?->razon_social
+            ?? 'Sin interviniente';
     }
 
     /**

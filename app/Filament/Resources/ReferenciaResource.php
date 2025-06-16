@@ -8,6 +8,7 @@ use App\Models\Referencia;
 use App\Models\User;
 use Filament\Forms;
 use Filament\Forms\Components\Livewire;
+use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
@@ -262,6 +263,8 @@ class ReferenciaResource extends Resource
                                 'troza' => 'Troza',
                                 'tacos' => 'Tacos',
                                 'puntal' => 'Puntal',
+                                'copas' => 'Copas',
+                                'rama' => 'Rama',
                             ])
                             ->required(),
 
@@ -338,29 +341,28 @@ class ReferenciaResource extends Resource
                         return !empty($get('referencia'));
                     }),
 
-                Forms\Components\Section::make('Usuarios')
-                    ->schema([
-                        Forms\Components\Select::make('usuarios')
-                            ->label('Usuarios relacionados')
-                            ->multiple()
-                            ->options(function () {
-                                return User::whereDoesntHave('roles', function ($query) {
-                                    $query->where('name', 'superadmin');
-                                })
-                                    ->whereNull('deleted_at') // Evitar usuarios eliminados
-                                    ->get()
-                                    ->mapWithKeys(function ($user) {
-                                        return [$user->id => $user->name . ' ' . $user->apellidos];
-                                    });
-                            })
-                            ->preload()
-                            ->searchable()
-                            ->columnSpanFull()
-                            ->visible(fn($get) => !empty($get('referencia'))),
-                    ])->columns(1)
-                    ->visible(function ($get) {
-                        return !empty($get('referencia'));
-                    }),
+                Forms\Components\Select::make('usuarios')
+                    ->label('Usuarios relacionados')
+                    ->multiple()
+                    ->relationship(
+                        name: 'usuarios',
+                        titleAttribute: 'name', // columna real
+                        modifyQueryUsing: fn($query) =>
+                        $query->orderBy('name')
+                            ->whereNull('users.deleted_at')
+                            ->whereDoesntHave(
+                                'roles',
+                                fn($q) =>
+                                $q->whereIn('name', ['superadmin'])
+                            )
+                    )
+                    ->getOptionLabelFromRecordUsing(function ($record) {
+                        return $record?->nombre_apellidos ?? '-';
+                    })
+                    ->preload()
+                    ->searchable()
+                    ->columnSpanFull()
+                    ->visible(fn($get) => !empty($get('referencia'))),
 
                 Forms\Components\Section::make('Estado')
                     ->schema([
@@ -440,9 +442,20 @@ class ReferenciaResource extends Resource
                         ->label('Referencia')
                         ->weight(FontWeight::Bold)
                         ->searchable(),
-                    TextColumn::make('provincia')
-                        ->label('Provincia')
-                        ->icon('heroicon-m-map-pin'),
+
+                    TextColumn::make('ayuntamiento')
+                        ->label('Municipio (Monte)')
+                        ->icon('heroicon-m-map-pin')
+                        ->formatStateUsing(function ($state, $record) {
+                            $monte = $record->monte_parcela;
+                            return $state . ($monte ? " ($monte)" : '');
+                        }),
+
+                    TextColumn::make('interviniente')
+                        ->label('Interviniente')
+                        ->icon('heroicon-m-building-office')
+                        ->sortable()
+                        ->searchable(),
 
                     TextColumn::make('estado_mostrar')
                         ->label('Estado'),
@@ -542,6 +555,14 @@ class ReferenciaResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
+            ->when(
+                !auth()->user()->hasAnyRole(['superadmin', 'administracion', 'administrador', 'direccion']),
+                fn($query) => $query->whereHas(
+                    'usuarios',
+                    fn($q) =>
+                    $q->where('users.id', auth()->id())
+                )
+            )
             ->withoutGlobalScopes([
                 SoftDeletingScope::class,
             ]);
@@ -764,6 +785,8 @@ class ReferenciaResource extends Resource
                             'troza' => 'Troza',
                             'tacos' => 'Tacos',
                             'puntal' => 'Puntal',
+                            'copas' => 'Copas',
+                            'rama' => 'Rama',
                         ])
                         ->required(),
 
@@ -841,29 +864,28 @@ class ReferenciaResource extends Resource
                     return !empty($get('referencia'));
                 }),
 
-            Forms\Components\Section::make('Usuarios')
-                ->schema([
-                    Forms\Components\Select::make('usuarios')
-                        ->label('Usuarios relacionados')
-                        ->multiple()
-                        ->options(function () {
-                            return User::whereDoesntHave('roles', function ($query) {
-                                $query->where('name', 'superadmin');
-                            })
-                                ->whereNull('deleted_at') // Evitar usuarios eliminados
-                                ->get()
-                                ->mapWithKeys(function ($user) {
-                                    return [$user->id => $user->name . ' ' . $user->apellidos];
-                                });
-                        })
-                        ->preload()
-                        ->searchable()
-                        ->columnSpanFull()
-                        ->visible(fn($get) => !empty($get('referencia'))),
-                ])->columns(1)
-                ->visible(function ($get) {
-                    return !empty($get('referencia'));
-                }),
+            Forms\Components\Select::make('usuarios')
+                ->label('Usuarios relacionados')
+                ->multiple()
+                ->relationship(
+                    name: 'usuarios',
+                    titleAttribute: 'name', // columna real
+                    modifyQueryUsing: fn($query) =>
+                    $query->orderBy('name')
+                        ->whereNull('users.deleted_at')
+                        ->whereDoesntHave(
+                            'roles',
+                            fn($q) =>
+                            $q->whereIn('name', ['superadmin', 'administracion', 'administrador', 'direccion'])
+                        )
+                )
+                ->getOptionLabelFromRecordUsing(function ($record) {
+                    return $record?->nombre_apellidos ?? '-';
+                })
+                ->preload()
+                ->searchable()
+                ->columnSpanFull()
+                ->visible(fn($get) => !empty($get('referencia'))),
 
             Forms\Components\Section::make('Estado')
                 ->schema([

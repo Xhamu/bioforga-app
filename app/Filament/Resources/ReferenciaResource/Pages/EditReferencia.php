@@ -94,4 +94,9 @@ class EditReferencia extends EditRecord
         ]);
     }
 
+    protected function afterSave(): void
+    {
+        $this->record->usuarios()->sync($this->data['usuarios'] ?? []);
+    }
+
 }
