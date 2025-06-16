@@ -91,6 +91,13 @@ class Referencia extends Model
         }
     }
 
+    public function getIntervinienteAttribute(): string
+    {
+        return $this->proveedor?->razon_social
+            ?? $this->cliente?->razon_social
+            ?? 'Sin interviniente';
+    }
+
     /**
      * The attributes that should be hidden for serialization.
      *
