@@ -8,6 +8,7 @@ use App\Models\Referencia;
 use App\Models\User;
 use Filament\Forms;
 use Filament\Forms\Components\Livewire;
+use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
@@ -338,29 +339,28 @@ class ReferenciaResource extends Resource
                         return !empty($get('referencia'));
                     }),
 
-                Forms\Components\Section::make('Usuarios')
+                Section::make('Usuarios')
                     ->schema([
                         Forms\Components\Select::make('usuarios')
                             ->label('Usuarios relacionados')
                             ->multiple()
-                            ->options(function () {
-                                return User::whereDoesntHave('roles', function ($query) {
-                                    $query->where('name', 'superadmin');
-                                })
-                                    ->whereNull('deleted_at') // Evitar usuarios eliminados
-                                    ->get()
-                                    ->mapWithKeys(function ($user) {
-                                        return [$user->id => $user->name . ' ' . $user->apellidos];
-                                    });
-                            })
+                            ->relationship(
+                                name: 'usuarios',
+                                titleAttribute: 'name', // usa un campo real de la tabla para evitar errores de ordenación
+                                modifyQueryUsing: fn($query) =>
+                                $query->whereNull('users.deleted_at')
+                                    ->whereDoesntHave(
+                                        'roles',
+                                        fn($q) =>
+                                        $q->where('name', 'superadmin')
+                                    )
+                            )
+                            ->getOptionLabelUsing(fn($user) => $user->name . ' ' . $user->apellidos) // esto se muestra al usuario
                             ->preload()
                             ->searchable()
                             ->columnSpanFull()
                             ->visible(fn($get) => !empty($get('referencia'))),
-                    ])->columns(1)
-                    ->visible(function ($get) {
-                        return !empty($get('referencia'));
-                    }),
+                    ]),
 
                 Forms\Components\Section::make('Estado')
                     ->schema([
@@ -841,29 +841,28 @@ class ReferenciaResource extends Resource
                     return !empty($get('referencia'));
                 }),
 
-            Forms\Components\Section::make('Usuarios')
+            Section::make('Usuarios')
                 ->schema([
                     Forms\Components\Select::make('usuarios')
                         ->label('Usuarios relacionados')
                         ->multiple()
-                        ->options(function () {
-                            return User::whereDoesntHave('roles', function ($query) {
-                                $query->where('name', 'superadmin');
-                            })
-                                ->whereNull('deleted_at') // Evitar usuarios eliminados
-                                ->get()
-                                ->mapWithKeys(function ($user) {
-                                    return [$user->id => $user->name . ' ' . $user->apellidos];
-                                });
-                        })
+                        ->relationship(
+                            name: 'usuarios',
+                            titleAttribute: 'name', // usa un campo real de la tabla para evitar errores de ordenación
+                            modifyQueryUsing: fn($query) =>
+                            $query->whereNull('users.deleted_at')
+                                ->whereDoesntHave(
+                                    'roles',
+                                    fn($q) =>
+                                    $q->where('name', 'superadmin')
+                                )
+                        )
+                        ->getOptionLabelUsing(fn($user) => $user->name . ' ' . $user->apellidos) // esto se muestra al usuario
                         ->preload()
                         ->searchable()
                         ->columnSpanFull()
                         ->visible(fn($get) => !empty($get('referencia'))),
-                ])->columns(1)
-                ->visible(function ($get) {
-                    return !empty($get('referencia'));
-                }),
+                ]),
 
             Forms\Components\Section::make('Estado')
                 ->schema([

@@ -38,8 +38,8 @@ class ParteTrabajoSuministroAveria extends Model
     ];
 
     protected $casts = [
-        'fecha_hora_inicio_averia' => 'date',
-        'fecha_hora_fin_averia' => 'date',
+        'fecha_hora_inicio_averia' => 'datetime',
+        'fecha_hora_fin_averia' => 'datetime',
     ];
 
     public function getActivitylogOptions(): LogOptions

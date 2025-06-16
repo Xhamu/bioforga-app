@@ -36,8 +36,8 @@ class ParteTrabajoSuministroDesplazamiento extends Model
     ];
 
     protected $casts = [
-        'fecha_hora_inicio_desplazamiento' => 'date',
-        'fecha_hora_fin_desplazamiento' => 'date',
+        'fecha_hora_inicio_desplazamiento' => 'datetime',
+        'fecha_hora_fin_desplazamiento' => 'datetime',
     ];
 
     public function getActivitylogOptions(): LogOptions

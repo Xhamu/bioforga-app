@@ -16,7 +16,6 @@ class ParteTrabajoSuministroOtros extends Model
     use HasFactory, Notifiable, SoftDeletes, LogsActivity;
 
     /**
-     * The attributes that are mass assignable.
      *
      * @var list<string>
      */
@@ -34,8 +33,8 @@ class ParteTrabajoSuministroOtros extends Model
     ];
 
     protected $casts = [
-        'fecha_hora_inicio_averia' => 'date',
-        'fecha_hora_fin_averia' => 'date',
+        'fecha_hora_inicio_otros' => 'datetime',
+        'fecha_hora_fin_otros' => 'datetime',
     ];
 
     public function getActivitylogOptions(): LogOptions

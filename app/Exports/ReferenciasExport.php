@@ -208,7 +208,7 @@ class ReferenciasExport implements FromCollection, WithHeadings, WithMapping, Wi
             $row->ayuntamiento,
             $row->monte_parcela,
             $row->ubicacion_gps
-            ? '=HYPERLINK("https://maps.google.com/?q=' . $row->ubicacion_gps . '")'
+            ? '=HYPERLINK("https://maps.google.com/?q=' . urlencode($row->ubicacion_gps) . '")'
             : null,
             $row->producto_tipo,
             $row->producto_especie,

@@ -60,7 +60,7 @@ class Referencia extends Model
 
     public function usuarios()
     {
-        return $this->belongsToMany(User::class, 'referencias_users', 'referencia_id', 'user_id')->withTimestamps()->withTrashed();
+        return $this->belongsToMany(User::class, 'referencias_users', 'referencia_id', 'user_id');
     }
 
     public function partesTransporte()
