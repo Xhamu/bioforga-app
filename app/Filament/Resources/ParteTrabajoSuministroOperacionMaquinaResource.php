@@ -55,14 +55,29 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                             ->searchable()
                             ->preload()
                             ->default(Filament::auth()->user()->id)
-                            ->required(),
+                            ->required()
+                            ->reactive()
+                            ->afterStateUpdated(function ($state, callable $set) {
+                                if (!$state) {
+                                    $set('maquina_id', null);
+                                    return;
+                                }
+
+                                $maquinas = \App\Models\Maquina::where('operario_id', $state)->pluck('id');
+
+                                $set('maquina_id', $maquinas->count() === 1 ? $maquinas->first() : null);
+                            }),
 
                         Select::make('maquina_id')
                             ->label('Máquina')
-                            ->options(function () {
-                                $usuario = Auth::user();
+                            ->options(function (callable $get) {
+                                $usuarioId = $get('usuario_id');
 
-                                $maquinas = \App\Models\Maquina::where('operario_id', $usuario->id)->get();
+                                if (!$usuarioId) {
+                                    return ['' => '- Selecciona un usuario -'];
+                                }
+
+                                $maquinas = \App\Models\Maquina::where('operario_id', $usuarioId)->get();
 
                                 if ($maquinas->isEmpty()) {
                                     return ['' => '- No hay máquinas asignadas -'];
@@ -72,9 +87,10 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                                     $maquina->id => "{$maquina->marca} {$maquina->modelo}"
                                 ])->toArray();
                             })
-                            ->default(function () {
-                                $usuario = Auth::user();
-                                $maquinas = \App\Models\Maquina::where('operario_id', $usuario->id)->pluck('id');
+                            ->default(function (callable $get) {
+                                $usuarioId = $get('usuario_id') ?? Filament::auth()->user()->id;
+
+                                $maquinas = \App\Models\Maquina::where('operario_id', $usuarioId)->pluck('id');
 
                                 return $maquinas->count() === 1 ? $maquinas->first() : null;
                             })
