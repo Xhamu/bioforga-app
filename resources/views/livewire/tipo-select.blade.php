@@ -32,7 +32,7 @@
                     fetch('/contador-referencias-hoy')
                         .then(res => res.json())
                         .then(data => {
-                            const contador = String(data.total + 1).padStart(3, '0');
+                            const contador = String(data.total + 1).padStart(2, '0');
                             referenciaInput.value = base + contador;
                             referenciaInput.dispatchEvent(new Event('input', {
                                 bubbles: true
@@ -40,7 +40,7 @@
                         })
                         .catch(error => {
                             console.error('Error al obtener el contador de referencias:', error);
-                            referenciaInput.value = base + '001';
+                            referenciaInput.value = base + '01';
                             referenciaInput.dispatchEvent(new Event('input', {
                                 bubbles: true
                             }));
