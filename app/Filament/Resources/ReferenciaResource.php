@@ -95,7 +95,7 @@ class ReferenciaResource extends Resource
 
                             $sector = $matches['sector'] ?? '01';
                             $fecha = $matches['fecha'] ?? now()->format('dmy');
-                            $contador = $matches['contador'] ?? '001';
+                            $contador = $matches['contador'] ?? '01';
 
                             $contadorInt = (int) $contador;
 
@@ -411,18 +411,82 @@ class ReferenciaResource extends Resource
                         Grid::make(['default' => 1, 'md' => 2])
                             ->schema([
                                 Stack::make([
-                                    TextColumn::make('provincia')
-                                        ->label('Provincia')
-                                        ->icon('heroicon-m-map-pin'),
+                                    TextColumn::make('ayuntamiento')
+                                        ->label('Municipio (Monte)')
+                                        ->icon('heroicon-m-map-pin')
+                                        ->formatStateUsing(function ($state, $record) {
+                                            $monte = $record->monte_parcela;
+                                            return $state . ($monte ? " ($monte)" : '');
+                                        }),
 
-                                    TextColumn::make('estado_mostrar')
-                                        ->label('Estado'),
+                                    TextColumn::make('interviniente')
+                                        ->label('Interviniente')
+                                        ->icon('heroicon-m-building-office'),
                                 ]),
                             ]),
                     ])->collapsed(false),
                 ])
                 ->filters([
                     Tables\Filters\TrashedFilter::make(),
+                ])
+                ->headerActions([
+                    Action::make('exportar_balance_masas')
+                        ->label('Balance de Masas')
+                        ->icon('heroicon-m-document-arrow-down')
+                        ->color('gray')
+                        ->action(function () {
+                            $hayDatos = \App\Models\CargaTransporte::exists();
+
+                            if (!$hayDatos) {
+                                Notification::make()
+                                    ->title('Sin datos')
+                                    ->body('No hay cargas registradas para exportar.')
+                                    ->warning()
+                                    ->send();
+                                return;
+                            }
+
+                            $filename = 'balance-de-masas-' . now()->format('Y-m-d') . '.xlsx';
+                            return \Maatwebsite\Excel\Facades\Excel::download(new \App\Exports\BalanceDeMasasExport, $filename);
+                        })
+                        ->after(function () {
+                            Notification::make()
+                                ->title('Exportación iniciada')
+                                ->body('El archivo "Balance de Masas" se está descargando.')
+                                ->success()
+                                ->send();
+                        }),
+
+                    Action::make('exportar_excel')
+                        ->label('Exportar a Excel')
+                        ->color('gray')
+                        ->modalWidth('xl')
+                        ->modalSubmitActionLabel('Exportar')
+                        ->modalCancelActionLabel('Cerrar')
+                        ->form([
+                            Select::make('tipo_exportacion')
+                                ->label('Selecciona una opción')
+                                ->options([
+                                    'suministro' => 'Suministro',
+                                    'servicio' => 'Servicio',
+                                ])
+                                ->searchable()
+                                ->required(),
+
+                            TextInput::make('nombre_archivo')
+                                ->label('Nombre del archivo')
+                                ->default('referencias-' . now()->format('Y-m-d'))
+                                ->required(),
+                        ])
+                        ->action(function (array $data) {
+                            $tipo = $data['tipo_exportacion'];
+                            $nombre = $data['nombre_archivo'] . '.xlsx';
+
+                            return redirect()->route('referencias.export', [
+                                'tipo' => $tipo,
+                                'nombre' => $nombre,
+                            ]);
+                        })
                 ])
                 ->actions([
                     Tables\Actions\EditAction::make(),
@@ -453,9 +517,7 @@ class ReferenciaResource extends Resource
 
                     TextColumn::make('interviniente')
                         ->label('Interviniente')
-                        ->icon('heroicon-m-building-office')
-                        ->sortable()
-                        ->searchable(),
+                        ->icon('heroicon-m-building-office'),
 
                     TextColumn::make('estado_mostrar')
                         ->label('Estado'),
@@ -556,7 +618,7 @@ class ReferenciaResource extends Resource
     {
         return parent::getEloquentQuery()
             ->when(
-                !auth()->user()->hasAnyRole(['superadmin', 'administracion', 'administrador', 'direccion']),
+                !auth()->user()->hasAnyRole(['superadmin', 'administración', 'administrador']),
                 fn($query) => $query->whereHas(
                     'usuarios',
                     fn($q) =>
@@ -618,7 +680,7 @@ class ReferenciaResource extends Resource
 
                         $sector = $matches['sector'] ?? '01';
                         $fecha = $matches['fecha'] ?? now()->format('dmy');
-                        $contador = $matches['contador'] ?? '001';
+                        $contador = $matches['contador'] ?? '01';
 
                         $contadorInt = (int) $contador;
 

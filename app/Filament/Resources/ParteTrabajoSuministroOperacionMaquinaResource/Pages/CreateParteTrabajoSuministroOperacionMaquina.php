@@ -7,6 +7,7 @@ use App\Models\AlmacenIntermedio;
 use App\Models\Referencia;
 use Auth;
 use Filament\Actions\Action;
+use Filament\Facades\Filament;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\View;
@@ -29,10 +30,10 @@ class CreateParteTrabajoSuministroOperacionMaquina extends CreateRecord
                     Select::make('referencia_id')
                         ->label('Referencia')
                         ->options(function () {
-                            $usuario = Auth::user();
+                            $usuarioId = $this->form->getState()['usuario_id'] ?? Filament::auth()->user()->id;
 
                             $referenciasIds = \DB::table('referencias_users')
-                                ->where('user_id', $usuario->id)
+                                ->where('user_id', $usuarioId)
                                 ->pluck('referencia_id');
 
                             $referencias = $referenciasIds->isNotEmpty()
@@ -42,7 +43,7 @@ class CreateParteTrabajoSuministroOperacionMaquina extends CreateRecord
                             return $referencias->mapWithKeys(function ($referencia) {
                                 return [
                                     $referencia->id => "{$referencia->referencia} | " .
-                                        ($referencia->proveedor?->razon_social ?? $referencia->cliente?->razon_social ?? 'Sin razón social') .
+                                        ($referencia->proveedor?->razon_social ?? $referencia->cliente?->razon_social ?? 'Sin interviniente') .
                                         " ({$referencia->monte_parcela}, {$referencia->ayuntamiento})"
                                 ];
                             });
@@ -50,6 +51,7 @@ class CreateParteTrabajoSuministroOperacionMaquina extends CreateRecord
                         ->searchable()
                         ->preload()
                         ->required(),
+
                     TextInput::make('gps_inicio_trabajo')
                         ->label('GPS')
                         ->required(),
