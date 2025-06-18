@@ -1,13 +1,11 @@
-<div>
+<div style="display: flex; justify-content: center;">
     <button type="button" class="custom-btn" id="location-fin-carga">
         Obtener ubicación
     </button>
 
     <style>
         .custom-btn {
-            width: 100%;
-            justify-items: center;
-            align-items: center;
+            width: 70%;
             background-color: #28a745;
             color: white;
             border: 2px solid #218838;

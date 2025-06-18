@@ -66,6 +66,8 @@ class CreateParteTrabajoAyudante extends CreateRecord
                     TextInput::make('gps_inicio_ayudante')
                         ->label('GPS')
                         ->required(),
+
+                    View::make('livewire.location-inicio-ayudante')->columnSpanFull(),
                 ])
                 ->action(function (array $data) {
                     $formData = array_merge(

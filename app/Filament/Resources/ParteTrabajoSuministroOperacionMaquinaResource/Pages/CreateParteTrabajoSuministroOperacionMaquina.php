@@ -56,7 +56,7 @@ class CreateParteTrabajoSuministroOperacionMaquina extends CreateRecord
                         ->label('GPS')
                         ->required(),
 
-                    //View::make('livewire.location-inicio-trabajo'),
+                    View::make('livewire.location-inicio-trabajo'),
                 ])
                 ->action(function (array $data) {
                     $this->form->fill();

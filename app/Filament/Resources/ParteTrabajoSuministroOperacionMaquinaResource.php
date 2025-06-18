@@ -50,11 +50,14 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                 Section::make('Datos generales')
                     ->schema([
                         Select::make('usuario_id')
-                            ->label('Operario')
+                            ->label('Usuario')
                             ->relationship(
                                 name: 'usuario',
                                 titleAttribute: 'name',
-                                modifyQueryUsing: fn($query) => $query->whereHas('roles', fn($q) => $q->where('name', 'operario'))
+                                modifyQueryUsing: fn($query) =>
+                                $query->whereHas('roles', function ($q) {
+                                    $q->whereIn('name', ['superadmin', 'administración', 'administrador', 'operario']);
+                                })
                             )
                             ->getOptionLabelFromRecordUsing(fn($record) => $record->name . ' ' . $record->apellidos)
                             ->searchable()
@@ -369,7 +372,7 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                                             ->label('GPS')
                                             ->required(),
 
-                                        //View::make('livewire.location-fin-trabajo'),
+                                        View::make('livewire.location-fin-trabajo'),
                                     ];
                                 })
 
