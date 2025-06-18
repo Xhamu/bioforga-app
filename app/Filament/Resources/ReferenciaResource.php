@@ -895,7 +895,11 @@ class ReferenciaResource extends Resource
                         ->reactive(), // necesario para reactividad
 
                     Forms\Components\TextInput::make('precio')
-                        ->label('Precio')
+                        ->label(fn(callable $get) => match ($get('tarifa')) {
+                            'toneladas' => 'Precio por tonelada',
+                            'm3' => 'Precio por m³',
+                            default => 'Precio',
+                        })
                         ->numeric()
                         ->nullable()
                         ->reactive()
@@ -904,8 +908,15 @@ class ReferenciaResource extends Resource
                             'm3' => '€/m³',
                             default => '€',
                         }),
+
+                    Forms\Components\TextInput::make('precio_horas')
+                        ->label('Precio por hora')
+                        ->numeric()
+                        ->nullable()
+                        ->reactive()
+                        ->suffix('€/hora')
                 ])
-                ->columns(2)
+                ->columns(3)
                 ->visible(function ($get) {
                     return !empty($get('referencia'));
                 }),
