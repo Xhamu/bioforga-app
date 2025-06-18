@@ -50,7 +50,12 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                 Section::make('Datos generales')
                     ->schema([
                         Select::make('usuario_id')
-                            ->relationship('usuario', 'name')
+                            ->label('Operario')
+                            ->relationship(
+                                name: 'usuario',
+                                titleAttribute: 'name',
+                                modifyQueryUsing: fn($query) => $query->whereHas('roles', fn($q) => $q->where('name', 'operario'))
+                            )
                             ->getOptionLabelFromRecordUsing(fn($record) => $record->name . ' ' . $record->apellidos)
                             ->searchable()
                             ->preload()
@@ -542,10 +547,19 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()
+        $query = parent::getEloquentQuery()
             ->withoutGlobalScopes([
                 SoftDeletingScope::class,
             ]);
+
+        $user = Filament::auth()->user();
+        $rolesPermitidos = ['superadmin', 'administración', 'administrador'];
+
+        if (!$user->hasAnyRole($rolesPermitidos)) {
+            $query->where('usuario_id', $user->id);
+        }
+
+        return $query;
     }
 
 }

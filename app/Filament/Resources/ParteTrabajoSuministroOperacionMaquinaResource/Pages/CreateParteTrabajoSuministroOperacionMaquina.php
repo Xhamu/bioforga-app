@@ -38,7 +38,7 @@ class CreateParteTrabajoSuministroOperacionMaquina extends CreateRecord
 
                             $referencias = $referenciasIds->isNotEmpty()
                                 ? Referencia::whereIn('id', $referenciasIds)->with('proveedor')->get()
-                                : Referencia::with('proveedor')->get();
+                                : collect(); // <- Aquí es el cambio clave
 
                             return $referencias->mapWithKeys(function ($referencia) {
                                 return [

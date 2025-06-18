@@ -100,8 +100,8 @@ class ParteTrabajoTallerMaquinariaResource extends Resource
                                                         <td class="px-4 py-3">' . e($horas) . 'h</td>
                                                     </tr>';
 
-                                        if ($record->fecha_hora_fin_taller_maquinaria) {
-                                            $tabla .= '
+                                if ($record->fecha_hora_fin_taller_maquinaria) {
+                                    $tabla .= '
                                             <tr>
                                                 <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Tipo de actuación</th>
                                                 <td class="px-4 py-3">' . e(ucfirst($tipoActuacion)) . '</td>
@@ -114,9 +114,9 @@ class ParteTrabajoTallerMaquinariaResource extends Resource
                                                 <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Recambios utilizados</th>
                                                 <td class="px-4 py-3">' . e(implode(', ', $recambiosNombres)) . '</td>
                                             </tr>';
-                                        }
-                                    
-                                        $tabla .= '
+                                }
+
+                                $tabla .= '
                                                 </tbody>
                                             </table>
                                         </div>
@@ -329,9 +329,18 @@ class ParteTrabajoTallerMaquinariaResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()
+        $query = parent::getEloquentQuery()
             ->withoutGlobalScopes([
                 SoftDeletingScope::class,
             ]);
+
+        $user = Filament::auth()->user();
+        $rolesPermitidos = ['superadmin', 'administración', 'administrador'];
+
+        if (!$user->hasAnyRole($rolesPermitidos)) {
+            $query->where('usuario_id', $user->id);
+        }
+
+        return $query;
     }
 }

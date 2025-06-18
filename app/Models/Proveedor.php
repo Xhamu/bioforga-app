@@ -38,7 +38,8 @@ class Proveedor extends Authenticatable
         'telefono_contacto',
         'email_contacto',
 
-        'usuario_id'
+        'usuario_id',
+        'observaciones',
     ];
 
     /**

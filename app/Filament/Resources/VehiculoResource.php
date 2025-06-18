@@ -233,9 +233,18 @@ class VehiculoResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()
+        $query = parent::getEloquentQuery()
             ->withoutGlobalScopes([
                 SoftDeletingScope::class,
             ]);
+
+        $user = \Filament\Facades\Filament::auth()->user();
+        $rolesPermitidos = ['superadmin', 'administración', 'administrador'];
+
+        if (!$user->hasAnyRole($rolesPermitidos)) {
+            $query->whereJsonContains('conductor_habitual', $user->id);
+        }
+
+        return $query;
     }
 }

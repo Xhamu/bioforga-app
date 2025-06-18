@@ -213,6 +213,19 @@ class ProveedorResource extends Resource
                     ])
                     ->columns(['default' => 1, 'md' => 2])
                     ->columnSpanFull(),
+
+
+                Section::make('Observaciones')
+                    ->schema([
+                        Forms\Components\Textarea::make('observaciones')
+                            ->label('')
+                            ->nullable()
+                            ->columnSpanFull()
+                            ->rows(5)
+                            ->columns(2),
+                    ])
+                    ->columns(['default' => 1, 'md' => 2])
+                    ->columnSpanFull(),
             ])
             ->columns(2);
     }
@@ -315,7 +328,7 @@ class ProveedorResource extends Resource
                         SelectFilter::make('provincia')
                             ->label('Provincia')
                             ->options($provinciasOptions)
-                            ->options( Provincia::orderBy('nombre')->pluck('nombre', 'id'))
+                            ->options(Provincia::orderBy('nombre')->pluck('nombre', 'id'))
                             ->searchable()
                             ->placeholder('Todas'),
                     ],
