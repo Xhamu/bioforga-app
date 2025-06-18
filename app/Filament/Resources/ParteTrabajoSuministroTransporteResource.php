@@ -64,7 +64,9 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                             ->preload()
                             ->default(Filament::auth()->user()->id)
                             ->getOptionLabelFromRecordUsing(fn($record) => $record->name . ' ' . strtoupper(substr($record->apellidos, 0, 1)) . '.')
-                            ->required(),
+                            ->required()
+                            ->reactive()
+                            ->afterStateUpdated(fn($state, callable $set) => $set('referencia_select', null)),
 
                         Select::make('camion_id')
                             ->label('Camión')
@@ -168,16 +170,24 @@ class ParteTrabajoSuministroTransporteResource extends Resource
 
                                             Select::make('referencia_select')
                                                 ->label('Referencia')
-                                                ->options(function () {
-                                                    $usuario = Auth::user();
+                                                ->options(function (callable $get) {
+                                                    $usuarioId = $get('usuario_id');
+
+                                                    if (!$usuarioId) {
+                                                        return []; // No mostrar nada si no se ha seleccionado usuario
+                                                    }
 
                                                     $referenciasIds = \DB::table('referencias_users')
-                                                        ->where('user_id', $usuario->id)
+                                                        ->where('user_id', $usuarioId)
                                                         ->pluck('referencia_id');
 
-                                                    $referencias = $referenciasIds->isNotEmpty()
-                                                        ? Referencia::whereIn('id', $referenciasIds)->with('proveedor')->get()
-                                                        : Referencia::with('proveedor')->get();
+                                                    if ($referenciasIds->isEmpty()) {
+                                                        return [];
+                                                    }
+
+                                                    $referencias = \App\Models\Referencia::whereIn('id', $referenciasIds)
+                                                        ->with('proveedor', 'cliente')
+                                                        ->get();
 
                                                     return $referencias->mapWithKeys(function ($referencia) {
                                                         $label = "{$referencia->referencia} | " .
@@ -190,6 +200,7 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                                 ->searchable()
                                                 ->preload()
                                                 ->required()
+                                                ->reactive() // Para que se recargue cuando cambia usuario_id
                                                 ->visible(fn(callable $get) => $get('eleccion') === 'referencia'),
 
                                             TextInput::make('gps_inicio_carga')
