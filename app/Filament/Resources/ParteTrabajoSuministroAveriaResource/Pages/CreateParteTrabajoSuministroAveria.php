@@ -27,6 +27,8 @@ class CreateParteTrabajoSuministroAveria extends CreateRecord
                     TextInput::make('gps_inicio_averia')
                         ->label('GPS')
                         ->required(),
+
+                    View::make('livewire.location-inicio-averia')->columnSpanFull(),
                 ])
                 ->action(function (array $data) {
                     $formData = array_merge(

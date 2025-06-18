@@ -184,6 +184,8 @@ class ParteTrabajoAyudanteResource extends Resource
                                     TextInput::make('gps_fin_ayudante')
                                         ->label('GPS')
                                         ->required(),
+
+                                    View::make('livewire.location-fin-ayudante')->columnSpanFull(),
                                 ])
                                 ->action(function (array $data, $record) {
                                     $record->update([

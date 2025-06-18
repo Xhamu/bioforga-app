@@ -39,6 +39,8 @@ class CreateParteTrabajoSuministroDesplazamiento extends CreateRecord
                     TextInput::make('gps_inicio_desplazamiento')
                         ->label('GPS')
                         ->required(),
+
+                    View::make('livewire.location-inicio-desplazamiento')->columnSpanFull(),
                 ])
                 ->action(function (array $data) {
                     $this->form->fill(); // rellena lo que ya hay en el formulario
