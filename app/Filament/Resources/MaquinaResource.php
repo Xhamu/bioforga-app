@@ -457,9 +457,18 @@ class MaquinaResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()
+        $query = parent::getEloquentQuery()
             ->withoutGlobalScopes([
                 SoftDeletingScope::class,
             ]);
+
+        $user = \Filament\Facades\Filament::auth()->user();
+        $rolesPermitidos = ['superadmin', 'administración', 'administrador'];
+
+        if (!$user->hasAnyRole($rolesPermitidos)) {
+            $query->where('operario_id', $user->id);
+        }
+
+        return $query;
     }
 }

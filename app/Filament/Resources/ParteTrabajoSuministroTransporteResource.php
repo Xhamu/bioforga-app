@@ -298,7 +298,10 @@ class ParteTrabajoSuministroTransporteResource extends Resource
 
                                             Select::make('cliente_id')
                                                 ->label('Cliente')
-                                                ->relationship('cliente', 'razon_social')
+                                                ->options(function () {
+                                                    return \App\Models\Cliente::where('tipo_cliente', 'Suministro')
+                                                        ->pluck('razon_social', 'id');
+                                                })
                                                 ->searchable()
                                                 ->preload()
                                                 ->required()
@@ -344,7 +347,9 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                                 ->label('Peso neto (Tn)')
                                                 ->numeric()
                                                 ->required()
-                                                ->minValue(0),
+                                                ->minValue(0)
+                                                ->maxValue(99)
+                                                ->step(0.01),
 
                                             TextInput::make('cantidad_total')
                                                 ->label('Cantidad total (m³)')
@@ -364,8 +369,8 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                                 ->label('Carta de porte')
                                                 ->disk('public')
                                                 ->directory('albaranes')
-                                                ->required(fn(callable $get) => $get('eleccion') === 'cliente')
-                                                ->visible(fn(callable $get) => $get('eleccion') === 'cliente'),
+                                                ->required(fn(callable $get) => $get('eleccion') === 'almacen_intermedio')
+                                                ->visible(fn(callable $get) => $get('eleccion') === 'almacen_intermedio'),
                                         ])
                                         ->action(function (array $data, $record) {
                                             $record->update([
@@ -382,7 +387,7 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                                 ->title('Descarga registrada correctamente')
                                                 ->send();
 
-                                            return redirect(request()->header('Referer')); // Recargar página
+                                            return redirect('/partes-trabajo-suministro-transporte');
                                         })
                                         ->color('primary');
                                 }
@@ -540,10 +545,19 @@ class ParteTrabajoSuministroTransporteResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()
+        $query = parent::getEloquentQuery()
             ->withoutGlobalScopes([
                 SoftDeletingScope::class,
             ]);
+
+        $user = Filament::auth()->user();
+        $rolesPermitidos = ['superadmin', 'administración', 'administrador'];
+
+        if (!$user->hasAnyRole($rolesPermitidos)) {
+            $query->where('usuario_id', $user->id);
+        }
+
+        return $query;
     }
 
     public static function hasCargasActions($record): bool

@@ -193,9 +193,18 @@ class CamionResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()
+        $query = parent::getEloquentQuery()
             ->withoutGlobalScopes([
                 SoftDeletingScope::class,
             ]);
+
+        $user = \Filament\Facades\Filament::auth()->user();
+        $rolesPermitidos = ['superadmin', 'administración', 'administrador'];
+
+        if (!$user->hasAnyRole($rolesPermitidos)) {
+            $query->where('conductor_id', $user->id); // Usa aquí el campo que relacione al usuario con el camión
+        }
+
+        return $query;
     }
 }

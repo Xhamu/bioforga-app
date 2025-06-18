@@ -135,7 +135,7 @@ class ParteTrabajoSuministroAveriaResource extends Resource
                             ->disabled(fn(callable $get) => !$get('maquina_id') || !$get('tipo')),
                     ])
                     ->columns(2),
-                    
+
                 Section::make('')
                     ->schema([
                         Placeholder::make('')
@@ -317,9 +317,18 @@ class ParteTrabajoSuministroAveriaResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()
+        $query = parent::getEloquentQuery()
             ->withoutGlobalScopes([
                 SoftDeletingScope::class,
             ]);
+
+        $user = Filament::auth()->user();
+        $rolesPermitidos = ['superadmin', 'administración', 'administrador'];
+
+        if (!$user->hasAnyRole($rolesPermitidos)) {
+            $query->where('usuario_id', $user->id);
+        }
+
+        return $query;
     }
 }
