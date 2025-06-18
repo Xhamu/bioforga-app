@@ -46,6 +46,7 @@ class Referencia extends Model
         'guia_sanidad',
         'finca',
         'precio',
+        'precio_horas',
     ];
 
     public function proveedor()

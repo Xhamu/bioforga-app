@@ -56,7 +56,7 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                                 titleAttribute: 'name',
                                 modifyQueryUsing: fn($query) =>
                                 $query->whereHas('roles', function ($q) {
-                                    $q->whereIn('name', ['superadmin', 'administración', 'administrador', 'operario']);
+                                    $q->whereIn('name', ['administración', 'administrador', 'operarios']);
                                 })
                             )
                             ->getOptionLabelFromRecordUsing(fn($record) => $record->name . ' ' . $record->apellidos)
