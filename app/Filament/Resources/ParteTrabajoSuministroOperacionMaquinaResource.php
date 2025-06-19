@@ -491,7 +491,8 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                 TextColumn::make('created_at')
                     ->label('Fecha y hora')
                     ->weight(FontWeight::Bold)
-                    ->dateTime(),
+                    ->dateTime()
+                    ->timezone('Europe/Madrid'),
 
                 TextColumn::make('usuario')
                     ->label('Usuario')
@@ -501,8 +502,7 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                         $inicialApellido = $apellido ? strtoupper(substr($apellido, 0, 1)) . '.' : '';
                         return trim("$nombre $inicialApellido");
                     })
-                    ->weight(FontWeight::Bold)
-                    ->searchable(),
+                    ->weight(FontWeight::Bold),
 
                 TextColumn::make('maquina')
                     ->label('Máquina')
@@ -511,8 +511,7 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                         $modelo = $record->maquina?->modelo ?? '';
                         $tipo_trabajo = $record->maquina?->tipo_trabajo ?? '';
                         return trim("$marca $modelo - ($tipo_trabajo)");
-                    })
-                    ->searchable(),
+                    }),
             ])
             ->filters([
                 Tables\Filters\TrashedFilter::make(),

@@ -59,7 +59,14 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                 Section::make('Datos del Transporte')
                     ->schema([
                         Select::make('usuario_id')
-                            ->relationship('usuario', 'name')
+                            ->relationship(
+                                name: 'usuario',
+                                titleAttribute: 'name',
+                                modifyQueryUsing: fn($query) =>
+                                $query->whereHas('roles', function ($q) {
+                                    $q->whereIn('name', ['administración', 'administrador', 'transportista']);
+                                })
+                            )
                             ->searchable()
                             ->preload()
                             ->default(Filament::auth()->user()->id)
@@ -498,7 +505,8 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                 TextColumn::make('created_at')
                     ->label('Fecha y hora')
                     ->weight(FontWeight::Bold)
-                    ->dateTime(),
+                    ->dateTime()
+                    ->timezone('Europe/Madrid'),
 
                 TextColumn::make('usuario')
                     ->label('Usuario')
@@ -508,8 +516,7 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                         $inicialApellido = $apellido ? strtoupper(substr($apellido, 0, 1)) . '.' : '';
                         return trim("$nombre $inicialApellido");
                     })
-                    ->weight(FontWeight::Bold)
-                    ->searchable(),
+                    ->weight(FontWeight::Bold),
 
                 TextColumn::make('camion')
                     ->label('Camión')
@@ -518,8 +525,7 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                         $modelo = $record->camion?->modelo ?? '';
                         $matricula_cabeza = $record->camion?->matricula_cabeza ?? '';
                         return trim("[$matricula_cabeza] - $marca $modelo");
-                    })
-                    ->searchable(),
+                    }),
 
                 TextColumn::make('cantidad_total')
                     ->label('Cantidad total'),

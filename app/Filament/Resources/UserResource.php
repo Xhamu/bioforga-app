@@ -157,8 +157,10 @@ class UserResource extends Resource
                     TextColumn::make('nombre_apellidos')
                         ->label('Nombre')
                         ->weight(FontWeight::Bold)
-                        ->searchable()
-                        ->sortable(),
+                        ->searchable(query: function ($query, $search) {
+                            $query->where('name', 'like', "%{$search}%")
+                                ->orWhere('apellidos', 'like', "%{$search}%");
+                        }),
 
                     Panel::make([
                         Grid::make(['default' => 1, 'md' => 2]) // 1 columna en móvil, 2 en pantallas medianas y grandes
@@ -174,14 +176,6 @@ class UserResource extends Resource
                                         ->icon('heroicon-m-phone'),
                                 ]),
 
-                                /*Stack::make([
-                                    TextColumn::make('proveedor.razon_social')
-                                        ->label('Razón Social')
-                                        ->icon('heroicon-m-user'),
-                                    TextColumn::make('proveedor.email')
-                                        ->label('Correo electrónico')
-                                        ->icon('heroicon-m-envelope'),
-                                ]),*/
                             ]),
                     ])->collapsed(false),
                 ])
@@ -205,7 +199,11 @@ class UserResource extends Resource
                 ->columns([
                     TextColumn::make('nombre_apellidos')
                         ->label('Nombre')
-                        ->weight(FontWeight::Bold),
+                        ->weight(FontWeight::Bold)
+                        ->searchable(query: function ($query, $search) {
+                            $query->where('name', 'like', "%{$search}%")
+                                ->orWhere('apellidos', 'like', "%{$search}%");
+                        }),
 
                     TextColumn::make('nif')
                         ->label('NIF')
