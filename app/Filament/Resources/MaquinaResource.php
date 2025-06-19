@@ -244,7 +244,14 @@ class MaquinaResource extends Resource
                                 ->rules('required')
                                 ->searchable()
                                 ->options(function () {
-                                    return \App\Models\User::all()->pluck('name', 'id')->toArray();
+                                    return \App\Models\User::whereDoesntHave('roles', function ($query) {
+                                        $query->where('name', 'superadmin');
+                                    })
+                                        ->get()
+                                        ->mapWithKeys(fn($user) => [
+                                            $user->id => $user->name . ' ' . $user->apellidos
+                                        ])
+                                        ->toArray();
                                 })
                                 ->validationMessages([
                                     'required' => 'El :attribute es obligatorio.',

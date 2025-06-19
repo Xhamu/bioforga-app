@@ -85,10 +85,15 @@ class ParteTrabajoSuministroTransporteResource extends Resource
 
                         Select::make('camion_id')
                             ->label('Camión')
-                            ->options(function () {
-                                $usuario = Auth::user();
+                            ->options(function (callable $get) {
+                                $usuarioId = $get('usuario_id');
+                                if (!$usuarioId) {
+                                    return ['' => '- Selecciona primero un usuario -'];
+                                }
 
-                                $camiones = Camion::where('proveedor_id', $usuario->proveedor_id)->get();
+                                $proveedorId = \App\Models\User::find($usuarioId)?->proveedor_id;
+
+                                $camiones = \App\Models\Camion::where('proveedor_id', $proveedorId)->get();
 
                                 if ($camiones->isEmpty()) {
                                     return ['' => '- No hay ningún camión vinculado -'];
@@ -102,19 +107,24 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                     )
                                 ])->toArray();
                             })
-                            ->default(function () {
-                                $usuario = Auth::user();
+                            ->default(function (callable $get) {
+                                $usuarioId = $get('usuario_id');
+                                if (!$usuarioId)
+                                    return null;
 
-                                $camiones = Camion::where('proveedor_id', $usuario->proveedor_id)->get();
+                                $proveedorId = \App\Models\User::find($usuarioId)?->proveedor_id;
+
+                                $camiones = \App\Models\Camion::where('proveedor_id', $proveedorId)->get();
 
                                 return $camiones->count() === 1 ? $camiones->first()->id : null;
                             })
                             ->searchable()
                             ->preload()
                             ->required()
+                            ->reactive() // <- para que se actualice cuando cambia usuario_id
                             ->validationMessages([
                                 'required' => 'El :attribute es obligatorio.',
-                            ])
+                            ]),
                     ])
                     ->columns([
                         'default' => 1,
