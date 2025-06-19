@@ -42,19 +42,30 @@ class ParteTrabajoAyudanteResource extends Resource
                 Section::make('Datos generales')
                     ->schema([
                         Select::make('usuario_id')
-                            ->label('Usuario')
-                            ->searchable()
-                            ->default(Filament::auth()->user()->id)
                             ->relationship(
-                                name: 'usuario',
-                                titleAttribute: 'name',
-                                modifyQueryUsing: fn($query) =>
-                                $query->whereHas('roles', function ($q) {
-                                    $q->whereIn('name', ['administración', 'administrador', 'operarios', 'proveedor de servicio']);
-                                })
+                                'usuario',
+                                'name',
+                                modifyQueryUsing: function ($query) {
+                                    $user = Filament::auth()->user();
+
+                                    if ($user->hasAnyRole(['operarios', 'proveedor de servicio'])) {
+                                        // Mostrar solo al usuario autenticado
+                                        $query->where('id', $user->id);
+                                    } else {
+                                        // Mostrar todos los usuarios que no sean superadmin
+                                        $query->whereDoesntHave('roles', function ($q) {
+                                            $q->where('name', 'superadmin');
+                                        });
+                                    }
+                                }
                             )
-                            ->required()
-                            ->columnSpanFull(),
+                            ->getOptionLabelFromRecordUsing(fn($record) => $record->name . ' ' . $record->apellidos)
+                            ->searchable()
+                            ->preload()
+                            ->columnSpanFull()
+                            ->default(Filament::auth()->user()->id)
+                            ->disabled(fn() => Filament::auth()->user()->hasAnyRole(['operarios', 'proveedor de servicio']))
+                            ->required(),
                     ])
                     ->columns(3),
 

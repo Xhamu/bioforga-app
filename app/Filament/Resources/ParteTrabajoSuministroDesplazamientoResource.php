@@ -45,7 +45,23 @@ class ParteTrabajoSuministroDesplazamientoResource extends Resource
                 Section::make('Datos generales')
                     ->schema([
                         Select::make('usuario_id')
-                            ->relationship('usuario', 'name')
+                            ->relationship(
+                                'usuario',
+                                'name',
+                                modifyQueryUsing: function ($query) {
+                                    $user = Filament::auth()->user();
+
+                                    if ($user->hasAnyRole(['superadmin', 'administrador', 'administración'])) {
+                                        // Ver todos menos los superadmin
+                                        $query->whereDoesntHave('roles', function ($q) {
+                                            $q->where('name', 'superadmin');
+                                        });
+                                    } else {
+                                        // Ver solo a sí mismo
+                                        $query->where('id', $user->id);
+                                    }
+                                }
+                            )
                             ->getOptionLabelFromRecordUsing(fn($record) => $record->name . ' ' . $record->apellidos)
                             ->searchable()
                             ->preload()
