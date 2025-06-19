@@ -50,7 +50,7 @@ class CreateParteTrabajoAyudante extends CreateRecord
                         ->label('Selecciona vehículo')
                         ->options(
                             \App\Models\Vehiculo::all()->mapWithKeys(fn($m) => [
-                                $m->id => $m->marca . ' ' . $m->modelo,
+                                $m->id => $m->marca . ' ' . $m->modelo . ' (' . $m->matricula . ')',
                             ])->toArray()
                         )->visible(fn($get) => $get('eleccion') === 'vehiculo')
                         ->searchable(),

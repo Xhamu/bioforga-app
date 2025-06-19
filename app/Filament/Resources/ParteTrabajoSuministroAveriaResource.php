@@ -65,6 +65,7 @@ class ParteTrabajoSuministroAveriaResource extends Resource
                             ->getOptionLabelFromRecordUsing(fn($record) => $record->name . ' ' . $record->apellidos)
                             ->searchable()
                             ->preload()
+                            ->columnSpanFull()
                             ->default(Filament::auth()->user()->id)
                             ->required(),
 

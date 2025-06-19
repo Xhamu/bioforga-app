@@ -66,14 +66,18 @@ class ParteTrabajoSuministroDesplazamientoResource extends Resource
                             ->searchable()
                             ->preload()
                             ->default(Filament::auth()->user()->id)
-                            ->required(),
+                            ->required()
+                            ->reactive(),
 
                         Select::make('vehiculo_id')
                             ->label('Vehículo')
                             ->relationship(
                                 name: 'vehiculo',
                                 titleAttribute: 'marca',
-                                modifyQueryUsing: fn($query) => $query->whereJsonContains('conductor_habitual', (string) Auth::id())
+                                modifyQueryUsing: fn($query, callable $get) => $query->when(
+                                    $get('usuario_id'),
+                                    fn($q, $usuarioId) => $q->whereJsonContains('conductor_habitual', (string) $usuarioId)
+                                )
                             )
                             ->getOptionLabelFromRecordUsing(
                                 fn($record) => $record->marca . ' ' . $record->modelo . ' (' . $record->matricula . ')'
@@ -81,8 +85,15 @@ class ParteTrabajoSuministroDesplazamientoResource extends Resource
                             ->searchable()
                             ->preload()
                             ->nullable()
-                            ->default(function () {
-                                $vehiculos = Vehiculo::whereJsonContains('conductor_habitual', (string) Auth::id())->get();
+                            ->reactive()
+                            ->default(function (callable $get) {
+                                $usuarioId = $get('usuario_id');
+
+                                if (!$usuarioId) {
+                                    return null;
+                                }
+
+                                $vehiculos = Vehiculo::whereJsonContains('conductor_habitual', (string) $usuarioId)->get();
                                 return $vehiculos->count() === 1 ? $vehiculos->first()->id : null;
                             }),
                     ])
