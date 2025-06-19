@@ -211,7 +211,8 @@ class ParteTrabajoSuministroDesplazamientoResource extends Resource
                 TextColumn::make('created_at')
                     ->label('Fecha y hora')
                     ->weight(FontWeight::Bold)
-                    ->dateTime(),
+                    ->dateTime()
+                    ->timezone('Europe/Madrid'),
 
                 TextColumn::make('usuario')
                     ->label('Usuario')

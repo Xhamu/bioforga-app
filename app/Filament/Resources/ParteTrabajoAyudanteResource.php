@@ -45,9 +45,14 @@ class ParteTrabajoAyudanteResource extends Resource
                             ->label('Usuario')
                             ->searchable()
                             ->default(Filament::auth()->user()->id)
-                            ->options([
-                                Filament::auth()->user()->id => Filament::auth()->user()->name . ' ' . Filament::auth()->user()->apellidos
-                            ])
+                            ->relationship(
+                                name: 'usuario',
+                                titleAttribute: 'name',
+                                modifyQueryUsing: fn($query) =>
+                                $query->whereHas('roles', function ($q) {
+                                    $q->whereIn('name', ['administración', 'administrador', 'operarios', 'proveedor de servicio']);
+                                })
+                            )
                             ->required()
                             ->columnSpanFull(),
                     ])
@@ -211,7 +216,8 @@ class ParteTrabajoAyudanteResource extends Resource
                 TextColumn::make('created_at')
                     ->label('Fecha y hora')
                     ->weight(FontWeight::Bold)
-                    ->dateTime(),
+                    ->dateTime()
+                    ->timezone('Europe/Madrid'),
 
                 TextColumn::make('usuario')
                     ->label('Usuario')
