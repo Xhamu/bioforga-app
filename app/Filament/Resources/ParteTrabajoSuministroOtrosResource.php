@@ -42,14 +42,29 @@ class ParteTrabajoSuministroOtrosResource extends Resource
                 Section::make('Datos generales')
                     ->schema([
                         Select::make('usuario_id')
-                            ->label('Usuario')
+                            ->relationship(
+                                'usuario',
+                                'name',
+                                modifyQueryUsing: function ($query) {
+                                    $user = Filament::auth()->user();
+
+                                    if ($user->hasAnyRole(['superadmin', 'administrador', 'administración'])) {
+                                        // Ver todos menos los superadmin
+                                        $query->whereDoesntHave('roles', function ($q) {
+                                            $q->where('name', 'superadmin');
+                                        });
+                                    } else {
+                                        // Ver solo a sí mismo
+                                        $query->where('id', $user->id);
+                                    }
+                                }
+                            )
+                            ->getOptionLabelFromRecordUsing(fn($record) => $record->name . ' ' . $record->apellidos)
                             ->searchable()
+                            ->preload()
+                            ->columnSpanFull()
                             ->default(Filament::auth()->user()->id)
-                            ->options([
-                                Filament::auth()->user()->id => Filament::auth()->user()->name . ' ' . Filament::auth()->user()->apellidos
-                            ])
-                            ->required()
-                            ->columnSpanFull(),
+                            ->required(),
                     ])
                     ->columns(3),
 

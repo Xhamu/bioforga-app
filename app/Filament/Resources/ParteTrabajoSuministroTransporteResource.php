@@ -62,10 +62,18 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                             ->relationship(
                                 name: 'usuario',
                                 titleAttribute: 'name',
-                                modifyQueryUsing: fn($query) =>
-                                $query->whereHas('roles', function ($q) {
-                                    $q->whereIn('name', ['administración', 'administrador', 'transportista']);
-                                })
+                                modifyQueryUsing: function ($query) {
+                                    $user = Filament::auth()->user();
+
+                                    // Si el usuario tiene el rol de transportista, solo mostrar su propio registro
+                                    if ($user->hasRole('transportista')) {
+                                        $query->where('id', $user->id);
+                                    } else {
+                                        $query->whereHas('roles', function ($q) {
+                                            $q->whereIn('name', ['administración', 'administrador', 'transportista']);
+                                        });
+                                    }
+                                }
                             )
                             ->searchable()
                             ->preload()
@@ -154,11 +162,11 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                     
                                             Select::make('almacen_id')
                                                 ->label('Almacén intermedio')
-                                                ->options(function () {
-                                                    $usuario = Auth::user();
+                                                ->options(function () use ($record) {
+                                                    $usuarioId = $record?->usuario_id;
 
                                                     $almacenesIds = \DB::table('almacenes_users')
-                                                        ->where('user_id', $usuario->id)
+                                                        ->where('user_id', $usuarioId)
                                                         ->pluck('almacen_id');
 
                                                     $almacenes = $almacenesIds->isNotEmpty()
@@ -177,8 +185,8 @@ class ParteTrabajoSuministroTransporteResource extends Resource
 
                                             Select::make('referencia_select')
                                                 ->label('Referencia')
-                                                ->options(function (callable $get) {
-                                                    $usuarioId = $get('usuario_id');
+                                                ->options(function () use ($record) {
+                                                    $usuarioId = $record?->usuario_id;
 
                                                     if (!$usuarioId) {
                                                         return []; // No mostrar nada si no se ha seleccionado usuario
@@ -192,7 +200,7 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                                         return [];
                                                     }
 
-                                                    $referencias = \App\Models\Referencia::whereIn('id', $referenciasIds)
+                                                    $referencias = Referencia::whereIn('id', $referenciasIds)
                                                         ->with('proveedor', 'cliente')
                                                         ->get();
 

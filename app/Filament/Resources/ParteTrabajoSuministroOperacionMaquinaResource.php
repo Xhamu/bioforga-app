@@ -54,10 +54,17 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                             ->relationship(
                                 name: 'usuario',
                                 titleAttribute: 'name',
-                                modifyQueryUsing: fn($query) =>
-                                $query->whereHas('roles', function ($q) {
-                                    $q->whereIn('name', ['administración', 'administrador', 'operarios']);
-                                })
+                                modifyQueryUsing: function ($query) {
+                                    $user = Filament::auth()->user();
+
+                                    if ($user->hasRole('operarios')) {
+                                        $query->where('id', $user->id);
+                                    } else {
+                                        $query->whereHas('roles', function ($q) {
+                                            $q->whereIn('name', ['administración', 'administrador', 'operarios']);
+                                        });
+                                    }
+                                }
                             )
                             ->getOptionLabelFromRecordUsing(fn($record) => $record->name . ' ' . $record->apellidos)
                             ->searchable()
