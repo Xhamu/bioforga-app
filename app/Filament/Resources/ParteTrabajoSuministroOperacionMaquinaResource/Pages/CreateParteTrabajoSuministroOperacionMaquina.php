@@ -3,7 +3,9 @@
 namespace App\Filament\Resources\ParteTrabajoSuministroOperacionMaquinaResource\Pages;
 
 use App\Filament\Resources\ParteTrabajoSuministroOperacionMaquinaResource;
+use App\Models\AlmacenIntermedio;
 use App\Models\Referencia;
+use Auth;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Select;
@@ -15,7 +17,6 @@ use Filament\Resources\Pages\CreateRecord;
 class CreateParteTrabajoSuministroOperacionMaquina extends CreateRecord
 {
     protected static string $resource = ParteTrabajoSuministroOperacionMaquinaResource::class;
-
     public function getFormActions(): array
     {
         return [
@@ -30,7 +31,7 @@ class CreateParteTrabajoSuministroOperacionMaquina extends CreateRecord
                         ->label('Referencia')
                         ->placeholder('- Selecciona una referencia -')
                         ->options(function () {
-                            $usuarioId = $this->form->getState()['usuario_id'] ?? Filament::auth()->user()->id;
+                            $usuarioId = $this->form->getState()['usuario_id'] ?? null;
 
                             if (!$usuarioId) {
                                 return [];
@@ -44,9 +45,7 @@ class CreateParteTrabajoSuministroOperacionMaquina extends CreateRecord
                                 return [];
                             }
 
-                            $referencias = Referencia::whereIn('id', $referenciasIds)
-                                ->with('proveedor', 'cliente')
-                                ->get();
+                            $referencias = Referencia::whereIn('id', $referenciasIds)->with('proveedor', 'cliente')->get();
 
                             return $referencias->mapWithKeys(function ($referencia) {
                                 return [
@@ -66,18 +65,19 @@ class CreateParteTrabajoSuministroOperacionMaquina extends CreateRecord
 
                     View::make('livewire.location-inicio-trabajo'),
                 ])
-                ->action(function (array $data, $livewire) {
-                    // Guardar el estado del formulario antes de usarlo
-                    $livewire->save(false);
+                ->action(function (array $data) {
+                    $this->form->fill();
 
-                    $formData = $livewire->form->getState();
+                    $formData = array_merge(
+                        $this->form->getState(),
+                        [
+                            'referencia_id' => $data['referencia_id'],
+                            'fecha_hora_inicio_trabajo' => now(),
+                            'gps_inicio_trabajo' => $data['gps_inicio_trabajo'] ?? '0.0000, 0.0000',
+                        ]
+                    );
 
-                    $this->record = static::getModel()::create([
-                        ...$formData,
-                        'referencia_id' => $data['referencia_id'],
-                        'fecha_hora_inicio_trabajo' => now(),
-                        'gps_inicio_trabajo' => $data['gps_inicio_trabajo'] ?? '0.0000, 0.0000',
-                    ]);
+                    $this->record = static::getModel()::create($formData);
 
                     Notification::make()
                         ->success()
