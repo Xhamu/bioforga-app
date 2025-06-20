@@ -46,7 +46,7 @@ class CreateParteTrabajoSuministroAveria extends CreateRecord
                         ->title('Trabajo iniciado correctamente')
                         ->send();
 
-                    $this->redirect(ParteTrabajoSuministroAveriaResource::getUrl('edit', ['record' => $this->record]));
+                    $this->redirect(ParteTrabajoSuministroAveriaResource::getUrl());
                 }),
         ];
     }

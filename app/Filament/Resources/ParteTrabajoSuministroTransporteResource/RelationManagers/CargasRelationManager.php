@@ -84,13 +84,13 @@ class CargasRelationManager extends RelationManager
 
                 Tables\Columns\TextColumn::make('fecha_hora_inicio_carga')
                     ->label('Inicio carga')
-                    ->dateTime()
-                    ->sortable(),
+                    ->sortable()
+                    ->formatStateUsing(fn($state) => \Carbon\Carbon::parse($state)->timezone('Europe/Madrid')->format('d/m/Y H:i')),
 
                 Tables\Columns\TextColumn::make('fecha_hora_fin_carga')
                     ->label('Fin carga')
-                    ->dateTime()
-                    ->sortable(),
+                    ->sortable()
+                    ->formatStateUsing(fn($state) => \Carbon\Carbon::parse($state)->timezone('Europe/Madrid')->format('d/m/Y H:i')),
 
                 Tables\Columns\TextColumn::make('cantidad')
                     ->label('Cantidad (m³)')

@@ -150,13 +150,14 @@ class ParteTrabajoTallerMaquinariaResource extends Resource
                                     return new HtmlString('<p>Estado actual: <strong>Sin iniciar</strong></p>');
                                 }
 
-                                $estado = $record->fecha_hora_fin_taller_maquinaria ? 'Finalizado' : 'Trabajando';
-                                $totalMinutos = Carbon::parse($record->getRawOriginal('fecha_hora_inicio_taller_maquinaria'))
-                                    ->diffInMinutes(
-                                        $record->fecha_hora_fin_taller_maquinaria
-                                        ? Carbon::parse($record->getRawOriginal('fecha_hora_fin_taller_maquinaria'))
-                                        : now()
-                                    );
+                                $inicio = Carbon::parse($record->getRawOriginal('fecha_hora_inicio_taller_maquinaria'))->timezone('Europe/Madrid');
+                                $fin = $record->fecha_hora_fin_taller_maquinaria
+                                    ? Carbon::parse($record->getRawOriginal('fecha_hora_fin_taller_maquinaria'))->timezone('Europe/Madrid')
+                                    : null;
+
+                                $estado = $fin ? 'Finalizado' : 'Trabajando';
+
+                                $totalMinutos = $inicio->diffInMinutes($fin ?? Carbon::now('Europe/Madrid'));
 
                                 $horas = floor($totalMinutos / 60);
                                 $minutos = $totalMinutos % 60;
@@ -167,9 +168,6 @@ class ParteTrabajoTallerMaquinariaResource extends Resource
                                     default => '❓',
                                 };
 
-                                $inicio = Carbon::parse($record->getRawOriginal('fecha_hora_inicio_taller_maquinaria'));
-                                $fin = $record->fecha_hora_fin_taller_maquinaria ? Carbon::parse($record->getRawOriginal('fecha_hora_fin_taller_maquinaria')) : null;
-
                                 $gpsInicio = $record->gps_inicio_taller_maquinaria
                                     ? ' (<a href="https://maps.google.com/?q=' . $record->gps_inicio_taller_maquinaria . '" target="_blank" class="text-blue-600 underline">📍 Ver ubicación</a>)'
                                     : '';
@@ -179,29 +177,29 @@ class ParteTrabajoTallerMaquinariaResource extends Resource
                                     : '';
 
                                 $tabla = '
-                                    <div class="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
-                                        <table class="w-full text-sm text-left text-gray-700 dark:text-gray-200">
-                                            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-                                                <tr class="bg-gray-50 dark:bg-gray-800">
-                                                    <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Estado actual</th>
-                                                    <td class="px-4 py-3 font-semibold text-gray-900 dark:text-white">' . $emoji . ' ' . $estado . '</td>
-                                                </tr>
-                                                <tr>
-                                                    <th class="px-4 py-3">Hora de inicio</th>
-                                                    <td class="px-4 py-3">' . $inicio->format('H:i') . $gpsInicio . '</td>
-                                                </tr>
-                                                <tr>
-                                                    <th class="px-4 py-3">Hora de finalización</th>
-                                                    <td class="px-4 py-3">' . ($fin ? $fin->format('H:i') . $gpsFin : '-') . '</td>
-                                                </tr>
-                                                <tr class="bg-gray-50 dark:bg-gray-800 border-t">
-                                                    <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Tiempo total</th>
-                                                    <td class="px-4 py-3 font-semibold">' . $horas . 'h ' . $minutos . 'min</td>
-                                                </tr>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                ';
+                    <div class="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
+                        <table class="w-full text-sm text-left text-gray-700 dark:text-gray-200">
+                            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                                <tr class="bg-gray-50 dark:bg-gray-800">
+                                    <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Estado actual</th>
+                                    <td class="px-4 py-3 font-semibold text-gray-900 dark:text-white">' . $emoji . ' ' . $estado . '</td>
+                                </tr>
+                                <tr>
+                                    <th class="px-4 py-3">Hora de inicio</th>
+                                    <td class="px-4 py-3">' . $inicio->format('H:i') . $gpsInicio . '</td>
+                                </tr>
+                                <tr>
+                                    <th class="px-4 py-3">Hora de finalización</th>
+                                    <td class="px-4 py-3">' . ($fin ? $fin->format('H:i') . $gpsFin : '-') . '</td>
+                                </tr>
+                                <tr class="bg-gray-50 dark:bg-gray-800 border-t">
+                                    <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Tiempo total</th>
+                                    <td class="px-4 py-3 font-semibold">' . $horas . 'h ' . $minutos . 'min</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                ';
 
                                 return new HtmlString($tabla);
                             })

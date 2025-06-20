@@ -68,7 +68,7 @@ class CreateParteTrabajoTallerVehiculos extends CreateRecord
                         ->title('Trabajo iniciado correctamente')
                         ->send();
 
-                    $this->redirect(ParteTrabajoTallerVehiculosResource::getUrl('edit', ['record' => $this->record]));
+                    $this->redirect(ParteTrabajoTallerVehiculosResource::getUrl());
                 }),
         ];
     }
