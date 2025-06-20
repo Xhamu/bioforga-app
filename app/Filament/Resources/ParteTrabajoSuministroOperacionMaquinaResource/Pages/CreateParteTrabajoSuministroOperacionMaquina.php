@@ -166,7 +166,7 @@ class CreateParteTrabajoSuministroOperacionMaquina extends CreateRecord
                         ->title('Trabajo iniciado correctamente')
                         ->send();
 
-                    $this->redirect(ParteTrabajoSuministroOperacionMaquinaResource::getUrl('edit', ['record' => $this->record]));
+                    $this->redirect(ParteTrabajoSuministroOperacionMaquinaResource::getUrl('view', ['record' => $this->record]));
                 }),
         ];
     }
