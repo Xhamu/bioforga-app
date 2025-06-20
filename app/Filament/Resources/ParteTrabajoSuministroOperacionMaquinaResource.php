@@ -139,10 +139,25 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                                 }
                             }),
                     ])
+                    ->visible(fn($record) => filled($record?->fecha_hora_inicio_trabajo))
                     ->columns(3),
 
                 Section::make('')
                     ->schema([
+                        Select::make('referencia_id')
+                            ->label('Referencia')
+                            ->options(function () {
+                                return \App\Models\Referencia::with('proveedor', 'cliente')->get()
+                                    ->mapWithKeys(fn($r) => [
+                                        $r->id => "{$r->referencia} | " .
+                                            ($r->proveedor?->razon_social ?? $r->cliente?->razon_social ?? 'Sin interviniente') .
+                                            " ({$r->monte_parcela}, {$r->ayuntamiento})"
+                                    ]);
+                            })
+                            ->searchable()
+                            ->disabled(fn($record) => !$record || !$record->exists)
+                            ->visible(fn($record) => filled($record?->referencia_id)),
+
                         Placeholder::make('')
                             ->content(function ($record) {
                                 if (!$record || !$record->fecha_hora_inicio_trabajo) {
@@ -572,5 +587,4 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
             : \App\Models\User::query()->whereHas('roles', fn($q) =>
                 $q->whereIn('name', ['administración', 'administrador', 'operarios']));
     }
-
 }
