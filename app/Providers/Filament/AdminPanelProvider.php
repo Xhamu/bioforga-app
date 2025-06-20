@@ -61,7 +61,7 @@ class AdminPanelProvider extends PanelProvider
             )
 
             ->plugins([
-                \TomatoPHP\FilamentPWA\FilamentPWAPlugin::make(),
+                //\TomatoPHP\FilamentPWA\FilamentPWAPlugin::make(),
                 FilamentShieldPlugin::make()
                     ->gridColumns([
                         'default' => 1,
