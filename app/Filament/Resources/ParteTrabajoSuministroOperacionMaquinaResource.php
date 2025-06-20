@@ -54,39 +54,16 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                             ->relationship(
                                 name: 'usuario',
                                 titleAttribute: 'name',
-                                modifyQueryUsing: function ($query) {
-                                    $user = Filament::auth()->user();
-
-                                    if ($user->hasRole('operarios')) {
-                                        $query->where('id', $user->id);
-                                    } else {
-                                        $query->whereHas('roles', function ($q) {
-                                            $q->whereIn('name', ['administración', 'administrador', 'operarios']);
-                                        });
-                                    }
-                                }
+                                modifyQueryUsing: fn($query) => self::getUsuariosPermitidosQuery()
                             )
                             ->getOptionLabelFromRecordUsing(fn($record) => $record->name . ' ' . $record->apellidos)
                             ->searchable()
                             ->preload()
+                            ->placeholder('- Selecciona un usuario -')
                             ->default(function () {
-                                $user = Filament::auth()->user();
-
-                                $query = \App\Models\User::query();
-
-                                if ($user->hasRole('operarios')) {
-                                    $query->where('id', $user->id);
-                                } else {
-                                    $query->whereHas('roles', function ($q) {
-                                        $q->whereIn('name', ['administración', 'administrador', 'operarios']);
-                                    });
-                                }
-
-                                $usuarios = $query->pluck('id');
-
+                                $usuarios = self::getUsuariosPermitidosQuery()->pluck('id');
                                 return $usuarios->count() === 1 ? $usuarios->first() : null;
                             })
-                            ->required()
                             ->reactive()
                             ->afterStateUpdated(function ($state, callable $set) {
                                 if (!$state) {
@@ -104,24 +81,23 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                                 $usuarioId = $get('usuario_id');
 
                                 if (!$usuarioId) {
-                                    return ['' => '- Selecciona un usuario -'];
+                                    return [];
                                 }
 
                                 $maquinas = \App\Models\Maquina::where('operario_id', $usuarioId)->get();
 
                                 if ($maquinas->isEmpty()) {
-                                    return ['' => '- No hay máquinas asignadas -'];
+                                    return [];
                                 }
 
                                 return $maquinas->mapWithKeys(fn($maquina) => [
                                     $maquina->id => "{$maquina->marca} {$maquina->modelo}"
                                 ])->toArray();
                             })
+                            ->placeholder('- Selecciona una máquina -')
                             ->default(function (callable $get) {
                                 $usuarioId = $get('usuario_id') ?? Filament::auth()->user()->id;
-
                                 $maquinas = \App\Models\Maquina::where('operario_id', $usuarioId)->pluck('id');
-
                                 return $maquinas->count() === 1 ? $maquinas->first() : null;
                             })
                             ->reactive()
@@ -146,6 +122,7 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                                 'carga' => 'Carga',
                                 'transporte' => 'Transporte',
                             ])
+                            ->placeholder('- Selecciona el tipo de trabajo -')
                             ->required()
                             ->searchable()
                             ->afterStateHydrated(function (callable $get, callable $set, $state) {
@@ -584,6 +561,16 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
         }
 
         return $query;
+    }
+
+    private static function getUsuariosPermitidosQuery()
+    {
+        $user = Filament::auth()->user();
+
+        return $user->hasRole('operarios')
+            ? \App\Models\User::query()->where('id', $user->id)
+            : \App\Models\User::query()->whereHas('roles', fn($q) =>
+                $q->whereIn('name', ['administración', 'administrador', 'operarios']));
     }
 
 }

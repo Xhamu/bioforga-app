@@ -29,16 +29,23 @@ class CreateParteTrabajoSuministroOperacionMaquina extends CreateRecord
                 ->form([
                     Select::make('referencia_id')
                         ->label('Referencia')
+                        ->placeholder('- Selecciona una referencia -')
                         ->options(function () {
-                            $usuarioId = $this->form->getState()['usuario_id'] ?? Filament::auth()->user()->id;
+                            $usuarioId = data_get($this->form->getState(), 'usuario_id');
+
+                            if (!$usuarioId) {
+                                return [];
+                            }
 
                             $referenciasIds = \DB::table('referencias_users')
                                 ->where('user_id', $usuarioId)
                                 ->pluck('referencia_id');
 
-                            $referencias = $referenciasIds->isNotEmpty()
-                                ? Referencia::whereIn('id', $referenciasIds)->with('proveedor')->get()
-                                : collect(); // <- Aquí es el cambio clave
+                            if ($referenciasIds->isEmpty()) {
+                                return [];
+                            }
+
+                            $referencias = Referencia::whereIn('id', $referenciasIds)->with('proveedor', 'cliente')->get();
 
                             return $referencias->mapWithKeys(function ($referencia) {
                                 return [
