@@ -52,7 +52,7 @@ class CreateParteTrabajoSuministroOtros extends CreateRecord
                         ->title('Trabajo iniciado correctamente')
                         ->send();
 
-                    $this->redirect(ParteTrabajoSuministroOtrosResource::getUrl('edit', ['record' => $this->record]));
+                    $this->redirect(ParteTrabajoSuministroOtrosResource::getUrl());
                 }),
         ];
     }

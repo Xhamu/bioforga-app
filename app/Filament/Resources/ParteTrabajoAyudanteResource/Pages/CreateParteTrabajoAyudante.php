@@ -88,7 +88,7 @@ class CreateParteTrabajoAyudante extends CreateRecord
                         ->title('Trabajo iniciado correctamente')
                         ->send();
 
-                    $this->redirect(ParteTrabajoAyudanteResource::getUrl('edit', ['record' => $this->record]));
+                    $this->redirect(ParteTrabajoAyudanteResource::getUrl());
                 }),
         ];
     }

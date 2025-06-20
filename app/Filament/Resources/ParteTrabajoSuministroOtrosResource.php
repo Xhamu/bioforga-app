@@ -74,17 +74,17 @@ class ParteTrabajoSuministroOtrosResource extends Resource
                             ->visible(fn($record) => $record && filled($record->descripcion))
                             ->content(function ($record) {
                                 return new HtmlString('
-                                <div class="mb-6">
-                                    <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2 flex items-center gap-1">
-                                        Descripción del trabajo
-                                    </h3>
-                                    <div class="px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm">
-                                        <p class="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
-                                            ' . nl2br(e($record->descripcion)) . '
-                                        </p>
-                                    </div>
-                                </div>
-                            ');
+                <div class="mb-6">
+                    <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2 flex items-center gap-1">
+                        Descripción del trabajo
+                    </h3>
+                    <div class="px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm">
+                        <p class="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+                            ' . nl2br(e($record->descripcion)) . '
+                        </p>
+                    </div>
+                </div>
+            ');
                             })
                             ->columnSpanFull(),
 
@@ -94,13 +94,14 @@ class ParteTrabajoSuministroOtrosResource extends Resource
                                     return new HtmlString('<p>Estado actual: <strong>Sin iniciar</strong></p>');
                                 }
 
-                                $estado = $record->fecha_hora_fin_otros ? 'Finalizado' : 'Trabajando';
-                                $totalMinutos = Carbon::parse($record->getRawOriginal('fecha_hora_inicio_otros'))
-                                    ->diffInMinutes(
-                                        $record->fecha_hora_fin_otros
-                                        ? Carbon::parse($record->getRawOriginal('fecha_hora_fin_otros'))
-                                        : now()
-                                    );
+                                $inicio = Carbon::parse($record->getRawOriginal('fecha_hora_inicio_otros'))->timezone('Europe/Madrid');
+                                $fin = $record->fecha_hora_fin_otros
+                                    ? Carbon::parse($record->getRawOriginal('fecha_hora_fin_otros'))->timezone('Europe/Madrid')
+                                    : null;
+
+                                $estado = $fin ? 'Finalizado' : 'Trabajando';
+
+                                $totalMinutos = $inicio->diffInMinutes($fin ?? Carbon::now('Europe/Madrid'));
 
                                 $horas = floor($totalMinutos / 60);
                                 $minutos = $totalMinutos % 60;
@@ -111,9 +112,6 @@ class ParteTrabajoSuministroOtrosResource extends Resource
                                     default => '❓',
                                 };
 
-                                $inicio = Carbon::parse($record->getRawOriginal('fecha_hora_inicio_otros'));
-                                $fin = $record->fecha_hora_fin_otros ? Carbon::parse($record->getRawOriginal('fecha_hora_fin_otros')) : null;
-
                                 $gpsInicio = $record->gps_inicio_otros
                                     ? ' (<a href="https://maps.google.com/?q=' . $record->gps_inicio_otros . '" target="_blank" class="text-blue-600 underline">📍 Ver ubicación</a>)'
                                     : '';
@@ -123,29 +121,29 @@ class ParteTrabajoSuministroOtrosResource extends Resource
                                     : '';
 
                                 $tabla = '
-                                    <div class="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
-                                        <table class="w-full text-sm text-left text-gray-700 dark:text-gray-200">
-                                            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-                                                <tr class="bg-gray-50 dark:bg-gray-800">
-                                                    <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Estado actual</th>
-                                                    <td class="px-4 py-3 font-semibold text-gray-900 dark:text-white">' . $emoji . ' ' . $estado . '</td>
-                                                </tr>
-                                                <tr>
-                                                    <th class="px-4 py-3">Hora de inicio</th>
-                                                    <td class="px-4 py-3">' . $inicio->format('H:i') . $gpsInicio . '</td>
-                                                </tr>
-                                                <tr>
-                                                    <th class="px-4 py-3">Hora de finalización</th>
-                                                    <td class="px-4 py-3">' . ($fin ? $fin->format('H:i') . $gpsFin : '-') . '</td>
-                                                </tr>
-                                                <tr class="bg-gray-50 dark:bg-gray-800 border-t">
-                                                    <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Tiempo total</th>
-                                                    <td class="px-4 py-3 font-semibold">' . $horas . 'h ' . $minutos . 'min</td>
-                                                </tr>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                ';
+                    <div class="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
+                        <table class="w-full text-sm text-left text-gray-700 dark:text-gray-200">
+                            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                                <tr class="bg-gray-50 dark:bg-gray-800">
+                                    <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Estado actual</th>
+                                    <td class="px-4 py-3 font-semibold text-gray-900 dark:text-white">' . $emoji . ' ' . $estado . '</td>
+                                </tr>
+                                <tr>
+                                    <th class="px-4 py-3">Hora de inicio</th>
+                                    <td class="px-4 py-3">' . $inicio->format('H:i') . $gpsInicio . '</td>
+                                </tr>
+                                <tr>
+                                    <th class="px-4 py-3">Hora de finalización</th>
+                                    <td class="px-4 py-3">' . ($fin ? $fin->format('H:i') . $gpsFin : '-') . '</td>
+                                </tr>
+                                <tr class="bg-gray-50 dark:bg-gray-800 border-t">
+                                    <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Tiempo total</th>
+                                    <td class="px-4 py-3 font-semibold">' . $horas . 'h ' . $minutos . 'min</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                ';
 
                                 return new HtmlString($tabla);
                             })

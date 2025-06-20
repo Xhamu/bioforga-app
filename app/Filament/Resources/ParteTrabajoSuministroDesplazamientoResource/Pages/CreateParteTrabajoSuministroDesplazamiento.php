@@ -61,7 +61,7 @@ class CreateParteTrabajoSuministroDesplazamiento extends CreateRecord
                         ->title('Trabajo iniciado correctamente')
                         ->send();
 
-                    $this->redirect(ParteTrabajoSuministroDesplazamientoResource::getUrl('view', ['record' => $this->record]));
+                    $this->redirect(ParteTrabajoSuministroDesplazamientoResource::getUrl());
                 }),
         ];
     }
