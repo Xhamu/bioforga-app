@@ -69,7 +69,23 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                             ->getOptionLabelFromRecordUsing(fn($record) => $record->name . ' ' . $record->apellidos)
                             ->searchable()
                             ->preload()
-                            ->default(Filament::auth()->user()->id)
+                            ->default(function () {
+                                $user = Filament::auth()->user();
+
+                                $query = \App\Models\User::query();
+
+                                if ($user->hasRole('operarios')) {
+                                    $query->where('id', $user->id);
+                                } else {
+                                    $query->whereHas('roles', function ($q) {
+                                        $q->whereIn('name', ['administración', 'administrador', 'operarios']);
+                                    });
+                                }
+
+                                $usuarios = $query->pluck('id');
+
+                                return $usuarios->count() === 1 ? $usuarios->first() : null;
+                            })
                             ->required()
                             ->reactive()
                             ->afterStateUpdated(function ($state, callable $set) {
@@ -79,7 +95,6 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                                 }
 
                                 $maquinas = \App\Models\Maquina::where('operario_id', $state)->pluck('id');
-
                                 $set('maquina_id', $maquinas->count() === 1 ? $maquinas->first() : null);
                             }),
 
