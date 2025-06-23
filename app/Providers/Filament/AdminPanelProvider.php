@@ -4,6 +4,7 @@ namespace App\Providers\Filament;
 
 use App\Filament\Pages\Auth\Register;
 use App\Filament\Resources\Auth\Login\Login;
+use App\Filament\Widgets\AccountWidget;
 use App\Filament\Widgets\PartesTrabajoActivos;
 use App\Filament\Widgets\ResumenPartesActivos;
 use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
@@ -87,7 +88,7 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->widgets([
-                Widgets\AccountWidget::class,
+                AccountWidget::class,
                 PartesTrabajoActivos::class,
                 ResumenPartesActivos::class,
             ])

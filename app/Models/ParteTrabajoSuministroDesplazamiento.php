@@ -32,6 +32,10 @@ class ParteTrabajoSuministroDesplazamiento extends Model
         'vehiculo_id',
         'destino',
 
+        'referencia_id',
+        'taller_id',
+        'maquina_id',
+
         'observaciones'
     ];
 
@@ -76,5 +80,10 @@ class ParteTrabajoSuministroDesplazamiento extends Model
     public function vehiculo()
     {
         return $this->belongsTo(Vehiculo::class);
+    }
+
+    public function maquina()
+    {
+        return $this->belongsTo(Maquina::class);
     }
 }

@@ -311,7 +311,11 @@ class ReferenciaResource extends Resource
                             ->reactive(), // necesario para reactividad
 
                         Forms\Components\TextInput::make('precio')
-                            ->label('Precio')
+                            ->label(fn(callable $get) => match ($get('tarifa')) {
+                                'toneladas' => 'Precio por tonelada',
+                                'm3' => 'Precio por m³',
+                                default => 'Precio',
+                            })
                             ->numeric()
                             ->nullable()
                             ->reactive()
@@ -320,7 +324,15 @@ class ReferenciaResource extends Resource
                                 'm3' => '€/m³',
                                 default => '€',
                             }),
-                    ])->columns(2)
+
+                        Forms\Components\TextInput::make('precio_horas')
+                            ->label('Precio por hora')
+                            ->numeric()
+                            ->nullable()
+                            ->reactive()
+                            ->suffix('€/hora')
+                    ])
+                    ->columns(3)
                     ->visible(function ($get) {
                         return !empty($get('referencia'));
                     }),
@@ -346,19 +358,26 @@ class ReferenciaResource extends Resource
                     ->multiple()
                     ->relationship(
                         name: 'usuarios',
-                        titleAttribute: 'name', // columna real
-                        modifyQueryUsing: fn($query) =>
-                        $query->orderBy('name')
-                            ->whereNull('users.deleted_at')
-                            ->whereDoesntHave(
-                                'roles',
-                                fn($q) =>
-                                $q->whereIn('name', ['superadmin'])
-                            )
+                        titleAttribute: 'name',
+                        modifyQueryUsing: function ($query, $get) {
+                            $query->orderBy('name')
+                                ->whereNull('users.deleted_at')
+                                ->whereDoesntHave(
+                                    'roles',
+                                    fn($q) =>
+                                    $q->where('name', 'superadmin')
+                                );
+
+                            if (!empty($get('referencia')) && strpos($get('referencia'), 'SU') === false) {
+                                // Solo si es una referencia de tipo servicio (ej: SE...)
+                                $query->where('empresa_bioforga', true);
+                            }
+                        }
                     )
-                    ->getOptionLabelFromRecordUsing(function ($record) {
-                        return $record?->nombre_apellidos ?? '-';
-                    })
+                    ->getOptionLabelFromRecordUsing(
+                        fn($record) =>
+                        $record?->nombre_apellidos ?? '-'
+                    )
                     ->preload()
                     ->searchable()
                     ->columnSpanFull()
@@ -942,19 +961,26 @@ class ReferenciaResource extends Resource
                 ->multiple()
                 ->relationship(
                     name: 'usuarios',
-                    titleAttribute: 'name', // columna real
-                    modifyQueryUsing: fn($query) =>
-                    $query->orderBy('name')
-                        ->whereNull('users.deleted_at')
-                        ->whereDoesntHave(
-                            'roles',
-                            fn($q) =>
-                            $q->whereIn('name', ['superadmin', 'administracion', 'administrador', 'direccion'])
-                        )
+                    titleAttribute: 'name',
+                    modifyQueryUsing: function ($query, $get) {
+                        $query->orderBy('name')
+                            ->whereNull('users.deleted_at')
+                            ->whereDoesntHave(
+                                'roles',
+                                fn($q) =>
+                                $q->where('name', 'superadmin')
+                            );
+
+                        if (!empty($get('referencia')) && strpos($get('referencia'), 'SU') === false) {
+                            // Solo si es una referencia de tipo servicio (ej: SE...)
+                            $query->where('empresa_bioforga', true);
+                        }
+                    }
                 )
-                ->getOptionLabelFromRecordUsing(function ($record) {
-                    return $record?->nombre_apellidos ?? '-';
-                })
+                ->getOptionLabelFromRecordUsing(
+                    fn($record) =>
+                    $record?->nombre_apellidos ?? '-'
+                )
                 ->preload()
                 ->searchable()
                 ->columnSpanFull()

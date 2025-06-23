@@ -94,7 +94,14 @@ class ParteTrabajoSuministroAveriaResource extends Resource
 
                         // Trabajo realizado (se rellena según máquina y tipo)
                         Select::make('trabajo_realizado')
-                            ->label('Trabajo realizado')
+                            ->label(function (callable $get) {
+                                return match ($get('tipo')) {
+                                    'averia' => 'Tipo de avería',
+                                    'mantenimiento' => 'Tipo de mantenimiento',
+                                    default => 'Tipo de ...',
+                                };
+                            })
+                            ->reactive()
                             ->required()
                             ->options(function (callable $get) {
                                 $maquinaId = $get('maquina_id');
@@ -127,10 +134,10 @@ class ParteTrabajoSuministroAveriaResource extends Resource
                             ->searchable()
                             ->disabled(fn(callable $get) => !$get('maquina_id') || !$get('tipo')),
                         Select::make('actuacion')
-                            ->label('Actuación')
+                            ->label('Medios utilizados')
                             ->required()
                             ->options([
-                                'medios_propios' => 'Por medios propios',
+                                'medios_propios' => 'Taller propio',
                                 'taller_externo' => 'Taller externo'
                             ])
                             ->reactive()

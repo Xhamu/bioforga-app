@@ -4,7 +4,9 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\ParteTrabajoSuministroDesplazamientoResource\Pages;
 use App\Filament\Resources\ParteTrabajoSuministroDesplazamientoResource\RelationManagers;
+use App\Models\Maquina;
 use App\Models\ParteTrabajoSuministroDesplazamiento;
+use App\Models\User;
 use App\Models\Vehiculo;
 use Carbon\Carbon;
 use Filament\Facades\Filament;
@@ -85,37 +87,95 @@ class ParteTrabajoSuministroDesplazamientoResource extends Resource
                             ->searchable()
                             ->preload()
                             ->nullable()
-                            ->reactive()
                             ->default(function (callable $get) {
                                 $usuarioId = $get('usuario_id');
-
-                                if (!$usuarioId) {
+                                if (!$usuarioId)
                                     return null;
-                                }
 
                                 $vehiculos = Vehiculo::whereJsonContains('conductor_habitual', (string) $usuarioId)->get();
                                 return $vehiculos->count() === 1 ? $vehiculos->first()->id : null;
-                            }),
+                            })
+                            ->reactive()
+                            ->visible(fn(callable $get) => $get('maquina_id') === null),
+
+                        Select::make('maquina_id')
+                            ->label('Máquina')
+                            ->relationship(
+                                name: 'maquina',
+                                titleAttribute: 'marca',
+                                modifyQueryUsing: fn($query, callable $get) => $query->when(
+                                    $get('usuario_id'),
+                                    fn($q, $usuarioId) => $q->where('operario_id', (string) $usuarioId)
+                                )
+                            )
+                            ->getOptionLabelFromRecordUsing(
+                                fn($record) => $record->marca . ' ' . $record->modelo
+                            )
+                            ->searchable()
+                            ->preload()
+                            ->nullable()
+                            ->default(function (callable $get) {
+                                $usuarioId = $get('usuario_id');
+                                if (!$usuarioId)
+                                    return null;
+
+                                $maquinas = Maquina::where('operario_id', (string) $usuarioId)->get();
+                                return $maquinas->count() === 1 ? $maquinas->first()->id : null;
+                            })
+                            ->reactive()
+                            ->visible(fn(callable $get) => $get('vehiculo_id') === null),
                     ])
+                    ->visible(
+                        fn($record) =>
+                        $record &&
+                        $record->fecha_hora_inicio_desplazamiento
+                    )
                     ->columns(2),
 
                 Section::make('')
                     ->schema([
-                        Select::make('destino')
-                            ->label('Destino')
+                        Select::make('referencia_id')
+                            ->label('Destino | Referencia')
                             ->searchable()
-                            ->options([
-                                'obra' => 'Obra',
-                                'trabajo' => 'Trabajo',
-                                'otro' => 'Otro',
-                            ])
+                            ->options(function (callable $get) {
+                                $usuarioId = $get('usuario_id');
+
+                                if (!$usuarioId) {
+                                    return [];
+                                }
+
+                                $usuario = \App\Models\User::find($usuarioId);
+
+                                return $usuario?->referencias()
+                                    ->select('referencias.id', 'referencias.referencia', 'referencias.ayuntamiento', 'referencias.monte_parcela')
+                                    ->get()
+                                    ->mapWithKeys(function ($ref) {
+                                        $label = "{$ref->referencia} | ({$ref->ayuntamiento}, {$ref->monte_parcela})";
+                                        return [$ref->id => $label];
+                                    }) ?? [];
+                            })
                             ->visible(
-                                fn($record) =>
+                                fn(callable $get, $record) =>
                                 $record &&
-                                $record->fecha_hora_inicio_desplazamiento
+                                $record->fecha_hora_inicio_desplazamiento &&
+                                $get('taller_id') === null
                             )
-                            ->required()
-                            ->nullable(),
+                            ->preload()
+                            ->reactive(),
+
+                        Select::make('taller_id')
+                            ->label('Destino | Taller')
+                            ->searchable()
+                            ->options(fn() => \App\Models\Taller::pluck('nombre', 'id'))
+                            ->visible(
+                                fn(callable $get, $record) =>
+                                $record &&
+                                $record->fecha_hora_inicio_desplazamiento &&
+                                $get('referencia_id') === null
+                            )
+                            ->preload()
+                            ->reactive(),
+
 
                         Placeholder::make('')
                             ->content(function ($record) {
@@ -192,7 +252,7 @@ class ParteTrabajoSuministroDesplazamientoResource extends Resource
                     ->schema([
                         Actions::make([
                             Action::make('Finalizar')
-                                ->label('Finalizar trabajo')
+                                ->label('Finalizar desplazamiento')
                                 ->color('danger')
                                 ->extraAttributes(['class' => 'w-full']) // Hace que el botón ocupe todo el ancho disponible
                                 ->visible(
@@ -222,6 +282,8 @@ class ParteTrabajoSuministroDesplazamientoResource extends Resource
                                         ->success()
                                         ->title('Trabajo finalizado correctamente')
                                         ->send();
+
+                                    return redirect(ParteTrabajoSuministroDesplazamientoResource::getUrl());
                                 }),
                         ])
                             ->columns(4)

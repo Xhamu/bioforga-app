@@ -173,7 +173,7 @@ class ActivityLogResource extends Resource
 
     public static function canAccess(): bool
     {
-        return auth()->user()?->hasAnyRole(['administración', 'superadmin']);
+        return auth()->user()?->hasRole('superadmin');
     }
 
     public static function canCreate(): bool

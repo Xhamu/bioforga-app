@@ -66,9 +66,12 @@ class UserResource extends Resource
                         TextInput::make('email')
                             ->label(__('Correo electrónico'))
                             ->email()
+                            ->required()
+                            ->rules('required')
                             ->columnSpan(1)
                             ->validationMessages([
                                 'email' => 'No es :attribute válido.',
+                                'required' => 'El correo electrónico es obligatorio.'
                             ]),
 
                         TextInput::make('telefono')
