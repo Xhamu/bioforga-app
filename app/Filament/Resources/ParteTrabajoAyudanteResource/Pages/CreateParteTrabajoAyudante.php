@@ -11,6 +11,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\View;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
+use Illuminate\Support\Facades\Auth;
 
 class CreateParteTrabajoAyudante extends CreateRecord
 {
@@ -65,7 +66,8 @@ class CreateParteTrabajoAyudante extends CreateRecord
 
                     TextInput::make('gps_inicio_ayudante')
                         ->label('GPS')
-                        ->required(),
+                        ->required()
+                        ->readOnly(fn() => !Auth::user()?->hasAnyRole(['administración', 'superadmin'])),
 
                     View::make('livewire.location-inicio-ayudante')->columnSpanFull(),
                 ])
@@ -88,7 +90,7 @@ class CreateParteTrabajoAyudante extends CreateRecord
                         ->title('Trabajo iniciado correctamente')
                         ->send();
 
-                    $this->redirect(ParteTrabajoAyudanteResource::getUrl());
+                    $this->redirect(ParteTrabajoAyudanteResource::getUrl(name: 'view', parameters: ['record' => $this->record]));
                 }),
         ];
     }

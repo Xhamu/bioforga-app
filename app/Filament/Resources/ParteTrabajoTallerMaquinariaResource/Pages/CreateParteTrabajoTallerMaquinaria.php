@@ -10,6 +10,7 @@ use Filament\Forms\Components\TimePicker;
 use Filament\Forms\Components\View;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
+use Filament\Forms\Components\TextInput\Mask;
 
 class CreateParteTrabajoTallerMaquinaria extends CreateRecord
 {
@@ -43,10 +44,12 @@ class CreateParteTrabajoTallerMaquinaria extends CreateRecord
                         ->searchable()
                         ->required(),
 
-                    TimePicker::make('horas_servicio')
-                        ->label('Horas de servicio')
-                        ->withoutSeconds()
-                        ->required(),
+                    TextInput::make('horas_servicio')
+                        ->label('Kilómetros')
+                        ->numeric()
+                        ->rules(['regex:/^\d{1,6}(\.\d{1,3})?$/']) // permite hasta 999.999
+                        ->maxLength(7)
+                        ->required()
                 ])
                 ->action(function (array $data) {
                     $this->form->fill();
@@ -68,7 +71,7 @@ class CreateParteTrabajoTallerMaquinaria extends CreateRecord
                         ->title('Trabajo iniciado correctamente')
                         ->send();
 
-                    $this->redirect(ParteTrabajoTallerMaquinariaResource::getUrl());
+                    $this->redirect(ParteTrabajoTallerMaquinariaResource::getUrl(name: 'view', parameters: ['record' => $this->record]));
                 }),
         ];
     }

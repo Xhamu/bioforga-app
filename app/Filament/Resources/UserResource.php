@@ -4,12 +4,15 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\UserResource\Pages;
 use App\Filament\Resources\UserResource\Pages\ListUserActivities;
+use App\Models\Maquina;
 use App\Models\User;
+use App\Models\Vehiculo;
 use Filament\Forms;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Support\Enums\FontWeight;
 use Filament\Tables;
@@ -21,6 +24,7 @@ use Filament\Tables\Columns\Layout\Split;
 use Filament\Tables\Columns\Layout\Stack;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Support\HtmlString;
 use Jenssegers\Agent\Agent;
 
 class UserResource extends Resource
@@ -233,7 +237,56 @@ class UserResource extends Resource
                 ->actions([
                     \STS\FilamentImpersonate\Tables\Actions\Impersonate::make(),
                     Tables\Actions\EditAction::make(),
-                    Tables\Actions\DeleteAction::make(),
+
+                    Tables\Actions\DeleteAction::make()
+                        ->before(function ($record, $action) {
+                            // Máquinas vinculadas
+                            $maquinas = Maquina::where('operario_id', $record->id)->get();
+
+                            if ($maquinas->isNotEmpty()) {
+                                $listaMaquinas = $maquinas
+                                    ->map(fn($m) => "<li><strong>{$m->marca} {$m->modelo}</strong></li>")
+                                    ->implode('');
+
+                                Notification::make()
+                                    ->title('No se puede eliminar')
+                                    ->danger()
+                                    ->icon('heroicon-o-exclamation-circle')
+                                    ->body(new HtmlString(
+                                        "Este usuario está asignado como operario en las siguientes máquinas:<br><ul>{$listaMaquinas}</ul>No se puede eliminar mientras tenga estas vinculaciones."
+                                    ))
+                                    ->duration(10000)
+                                    ->send();
+
+                                $action->cancel();
+                                return;
+                            }
+
+                            // Vehículos vinculados
+                            $vehiculos = Vehiculo::whereJsonContains('conductor_habitual', (string) $record->id)->get();
+
+                            if ($vehiculos->isNotEmpty()) {
+                                $listaVehiculos = $vehiculos
+                                    ->map(fn($v) => "<li><strong>{$v->marca} {$v->modelo} ({$v->matricula})</strong></li>")
+                                    ->implode('');
+
+                                Notification::make()
+                                    ->title('No se puede eliminar')
+                                    ->icon('heroicon-o-exclamation-circle')
+                                    ->danger()
+                                    ->body(new HtmlString(
+                                        "Este usuario figura como conductor habitual en los siguientes vehículos:<br><ul>{$listaVehiculos}</ul>No se puede eliminar mientras esté asignado."
+                                    ))
+                                    ->duration(10000)
+                                    ->send();
+
+                                $action->cancel();
+                            }
+                        })
+                        ->requiresConfirmation()
+                        ->modalHeading('¿Estás seguro de que quieres eliminar este usuario?')
+                        ->modalDescription('Esta acción no se puede deshacer. Asegúrate de que el usuario no tenga datos relacionados.'),
+
                     Action::make('activities')
                         ->label('Actividad')
                         ->icon('heroicon-o-clock')

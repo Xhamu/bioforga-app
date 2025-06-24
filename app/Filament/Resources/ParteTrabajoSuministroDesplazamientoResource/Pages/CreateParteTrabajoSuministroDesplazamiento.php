@@ -14,6 +14,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\View;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
+use Illuminate\Support\Facades\Auth;
 
 class CreateParteTrabajoSuministroDesplazamiento extends CreateRecord
 {
@@ -166,7 +167,8 @@ class CreateParteTrabajoSuministroDesplazamiento extends CreateRecord
 
                     TextInput::make('gps_inicio_desplazamiento')
                         ->label('GPS')
-                        ->required(),
+                        ->required()
+                        ->readOnly(fn() => !Auth::user()?->hasAnyRole(['administración', 'superadmin'])),
 
                     View::make('livewire.location-inicio-desplazamiento')
                         ->columnSpanFull(),

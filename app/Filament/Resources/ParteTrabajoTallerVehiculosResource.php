@@ -89,6 +89,17 @@ class ParteTrabajoTallerVehiculosResource extends Resource
                                 $trabajoRealizado = $record->trabajo_realizado ?? '-';
                                 $recambiosUtilizados = $record->recambios_utilizados ?? '-';
 
+                                // ⚠️ Convertir IDs a nombres
+                                $trabajoRealizadoIds = $record->trabajo_realizado ?? [];
+                                $recambiosUtilizadosIds = $record->recambios_utilizados ?? [];
+
+                                // Por si vienen en string JSON
+                                $trabajoRealizadoIds = is_array($trabajoRealizadoIds) ? $trabajoRealizadoIds : json_decode($trabajoRealizadoIds, true);
+                                $recambiosUtilizadosIds = is_array($recambiosUtilizadosIds) ? $recambiosUtilizadosIds : json_decode($recambiosUtilizadosIds, true);
+
+                                $trabajoRealizadoNombres = \App\Models\TrabajoRealizado::whereIn('id', $trabajoRealizadoIds)->pluck('nombre')->toArray();
+                                $recambiosNombres = \App\Models\RecambioUtilizado::whereIn('id', $recambiosUtilizadosIds)->pluck('nombre')->toArray();
+
                                 $tabla = '
                                 <div class="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
                                     <table class="w-full text-sm text-left text-gray-700 dark:text-gray-200">
@@ -114,11 +125,11 @@ class ParteTrabajoTallerVehiculosResource extends Resource
                                     </tr>
                                     <tr>
                                         <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Trabajo realizado</th>
-                                        <td class="px-4 py-3">' . e($trabajoRealizado) . '</td>
+                                        <td class="px-4 py-3">' . e(implode(', ', $trabajoRealizadoNombres)) . '</td>
                                     </tr>
                                     <tr>
                                         <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Recambios utilizados</th>
-                                        <td class="px-4 py-3">' . e($recambiosUtilizados) . '</td>
+                                        <td class="px-4 py-3">' . e(implode(', ', $recambiosNombres)) . '</td>
                                     </tr>';
                                 }
 
@@ -234,12 +245,18 @@ class ParteTrabajoTallerVehiculosResource extends Resource
                                         ])
                                         ->required(),
 
-                                    TextInput::make('trabajo_realizado')
+                                    Select::make('trabajo_realizado')
                                         ->label('Trabajo realizado')
+                                        ->multiple()
+                                        ->searchable()
+                                        ->options(\App\Models\TrabajoRealizado::pluck('nombre', 'id'))
                                         ->required(),
 
-                                    TextInput::make('recambios_utilizados')
+                                    Select::make('recambios_utilizados')
                                         ->label('Recambios utilizados')
+                                        ->multiple()
+                                        ->searchable()
+                                        ->options(\App\Models\RecambioUtilizado::pluck('nombre', 'id'))
                                         ->required(),
                                 ])
                                 ->action(function (array $data, $record) {
@@ -254,6 +271,8 @@ class ParteTrabajoTallerVehiculosResource extends Resource
                                         ->success()
                                         ->title('Trabajo finalizado correctamente')
                                         ->send();
+
+                                    return redirect(ParteTrabajoTallerVehiculosResource::getUrl());
                                 }),
                         ])
                             ->columns(4)
@@ -282,16 +301,17 @@ class ParteTrabajoTallerVehiculosResource extends Resource
                     ->weight(FontWeight::Bold)
                     ->searchable(),
 
-                TextColumn::make('tipo_actuacion')
-                    ->label('Tipo de actuación')
-                    ->formatStateUsing(function ($state) {
-                        return match ($state) {
-                            'reparacion' => 'Reparación',
-                            'mantenimiento' => 'Mantenimiento',
-                            default => ucfirst($state),
-                        };
-                    })
-                    ->searchable(),
+                TextColumn::make('vehiculo.marca')
+                    ->label('Vehículo')
+                    ->searchable()
+                    ->formatStateUsing(function ($state, $record) {
+                        $marca = $record->vehiculo?->marca ?? '';
+                        $modelo = $record->vehiculo?->modelo ?? '';
+                        $matricula = ucfirst($record->vehiculo?->matricula ?? '');
+
+                        return "{$marca} {$modelo} ({$matricula})";
+                    }),
+
             ])
             ->filters([
                 Tables\Filters\TrashedFilter::make(),
