@@ -13,6 +13,7 @@ use Filament\Forms\Components\Actions\Action;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\View;
 use Filament\Forms\Form;
@@ -24,6 +25,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\HtmlString;
 
 class ParteTrabajoAyudanteResource extends Resource
@@ -166,6 +168,12 @@ class ParteTrabajoAyudanteResource extends Resource
                                 return new HtmlString($tabla);
                             })
                             ->columnSpanFull(),
+
+                        Textarea::make('observaciones')
+                            ->label('Observaciones')
+                            ->rows(3)
+                            ->visible(fn($record) => filled($record?->fecha_hora_inicio_ayudante))
+                            ->columnSpanFull(),
                     ])
                     ->columns(1),
 
@@ -197,7 +205,8 @@ class ParteTrabajoAyudanteResource extends Resource
                                 ->form([
                                     TextInput::make('gps_fin_ayudante')
                                         ->label('GPS')
-                                        ->required(),
+                                        ->required()
+                                        ->readOnly(fn() => !Auth::user()?->hasAnyRole(['administración', 'superadmin'])),
 
                                     View::make('livewire.location-fin-ayudante')->columnSpanFull(),
                                 ])
@@ -211,6 +220,8 @@ class ParteTrabajoAyudanteResource extends Resource
                                         ->success()
                                         ->title('Trabajo finalizado correctamente')
                                         ->send();
+
+                                    return redirect(ParteTrabajoAyudanteResource::getUrl());
                                 }),
                         ])
                             ->columns(4)

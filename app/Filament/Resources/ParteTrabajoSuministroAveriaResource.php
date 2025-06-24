@@ -67,7 +67,38 @@ class ParteTrabajoSuministroAveriaResource extends Resource
                             ->preload()
                             ->columnSpanFull()
                             ->default(Filament::auth()->user()->id)
+                            ->reactive()
                             ->required(),
+
+                        // Máquina (todas)
+                        Select::make('maquina_id')
+                            ->label('Máquina')
+                            ->reactive()
+                            ->options(function (callable $get) {
+                                $usuarioId = $get('usuario_id');
+
+                                if (!$usuarioId) {
+                                    return [];
+                                }
+
+                                return \App\Models\Maquina::where('operario_id', $usuarioId)
+                                    ->get()
+                                    ->mapWithKeys(function ($maquina) {
+                                        return [$maquina->id => "{$maquina->marca} {$maquina->modelo}"];
+                                    })
+                                    ->toArray();
+                            })
+                            ->afterStateHydrated(function (callable $get, callable $set) {
+                                // Al cargar el formulario por primera vez
+                                $usuarioId = $get('usuario_id');
+                                if ($usuarioId) {
+                                    $maquinas = \App\Models\Maquina::where('operario_id', $usuarioId)->get();
+                                    $set('maquina_id', $maquinas->count() === 1 ? $maquinas->first()->id : null);
+                                }
+                            })
+                            ->searchable()
+                            ->required()
+                            ->live(), // Para que reaccione a los cambios en vivo
 
                         // Tipo: Avería o Mantenimiento
                         Select::make('tipo')
@@ -80,21 +111,16 @@ class ParteTrabajoSuministroAveriaResource extends Resource
                             ])
                             ->required(),
 
-                        // Máquina (todas)
-                        Select::make('maquina_id')
-                            ->label('Máquina')
-                            ->reactive()
-                            ->options(function () {
-                                return \App\Models\Maquina::all()->mapWithKeys(function ($maquina) {
-                                    return [$maquina->id => "{$maquina->marca} {$maquina->modelo}"];
-                                })->toArray();
-                            })
-                            ->searchable()
-                            ->required(),
-
                         // Trabajo realizado (se rellena según máquina y tipo)
                         Select::make('trabajo_realizado')
-                            ->label('Trabajo realizado')
+                            ->label(function (callable $get) {
+                                return match ($get('tipo')) {
+                                    'averia' => 'Tipo de avería',
+                                    'mantenimiento' => 'Tipo de mantenimiento',
+                                    default => 'Tipo de ...',
+                                };
+                            })
+                            ->reactive()
                             ->required()
                             ->options(function (callable $get) {
                                 $maquinaId = $get('maquina_id');
@@ -127,10 +153,10 @@ class ParteTrabajoSuministroAveriaResource extends Resource
                             ->searchable()
                             ->disabled(fn(callable $get) => !$get('maquina_id') || !$get('tipo')),
                         Select::make('actuacion')
-                            ->label('Actuación')
+                            ->label('Medios utilizados')
                             ->required()
                             ->options([
-                                'medios_propios' => 'Por medios propios',
+                                'medios_propios' => 'Taller propio',
                                 'taller_externo' => 'Taller externo'
                             ])
                             ->reactive()
@@ -244,7 +270,8 @@ class ParteTrabajoSuministroAveriaResource extends Resource
                                 ->form([
                                     TextInput::make('gps_fin_averia')
                                         ->label('GPS')
-                                        ->required(),
+                                        ->required()
+                                        ->readOnly(fn() => !Auth::user()?->hasAnyRole(['administración', 'superadmin'])),
 
                                     View::make('livewire.location-fin-averia')->columnSpanFull(),
                                 ])
@@ -258,6 +285,8 @@ class ParteTrabajoSuministroAveriaResource extends Resource
                                         ->success()
                                         ->title('Trabajo finalizado correctamente')
                                         ->send();
+
+                                    return redirect(ParteTrabajoSuministroAveriaResource::getUrl());
                                 }),
                         ])
                             ->columns(4)

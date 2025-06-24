@@ -13,6 +13,7 @@ use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
 use App\Models\Maquina;
 use App\Models\User;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class CreateParteTrabajoSuministroOperacionMaquina extends CreateRecord
@@ -147,7 +148,8 @@ class CreateParteTrabajoSuministroOperacionMaquina extends CreateRecord
 
                     TextInput::make('gps_inicio_trabajo')
                         ->label('GPS')
-                        ->required(),
+                        ->required()
+                        ->readOnly(fn() => !Auth::user()?->hasAnyRole(['administración', 'superadmin'])),
 
                     View::make('livewire.location-inicio-trabajo'),
                 ])
@@ -166,7 +168,7 @@ class CreateParteTrabajoSuministroOperacionMaquina extends CreateRecord
                         ->title('Trabajo iniciado correctamente')
                         ->send();
 
-                    $this->redirect(ParteTrabajoSuministroOperacionMaquinaResource::getUrl());
+                    $this->redirect(ParteTrabajoSuministroOperacionMaquinaResource::getUrl(name: 'view', parameters: ['record' => $this->record]));
                 }),
         ];
     }
@@ -176,8 +178,8 @@ class CreateParteTrabajoSuministroOperacionMaquina extends CreateRecord
         $user = Filament::auth()->user();
 
         return $user->hasRole('operarios')
-            ? \App\Models\User::query()->where('id', $user->id)
-            : \App\Models\User::query()->whereHas('roles', fn($q) =>
+            ? User::query()->where('id', $user->id)
+            : User::query()->whereHas('roles', fn($q) =>
                 $q->whereIn('name', ['administración', 'administrador', 'operarios']));
     }
 }

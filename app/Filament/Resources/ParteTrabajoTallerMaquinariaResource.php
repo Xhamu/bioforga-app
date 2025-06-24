@@ -111,8 +111,8 @@ class ParteTrabajoTallerMaquinariaResource extends Resource
                                                         <td class="px-4 py-3">' . e($maquinaLabel) . '</td>
                                                     </tr>
                                                     <tr>
-                                                        <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Horas de servicio</th>
-                                                        <td class="px-4 py-3">' . e($horas) . 'h</td>
+                                                        <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Kilómetros</th>
+                                                        <td class="px-4 py-3">' . e(number_format($horas, 0, ',', '.')) . 'km</td>
                                                     </tr>';
 
                                 if ($record->fecha_hora_fin_taller_maquinaria) {
@@ -268,6 +268,8 @@ class ParteTrabajoTallerMaquinariaResource extends Resource
                                         ->success()
                                         ->title('Trabajo finalizado correctamente')
                                         ->send();
+
+                                    return redirect(ParteTrabajoTallerMaquinariaResource::getUrl());
                                 }),
                         ])
                             ->columns(4)
@@ -296,16 +298,16 @@ class ParteTrabajoTallerMaquinariaResource extends Resource
                     ->weight(FontWeight::Bold)
                     ->searchable(),
 
-                TextColumn::make('tipo_actuacion')
-                    ->label('Tipo de actuación')
-                    ->formatStateUsing(function ($state) {
-                        return match ($state) {
-                            'reparacion' => 'Reparación',
-                            'mantenimiento' => 'Mantenimiento',
-                            default => ucfirst($state),
-                        };
-                    })
-                    ->searchable(),
+                TextColumn::make('maquina.marca')
+                    ->label('Máquina')
+                    ->searchable()
+                    ->formatStateUsing(function ($state, $record) {
+                        $marca = $record->maquina?->marca ?? '';
+                        $modelo = $record->maquina?->modelo ?? '';
+                        $tipo = ucfirst($record->maquina?->tipo_trabajo ?? '');
+
+                        return "{$marca} {$modelo} - {$tipo}";
+                    }),
             ])
             ->filters([
                 Tables\Filters\TrashedFilter::make(),

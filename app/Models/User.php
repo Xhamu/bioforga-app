@@ -84,4 +84,18 @@ class User extends Authenticatable
     {
         return $this->name . ' ' . $this->apellidos;
     }
+
+    public function canImpersonate(): bool
+    {
+        return $this->hasAnyRole(['superadmin', 'administración']);
+    }
+
+    public function canBeImpersonated(): bool
+    {
+        if ($this->hasRole('superadmin') && auth()->user()?->hasRole('administrador')) {
+            return false;
+        }
+
+        return true;
+    }
 }

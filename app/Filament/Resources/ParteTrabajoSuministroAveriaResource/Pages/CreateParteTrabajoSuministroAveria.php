@@ -9,6 +9,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\View;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
+use Illuminate\Support\Facades\Auth;
 
 class CreateParteTrabajoSuministroAveria extends CreateRecord
 {
@@ -26,7 +27,8 @@ class CreateParteTrabajoSuministroAveria extends CreateRecord
                 ->form([
                     TextInput::make('gps_inicio_averia')
                         ->label('GPS')
-                        ->required(),
+                        ->required()
+                        ->readOnly(fn() => !Auth::user()?->hasAnyRole(['administración', 'superadmin'])),
 
                     View::make('livewire.location-inicio-averia')->columnSpanFull(),
                 ])
@@ -46,7 +48,7 @@ class CreateParteTrabajoSuministroAveria extends CreateRecord
                         ->title('Trabajo iniciado correctamente')
                         ->send();
 
-                    $this->redirect(ParteTrabajoSuministroAveriaResource::getUrl());
+                    $this->redirect(ParteTrabajoSuministroAveriaResource::getUrl(name: 'view', parameters: ['record' => $this->record]));
                 }),
         ];
     }

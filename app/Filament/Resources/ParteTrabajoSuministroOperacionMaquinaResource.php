@@ -384,7 +384,8 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
 
                                         TextInput::make('gps_fin_trabajo')
                                             ->label('GPS')
-                                            ->required(),
+                                            ->required()
+                                            ->readOnly(fn() => !Auth::user()?->hasAnyRole(['administración', 'superadmin'])),
 
                                         View::make('livewire.location-fin-trabajo'),
                                     ];
@@ -409,6 +410,8 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                                         ->success()
                                         ->title('Trabajo finalizado correctamente')
                                         ->send();
+
+                                    return redirect(ParteTrabajoSuministroOperacionMaquinaResource::getUrl());
                                 }),
                         ])
                             ->columns(4)

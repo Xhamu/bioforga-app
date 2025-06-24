@@ -24,6 +24,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\HtmlString;
 
 class ParteTrabajoSuministroOtrosResource extends Resource
@@ -179,7 +180,8 @@ class ParteTrabajoSuministroOtrosResource extends Resource
                                 ->form([
                                     TextInput::make('gps_fin_otros')
                                         ->label('GPS')
-                                        ->required(),
+                                        ->required()
+                                        ->readOnly(fn() => !Auth::user()?->hasAnyRole(['administración', 'superadmin'])),
 
                                     View::make('livewire.location-fin-otros')->columnSpanFull(),
                                 ])
@@ -193,6 +195,8 @@ class ParteTrabajoSuministroOtrosResource extends Resource
                                         ->success()
                                         ->title('Trabajo finalizado correctamente')
                                         ->send();
+
+                                    return redirect(ParteTrabajoSuministroOtrosResource::getUrl());
                                 }),
                         ])
                             ->columns(4)

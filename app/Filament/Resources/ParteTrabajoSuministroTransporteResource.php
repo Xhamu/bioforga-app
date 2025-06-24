@@ -230,8 +230,8 @@ class ParteTrabajoSuministroTransporteResource extends Resource
 
                                             TextInput::make('gps_inicio_carga')
                                                 ->label('GPS')
-                                                ->required(),
-
+                                                ->required()
+                                                ->readOnly(fn() => !Auth::user()?->hasAnyRole(['administración', 'superadmin'])),
 
                                             View::make('livewire.location-inicio-carga')->columnSpanFull(),
                                         ])
@@ -277,7 +277,8 @@ class ParteTrabajoSuministroTransporteResource extends Resource
 
                                             TextInput::make('gps_fin_carga')
                                                 ->label('GPS')
-                                                ->required(),
+                                                ->required()
+                                                ->readOnly(fn() => !Auth::user()?->hasAnyRole(['administración', 'superadmin'])),
 
                                             View::make('livewire.location-fin-carga')->columnSpanFull(),
 

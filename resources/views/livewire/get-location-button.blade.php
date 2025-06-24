@@ -39,7 +39,6 @@
             const locationButton = document.getElementById('get-location-button');
             const ubicacionInput = document.querySelector('input[id="data.ubicacion_gps"]');
             const provinciaInput = document.querySelector('input[id="data.provincia"]');
-            const ayuntamientoInput = document.querySelector('input[id="data.ayuntamiento"]');
             const referenciaInput = document.querySelector('input[id="data.referencia"]');
             const tipoSelect = document.getElementById('referencia-select'); // SUMINISTRO o SERVICIO
 
@@ -69,19 +68,10 @@
                             .then(data => {
                                 const provincia = data?.address?.province ??
                                     'Provincia desconocida';
-                                const ayuntamiento = data?.address?.town ??
-                                    'Ayuntamiento desconocido';
 
                                 if (provinciaInput) {
                                     provinciaInput.value = provincia;
                                     provinciaInput.dispatchEvent(new Event('input', {
-                                        bubbles: true
-                                    }));
-                                }
-
-                                if (ayuntamientoInput) {
-                                    ayuntamientoInput.value = ayuntamiento;
-                                    ayuntamientoInput.dispatchEvent(new Event('input', {
                                         bubbles: true
                                     }));
                                 }
