@@ -268,6 +268,7 @@ class ParteTrabajoSuministroDesplazamientoResource extends Resource
                                 ->form([
                                     TextInput::make('gps_fin_desplazamiento')
                                         ->label('GPS')
+                                        ->readOnly(fn() => !Auth::user()?->hasAnyRole(['administración', 'superadmin']))
                                         ->required(),
 
                                     View::make('livewire.location-fin-desplazamiento')->columnSpanFull(),
