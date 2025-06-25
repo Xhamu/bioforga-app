@@ -165,37 +165,37 @@ class ParteTrabajoAyudanteResource extends Resource
                                 $gpsFin = $record->gps_fin_ayudante ? ' (<a href="https://maps.google.com/?q=' . $record->gps_fin_ayudante . '" target="_blank" class="text-blue-600 underline">📍 Ver ubicación</a>)' : '';
 
                                 $tabla = '
-                <div class="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
-                    <table class="w-full text-sm text-left text-gray-700 dark:text-gray-200">
-                        <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-                            <tr class="bg-gray-50 dark:bg-gray-800">
-                                <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Estado actual</th>
-                                <td class="px-4 py-3 font-semibold text-gray-900 dark:text-white">' . $emoji . ' ' . $estado . '</td>
-                            </tr>
-                            <tr>
-                                <th class="px-4 py-3">Hora de inicio</th>
-                                <td class="px-4 py-3">' . $inicio->format('H:i') . $gpsInicio . '</td>
-                            </tr>
-                            <tr>
-                                <th class="px-4 py-3">Hora de pausa</th>
-                                <td class="px-4 py-3">' . ($parada ? $parada->format('H:i') . $gpsPausa : '-') . '</td>
-                            </tr>
-                            <tr>
-                                <th class="px-4 py-3">Hora de reanudación</th>
-                                <td class="px-4 py-3">' . ($reanudacion ? $reanudacion->format('H:i') . $gpsReanudar : '-') . '</td>
-                            </tr>
-                            <tr>
-                                <th class="px-4 py-3">Hora de finalización</th>
-                                <td class="px-4 py-3">' . ($fin ? $fin->format('H:i') . $gpsFin : '-') . '</td>
-                            </tr>
-                            <tr class="bg-gray-50 dark:bg-gray-800 border-t">
-                                <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Tiempo total</th>
-                                <td class="px-4 py-3 font-semibold">' . $horas . 'h ' . $minutos . 'min</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-                ';
+                                    <div class="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
+                                        <table class="w-full text-sm text-left text-gray-700 dark:text-gray-200">
+                                            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                                                <tr class="bg-gray-50 dark:bg-gray-800">
+                                                    <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Estado actual</th>
+                                                    <td class="px-4 py-3 font-semibold text-gray-900 dark:text-white">' . $emoji . ' ' . $estado . '</td>
+                                                </tr>
+                                                <tr>
+                                                    <th class="px-4 py-3">Hora de inicio</th>
+                                                    <td class="px-4 py-3">' . $inicio->format('H:i') . $gpsInicio . '</td>
+                                                </tr>
+                                                <tr>
+                                                    <th class="px-4 py-3">Hora de pausa</th>
+                                                    <td class="px-4 py-3">' . ($parada ? $parada->format('H:i') . $gpsPausa : '-') . '</td>
+                                                </tr>
+                                                <tr>
+                                                    <th class="px-4 py-3">Hora de reanudación</th>
+                                                    <td class="px-4 py-3">' . ($reanudacion ? $reanudacion->format('H:i') . $gpsReanudar : '-') . '</td>
+                                                </tr>
+                                                <tr>
+                                                    <th class="px-4 py-3">Hora de finalización</th>
+                                                    <td class="px-4 py-3">' . ($fin ? $fin->format('H:i') . $gpsFin : '-') . '</td>
+                                                </tr>
+                                                <tr class="bg-gray-50 dark:bg-gray-800 border-t">
+                                                    <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Tiempo total</th>
+                                                    <td class="px-4 py-3 font-semibold">' . $horas . 'h ' . $minutos . 'min</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    ';
                                 return new HtmlString($tabla);
                             })
                             ->columnSpanFull(),
