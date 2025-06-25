@@ -10,6 +10,7 @@ use Filament\Forms;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Actions;
 use Filament\Forms\Components\Actions\Action;
+use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
@@ -66,7 +67,6 @@ class ParteTrabajoAyudanteResource extends Resource
                             ->preload()
                             ->columnSpanFull()
                             ->default(Filament::auth()->user()->id)
-                            ->disabled(fn() => Filament::auth()->user()->hasAnyRole(['operarios', 'proveedor de servicio']))
                             ->required(),
                     ])
                     ->columns(3),
@@ -114,31 +114,55 @@ class ParteTrabajoAyudanteResource extends Resource
                                     return new HtmlString('<p>Estado actual: <strong>Sin iniciar</strong></p>');
                                 }
 
+                                $estado = 'Desconocido';
+                                $totalMinutos = 0;
+
                                 $inicio = Carbon::parse($record->getRawOriginal('fecha_hora_inicio_ayudante'))->timezone('Europe/Madrid');
+                                $parada = $record->fecha_hora_parada_ayudante
+                                    ? Carbon::parse($record->getRawOriginal('fecha_hora_parada_ayudante'))->timezone('Europe/Madrid')
+                                    : null;
+
+                                $reanudacion = $record->fecha_hora_reanudacion_ayudante
+                                    ? Carbon::parse($record->getRawOriginal('fecha_hora_reanudacion_ayudante'))->timezone('Europe/Madrid')
+                                    : null;
+
                                 $fin = $record->fecha_hora_fin_ayudante
                                     ? Carbon::parse($record->getRawOriginal('fecha_hora_fin_ayudante'))->timezone('Europe/Madrid')
                                     : null;
 
-                                $estado = $fin ? 'Finalizado' : 'Trabajando';
-
-                                $totalMinutos = $inicio->diffInMinutes($fin ?? Carbon::now('Europe/Madrid'));
+                                if ($fin) {
+                                    if ($parada && $reanudacion) {
+                                        $totalMinutos = $inicio->diffInMinutes($parada) + $reanudacion->diffInMinutes($fin);
+                                    } else {
+                                        $totalMinutos = $inicio->diffInMinutes($fin);
+                                    }
+                                    $estado = 'Finalizado';
+                                } elseif ($reanudacion) {
+                                    $totalMinutos = $inicio->diffInMinutes($parada) + $reanudacion->diffInMinutes(Carbon::now('Europe/Madrid'));
+                                    $estado = 'Reanudado';
+                                } elseif ($parada) {
+                                    $totalMinutos = $inicio->diffInMinutes($parada);
+                                    $estado = 'Pausado';
+                                } else {
+                                    $totalMinutos = $inicio->diffInMinutes(Carbon::now('Europe/Madrid'));
+                                    $estado = 'Trabajando';
+                                }
 
                                 $horas = floor($totalMinutos / 60);
                                 $minutos = $totalMinutos % 60;
 
                                 $emoji = match ($estado) {
                                     'Trabajando' => '🟢',
+                                    'Pausado' => '⏸️',
+                                    'Reanudado' => '🔁',
                                     'Finalizado' => '✅',
                                     default => '❓',
                                 };
 
-                                $gpsInicio = $record->gps_inicio_ayudante
-                                    ? ' (<a href="https://maps.google.com/?q=' . $record->gps_inicio_ayudante . '" target="_blank" class="text-blue-600 underline">📍 Ver ubicación</a>)'
-                                    : '';
-
-                                $gpsFin = $record->gps_fin_ayudante
-                                    ? ' (<a href="https://maps.google.com/?q=' . $record->gps_fin_ayudante . '" target="_blank" class="text-blue-600 underline">📍 Ver ubicación</a>)'
-                                    : '';
+                                $gpsInicio = $record->gps_inicio_ayudante ? ' (<a href="https://maps.google.com/?q=' . $record->gps_inicio_ayudante . '" target="_blank" class="text-blue-600 underline">📍 Ver ubicación</a>)' : '';
+                                $gpsPausa = $record->gps_parada_ayudante ? ' (<a href="https://maps.google.com/?q=' . $record->gps_parada_ayudante . '" target="_blank" class="text-blue-600 underline">📍 Ver ubicación</a>)' : '';
+                                $gpsReanudar = $record->gps_reanudacion_ayudante ? ' (<a href="https://maps.google.com/?q=' . $record->gps_reanudacion_ayudante . '" target="_blank" class="text-blue-600 underline">📍 Ver ubicación</a>)' : '';
+                                $gpsFin = $record->gps_fin_ayudante ? ' (<a href="https://maps.google.com/?q=' . $record->gps_fin_ayudante . '" target="_blank" class="text-blue-600 underline">📍 Ver ubicación</a>)' : '';
 
                                 $tabla = '
                 <div class="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
@@ -153,6 +177,14 @@ class ParteTrabajoAyudanteResource extends Resource
                                 <td class="px-4 py-3">' . $inicio->format('H:i') . $gpsInicio . '</td>
                             </tr>
                             <tr>
+                                <th class="px-4 py-3">Hora de pausa</th>
+                                <td class="px-4 py-3">' . ($parada ? $parada->format('H:i') . $gpsPausa : '-') . '</td>
+                            </tr>
+                            <tr>
+                                <th class="px-4 py-3">Hora de reanudación</th>
+                                <td class="px-4 py-3">' . ($reanudacion ? $reanudacion->format('H:i') . $gpsReanudar : '-') . '</td>
+                            </tr>
+                            <tr>
                                 <th class="px-4 py-3">Hora de finalización</th>
                                 <td class="px-4 py-3">' . ($fin ? $fin->format('H:i') . $gpsFin : '-') . '</td>
                             </tr>
@@ -164,7 +196,6 @@ class ParteTrabajoAyudanteResource extends Resource
                     </table>
                 </div>
                 ';
-
                                 return new HtmlString($tabla);
                             })
                             ->columnSpanFull(),
@@ -183,15 +214,75 @@ class ParteTrabajoAyudanteResource extends Resource
                             return false;
 
                         return (
+                            $record->fecha_hora_inicio_ayudante && !$record->fecha_hora_parada_ayudante && !$record->fecha_hora_fin_ayudante ||
+
+                            $record->fecha_hora_parada_ayudante && !$record->fecha_hora_reanudacion_ayudante && !$record->fecha_hora_fin_ayudante ||
+
                             $record->fecha_hora_inicio_ayudante && !$record->fecha_hora_fin_ayudante
                         );
                     })
                     ->schema([
                         Actions::make([
+                            Action::make('Parar')
+                                ->label('Parar trabajo')
+                                ->color('warning')
+                                ->button()
+                                ->extraAttributes(['id' => 'btn-parar-ayudante', 'class' => 'w-full'])
+                                ->visible(
+                                    fn($record) =>
+                                    $record &&
+                                    $record->fecha_hora_inicio_ayudante &&
+                                    !$record->fecha_hora_parada_ayudante &&
+                                    !$record->fecha_hora_fin_ayudante
+                                )
+                                ->requiresConfirmation()
+                                ->form([
+                                    Hidden::make('gps_parada_ayudante'),
+                                ])
+                                ->action(function (array $data, $record) {
+                                    $record->update([
+                                        'fecha_hora_parada_ayudante' => now(),
+                                        'gps_parada_ayudante' => $data['gps_parada_ayudante'],
+                                    ]);
+
+                                    Notification::make()
+                                        ->info()
+                                        ->title('Trabajo pausado')
+                                        ->send();
+                                }),
+
+                            Action::make('Reanudar')
+                                ->label('Reanudar trabajo')
+                                ->color('info')
+                                ->extraAttributes(['id' => 'btn-reanudar-ayudante', 'class' => 'w-full'])
+                                ->visible(
+                                    fn($record) =>
+                                    $record &&
+                                    $record->fecha_hora_parada_ayudante &&
+                                    !$record->fecha_hora_reanudacion_ayudante &&
+                                    !$record->fecha_hora_fin_ayudante
+                                )
+                                ->button()
+                                ->requiresConfirmation()
+                                ->form([
+                                    Hidden::make('gps_reanudacion_ayudante'),
+                                ])
+                                ->action(function (array $data, $record) {
+                                    $record->update([
+                                        'fecha_hora_reanudacion_ayudante' => now(),
+                                        'gps_reanudacion_ayudante' => $data['gps_reanudacion_ayudante'],
+                                    ]);
+
+                                    Notification::make()
+                                        ->success()
+                                        ->title('Trabajo reanudado')
+                                        ->send();
+                                }),
+
                             Action::make('Finalizar')
                                 ->label('Finalizar trabajo')
                                 ->color('danger')
-                                ->extraAttributes(['class' => 'w-full']) // Hace que el botón ocupe todo el ancho disponible
+                                ->extraAttributes(['class' => 'w-full'])
                                 ->visible(
                                     fn($record) =>
                                     $record &&
@@ -221,10 +312,9 @@ class ParteTrabajoAyudanteResource extends Resource
                                         ->title('Trabajo finalizado correctamente')
                                         ->send();
 
-                                    return redirect(ParteTrabajoAyudanteResource::getUrl());
+                                    return redirect(\App\Filament\Resources\ParteTrabajoAyudanteResource::getUrl());
                                 }),
-                        ])
-                            ->columns(4)
+                        ])->columns(4)
                     ]),
             ]);
     }

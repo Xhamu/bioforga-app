@@ -291,7 +291,7 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
 
                                     Notification::make()
                                         ->info()
-                                        ->title('Trabajo pausado con ubicación')
+                                        ->title('Trabajo pausado')
                                         ->send();
                                 }),
 

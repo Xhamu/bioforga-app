@@ -30,11 +30,18 @@ class ParteTrabajoAyudante extends Model
         'gps_fin_ayudante',
         'tipologia',
         'observaciones',
+
+        'fecha_hora_parada_ayudante',
+        'gps_parada_ayudante',
+        'gps_reanudacion_ayudante',
+        'fecha_hora_reanudacion_ayudante',
     ];
 
     protected $casts = [
-        'fecha_hora_inicio_ayudante' => 'date',
-        'fecha_hora_fin_ayudante' => 'date',
+        'fecha_hora_inicio_ayudante' => 'datetime',
+        'fecha_hora_parada_ayudante' => 'datetime',
+        'fecha_hora_reanudacion_ayudante' => 'datetime',
+        'fecha_hora_fin_ayudante' => 'datetime',
     ];
 
     public function getActivitylogOptions(): LogOptions
