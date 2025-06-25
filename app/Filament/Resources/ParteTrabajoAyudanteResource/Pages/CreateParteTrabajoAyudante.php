@@ -72,6 +72,9 @@ class CreateParteTrabajoAyudante extends CreateRecord
                     View::make('livewire.location-inicio-ayudante')->columnSpanFull(),
                 ])
                 ->action(function (array $data) {
+                    $formState = $this->form->getState();
+
+
                     $formData = array_merge(
                         $this->form->getState(),
                         [

@@ -79,15 +79,19 @@ class ListadoItvs extends Page implements HasTable
 
     public function getTableRecords(): LengthAwarePaginator
     {
-        $maquinas = ITV_Maquinas::all()->map(function ($itv) {
+        $maquinas = ITV_Maquinas::whereNull('deleted_at')->get()->filter(function ($itv) {
+            return $itv->maquina && is_null($itv->maquina->deleted_at);
+        })->map(function ($itv) {
             $itv->tipo = 'Máquina';
-            $itv->nombre = optional($itv->maquina)->marca . ' ' . optional($itv->maquina)->modelo;
+            $itv->nombre = $itv->maquina->marca . ' ' . $itv->maquina->modelo;
             return $itv;
         });
 
-        $vehiculos = ITV_Vehiculos::all()->map(function ($itv) {
+        $vehiculos = ITV_Vehiculos::whereNull('deleted_at')->get()->filter(function ($itv) {
+            return $itv->vehiculo && is_null($itv->vehiculo->deleted_at);
+        })->map(function ($itv) {
             $itv->tipo = 'Vehículo';
-            $itv->nombre = optional($itv->vehiculo)->marca . ' ' . optional($itv->vehiculo)->modelo;
+            $itv->nombre = $itv->vehiculo->marca . ' ' . $itv->vehiculo->modelo . ' (' . $itv->vehiculo->matricula . ')';
             return $itv;
         });
 
@@ -97,6 +101,7 @@ class ListadoItvs extends Page implements HasTable
         $page = request()->get('page', 1);
         $perPage = 10;
         $items = $combined->slice(($page - 1) * $perPage, $perPage)->values();
+
         return new LengthAwarePaginator(
             $items,
             $combined->count(),
