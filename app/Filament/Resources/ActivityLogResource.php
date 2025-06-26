@@ -25,6 +25,11 @@ class ActivityLogResource extends Resource
     {
         return $table
             ->columns([
+                TextColumn::make('created_at')
+                    ->label('Fecha')
+                    ->formatStateUsing(fn($state) => \Carbon\Carbon::parse($state)->timezone('Europe/Madrid')->format('d/m/Y H:i'))
+                    ->sortable(),
+
                 TextColumn::make('description')
                     ->label('Descripción')
                     ->formatStateUsing(fn(string $state) => match ($state) {
@@ -33,6 +38,7 @@ class ActivityLogResource extends Resource
                         'deleted' => 'Eliminación',
                         'login' => 'Inicio de sesión',
                         'logout' => 'Cierre de sesión',
+                        'impersonation' => 'Suplantación',
                         default => ucfirst($state),
                     })
                     ->badge()
@@ -41,7 +47,8 @@ class ActivityLogResource extends Resource
                         'created' => 'success',
                         'deleted' => 'danger',
                         'login' => 'success',
-                        'logout' => 'gray',
+                        'Cierre de sesión' => 'gray',
+                        'impersonation' => 'info',
                         default => 'primary',
                     })
                     ->searchable(),
@@ -58,15 +65,51 @@ class ActivityLogResource extends Resource
                     ->label('Email')
                     ->default('-'),
 
+                TextColumn::make('subject_type')
+                    ->label('Modelo')
+                    ->formatStateUsing(
+                        fn($state, $record) =>
+                        $record->subject_type
+                        ? class_basename($record->subject_type) . ' (ID ' . ($record->subject_id ?? '—') . ')'
+                        : '—'
+                    )
+                    ->badge()
+                    ->color('gray'),
+
                 TextColumn::make('changes')
                     ->label('Cambios')
                     ->formatStateUsing(function ($state, $record) {
-                        $changes = $record->properties['attributes'] ?? [];
+                        $description = $record->description;
+
+                        // Mostrar suplantación personalizada
+                        if ($description === 'impersonation') {
+                            $impersonator = $record->properties['impersonator_name'] ?? '—';
+                            $impersonated = $record->properties['impersonated_name'] ?? '—';
+                            $ip = $record->properties['ip'] ?? '—';
+                            $ua = $record->properties['user_agent'] ?? '—';
+
+                            return "
+            <div class='text-sm'>
+                <strong>{$impersonator}</strong> suplantó a <strong>{$impersonated}</strong><br>
+                <span class='text-gray-500'>IP: {$ip}</span><br>
+                <span class='text-gray-500'>Navegador: {$ua}</span>
+            </div>
+        ";
+                        }
+
+                        // Resto de lógica para otros eventos (created, updated, deleted)
+                        $changes = $description === 'deleted'
+                            ? $record->properties['old'] ?? []
+                            : $record->properties['attributes'] ?? [];
+
                         $old = $record->properties['old'] ?? [];
 
                         unset($changes['updated_at'], $old['updated_at']);
 
-                        $changes = collect($changes)->filter(function ($new, $key) use ($old) {
+                        $changes = collect($changes)->filter(function ($new, $key) use ($old, $description) {
+                            if ($description === 'deleted') {
+                                return true;
+                            }
                             return !is_null($new) && ($old[$key] ?? null) !== $new;
                         });
 
@@ -81,44 +124,41 @@ class ActivityLogResource extends Resource
                                 }
                             } catch (\Exception $e) {
                             }
-
                             $stringVal = is_string($val) ? $val : json_encode($val);
                             return mb_strlen($stringVal) > 25 ? mb_substr($stringVal, 0, 25) . '...' : $stringVal;
                         };
 
-                        $rows = $changes->map(function ($new, $key) use ($old, $formatValue) {
-                            $oldValue = $old[$key] ?? '—';
-
+                        $rows = $changes->map(function ($new, $key) use ($old, $formatValue, $description) {
+                            $oldValue = $description === 'deleted' ? '—' : ($old[$key] ?? '—');
                             $fullOld = is_string($oldValue) ? $oldValue : json_encode($oldValue);
                             $fullNew = is_string($new) ? $new : json_encode($new);
 
                             return "
-                                <tr class='border-b border-gray-100'>
-                                    <td class='px-2 py-1 align-top font-medium text-sm text-gray-700'>{$key}</td>
-                                    <td class='px-2 py-1 align-top text-sm text-gray-500 max-w-[200px] break-all'>
-                                        <span title=\"" . e($fullOld) . "\">\"" . e($formatValue($oldValue)) . "\"</span>
-                                    </td>
-                                    <td class='px-2 py-1 align-top text-sm text-gray-400'>→</td>
-                                    <td class='px-2 py-1 align-top text-sm text-green-700 max-w-[200px] break-all'>
-                                        <span title=\"" . e($fullNew) . "\">\"" . e($formatValue($new)) . "\"</span>
-                                    </td>
-                                </tr>
-                            ";
+            <tr class='border-b border-gray-100'>
+                <td class='px-2 py-1 align-top font-medium text-sm text-gray-700'>{$key}</td>
+                <td class='px-2 py-1 align-top text-sm text-gray-500 max-w-[200px] break-all'>
+                    <span title=\"" . e($fullOld) . "\">\"" . e($formatValue($oldValue)) . "\"</span>
+                </td>
+                <td class='px-2 py-1 align-top text-sm text-gray-400'>→</td>
+                <td class='px-2 py-1 align-top text-sm text-green-700 max-w-[200px] break-all'>
+                    <span title=\"" . e($fullNew) . "\">\"" . e($formatValue($new)) . "\"</span>
+                </td>
+            </tr>
+        ";
                         })->implode('');
 
                         return "
-                            <div class='overflow-x-auto'>
-                                <table class='min-w-full text-sm text-left table-auto border-collapse'>
-                                    <tbody>{$rows}</tbody>
-                                </table>
-                            </div>
-                        ";
+        <div class='overflow-x-auto'>
+            <table class='min-w-full text-sm text-left table-auto border-collapse'>
+                <tbody>{$rows}</tbody>
+            </table>
+        </div>
+    ";
                     })
                     ->html()
                     ->wrap(),
 
-                TextColumn::make('properties.ip')
-                    ->label('IP'),
+                TextColumn::make('properties.ip')->label('IP'),
 
                 TextColumn::make('properties.user_agent')
                     ->label('Navegador')
@@ -135,11 +175,6 @@ class ActivityLogResource extends Resource
                     })
                     ->badge()
                     ->color('gray'),
-
-                TextColumn::make('created_at')
-                    ->label('Fecha')
-                    ->formatStateUsing(fn($state) => \Carbon\Carbon::parse($state)->timezone('Europe/Madrid')->format('d/m/Y H:i'))
-                    ->sortable(),
             ])
             ->defaultSort('created_at', 'desc')
             ->headerActions([
