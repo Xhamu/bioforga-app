@@ -235,7 +235,25 @@ class UserResource extends Resource
                         ->color('gray'),
                 ])
                 ->actions([
-                    \STS\FilamentImpersonate\Tables\Actions\Impersonate::make(),
+                    \STS\FilamentImpersonate\Tables\Actions\Impersonate::make()
+                        ->after(function ($record) {
+                            $suplantador = auth()->user();
+                            $suplantado = $record;
+
+                            activity()
+                                ->causedBy($suplantador)
+                                ->performedOn($suplantado)
+                                ->withProperties([
+                                    'impersonator_id' => $suplantador->id,
+                                    'impersonator_name' => $suplantador->nombre_apellidos ?? $suplantador->name,
+                                    'impersonated_id' => $suplantado->id,
+                                    'impersonated_name' => $suplantado->nombre_apellidos ?? $suplantado->name,
+                                    'ip' => request()->ip(),
+                                    'user_agent' => request()->userAgent(),
+                                ])
+                                ->log('impersonation');
+                        }),
+
                     Tables\Actions\EditAction::make(),
 
                     Tables\Actions\DeleteAction::make()
