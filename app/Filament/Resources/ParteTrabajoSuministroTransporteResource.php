@@ -563,6 +563,8 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                     Tables\Actions\RestoreBulkAction::make(),
                 ]),
             ])
+            ->paginated(true)
+            ->paginationPageOptions([15, 30, 50])
             ->defaultSort('created_at', 'desc');
     }
 

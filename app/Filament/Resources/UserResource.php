@@ -187,7 +187,7 @@ class UserResource extends Resource
                     ])->collapsed(false),
                 ])
                 ->filters([
-                    //
+                    Tables\Filters\TrashedFilter::make(),
                 ])
                 ->actions([
                     \STS\FilamentImpersonate\Tables\Actions\Impersonate::make(),

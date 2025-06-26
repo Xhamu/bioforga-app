@@ -19,6 +19,8 @@ use Filament\Tables;
 use Filament\Tables\Columns\Layout\Split;
 use Filament\Tables\Columns\Layout\Stack;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Enums\FiltersLayout;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
@@ -445,9 +447,51 @@ class ReferenciaResource extends Resource
                             ]),
                     ])->collapsed(false),
                 ])
-                ->filters([
-                    Tables\Filters\TrashedFilter::make(),
-                ])
+                ->filters(
+                    [
+                        SelectFilter::make('tipo_referencia')
+                            ->label('Tipo de referencia')
+                            ->options([
+                                'suministro' => 'Suministro',
+                                'servicio' => 'Servicio',
+                            ])
+                            ->query(function ($query, array $data) {
+                                if ($data['value'] === 'suministro') {
+                                    return $query->whereNotNull('formato')->whereNull('tipo_servicio');
+                                }
+
+                                if ($data['value'] === 'servicio') {
+                                    return $query->whereNull('formato')->whereNotNull('tipo_servicio');
+                                }
+
+                                return $query;
+                            })
+                            ->searchable()
+                            ->placeholder('Todos'),
+
+                        SelectFilter::make('sector')
+                            ->label('Sector')
+                            ->multiple()
+                            ->searchable()
+                            ->options([
+                                '01' => 'Zona Norte',
+                                '02' => 'Zona Sur',
+                                '03' => 'Andalucía Oriental',
+                                '04' => 'Andalucía Occidental',
+                                '05' => 'Otros',
+                            ])
+                            ->query(function ($query, array $data) {
+                                if (!empty($data['values'])) {
+                                    return $query->whereIn('sector', $data['values']);
+                                }
+
+                                return $query;
+                            })
+                            ->placeholder('Todos'),
+                    ],
+                    layout: FiltersLayout::AboveContent
+                )
+                ->filtersFormColumns(2)
                 ->headerActions([
                     Action::make('exportar_balance_masas')
                         ->label('Balance de Masas')
@@ -541,9 +585,51 @@ class ReferenciaResource extends Resource
                     TextColumn::make('estado_mostrar')
                         ->label('Estado'),
                 ])
-                ->filters([
-                    Tables\Filters\TrashedFilter::make(),
-                ])
+                ->filters(
+                    [
+                        SelectFilter::make('tipo_referencia')
+                            ->label('Tipo de referencia')
+                            ->options([
+                                'suministro' => 'Suministro',
+                                'servicio' => 'Servicio',
+                            ])
+                            ->query(function ($query, array $data) {
+                                if ($data['value'] === 'suministro') {
+                                    return $query->whereNotNull('formato')->whereNull('tipo_servicio');
+                                }
+
+                                if ($data['value'] === 'servicio') {
+                                    return $query->whereNull('formato')->whereNotNull('tipo_servicio');
+                                }
+
+                                return $query;
+                            })
+                            ->searchable()
+                            ->placeholder('Todos'),
+
+                        SelectFilter::make('sector')
+                            ->label('Sector')
+                            ->multiple()
+                            ->searchable()
+                            ->options([
+                                '01' => 'Zona Norte',
+                                '02' => 'Zona Sur',
+                                '03' => 'Andalucía Oriental',
+                                '04' => 'Andalucía Occidental',
+                                '05' => 'Otros',
+                            ])
+                            ->query(function ($query, array $data) {
+                                if (!empty($data['values'])) {
+                                    return $query->whereIn('sector', $data['values']);
+                                }
+
+                                return $query;
+                            })
+                            ->placeholder('Todos'),
+                    ],
+                    layout: FiltersLayout::AboveContent
+                )
+                ->filtersFormColumns(2)
                 ->headerActions([
                     Action::make('exportar_balance_masas')
                         ->label('Balance de Masas')
