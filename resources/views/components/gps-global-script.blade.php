@@ -1,118 +1,75 @@
 <script>
     document.body.addEventListener('click', function(e) {
-        const inicioBtn = e.target.closest('#location-inicio-carga');
-        const finBtn = e.target.closest('#location-fin-carga');
+        const buttons = [{
+                id: 'location-inicio-carga',
+                inputIdSuffix: 'gps_inicio_carga'
+            },
+            {
+                id: 'location-fin-carga',
+                inputIdSuffix: 'gps_fin_carga'
+            },
 
-        const inicioTrabajoBtn = e.target.closest('#location-inicio-trabajo');
-        const finTrabajoBtn = e.target.closest('#location-fin-trabajo');
+            {
+                id: 'location-inicio-trabajo',
+                inputIdSuffix: 'gps_inicio_trabajo'
+            },
+            {
+                id: 'location-fin-trabajo',
+                inputIdSuffix: 'gps_fin_trabajo'
+            },
 
-        const inicioDesplazamientoBtn = e.target.closest('#location-inicio-desplazamiento');
-        const finDesplazamientoBtn = e.target.closest('#location-fin-desplazamiento');
+            {
+                id: 'location-inicio-desplazamiento',
+                inputIdSuffix: 'gps_inicio_desplazamiento'
+            },
+            {
+                id: 'location-fin-desplazamiento',
+                inputIdSuffix: 'gps_fin_desplazamiento'
+            },
 
-        const inicioAveriaBtn = e.target.closest('#location-inicio-averia');
-        const finAveriaBtn = e.target.closest('#location-fin-averia');
+            {
+                id: 'location-inicio-averia',
+                inputIdSuffix: 'gps_inicio_averia'
+            },
+            {
+                id: 'location-fin-averia',
+                inputIdSuffix: 'gps_fin_averia'
+            },
 
-        const inicioOtrosBtn = e.target.closest('#location-inicio-otros');
-        const finOtrosBtn = e.target.closest('#location-fin-otros');
+            {
+                id: 'location-inicio-otros',
+                inputIdSuffix: 'gps_inicio_otros'
+            },
+            {
+                id: 'location-fin-otros',
+                inputIdSuffix: 'gps_fin_otros'
+            },
 
-        const inicioAyudanteBtn = e.target.closest('#location-inicio-ayudante');
-        const finAyudanteBtn = e.target.closest('#location-fin-ayudante');
+            {
+                id: 'location-inicio-ayudante',
+                inputIdSuffix: 'gps_inicio_ayudante'
+            },
+            {
+                id: 'location-fin-ayudante',
+                inputIdSuffix: 'gps_fin_ayudante'
+            },
+        ];
 
-        // SUMINISTROS DEL TRANSPORTISTA
-        // GPS de inicio
-        if (inicioBtn) {
-            const gpsInput = document.querySelector('input[id$="gps_inicio_carga"]');
-            if (gpsInput) requestLocationAndFill(gpsInput, true);
-            return;
-        }
-
-        // GPS de fin
-        if (finBtn) {
-            const gpsInput = document.querySelector('input[id$="gps_fin_carga"]');
-            if (gpsInput) requestLocationAndFill(gpsInput, true);
-            return;
-        }
-
-        // OPERACIONES MAQUINA
-        // GPS de inicio trabajo
-        if (inicioTrabajoBtn) {
-            const gpsInput = document.querySelector('input[id$="gps_inicio_trabajo"]');
-            if (gpsInput) requestLocationAndFill(gpsInput, true);
-            return;
-        }
-
-        // GPS de fin trabajo
-        if (finTrabajoBtn) {
-            const gpsInput = document.querySelector('input[id$="gps_fin_trabajo"]');
-            if (gpsInput) requestLocationAndFill(gpsInput, true);
-            return;
-        }
-
-        // DESPLAZAMIENTOS
-        // GPS de inicio trabajo
-        if (inicioDesplazamientoBtn) {
-            const gpsInput = document.querySelector('input[id$="gps_inicio_desplazamiento"]');
-            if (gpsInput) requestLocationAndFill(gpsInput, true);
-            return;
-        }
-
-        // GPS de fin trabajo
-        if (finDesplazamientoBtn) {
-            const gpsInput = document.querySelector('input[id$="gps_fin_desplazamiento"]');
-            if (gpsInput) requestLocationAndFill(gpsInput, true);
-            return;
-        }
-
-        // AVERIAS MANTENIMIENTOS
-        if (inicioAveriaBtn) {
-            const gpsInput = document.querySelector('input[id$="gps_inicio_averia"]');
-            if (gpsInput) requestLocationAndFill(gpsInput, true);
-            return;
-        }
-
-        // GPS de fin trabajo
-        if (finAveriaBtn) {
-            const gpsInput = document.querySelector('input[id$="gps_fin_averia"]');
-            if (gpsInput) requestLocationAndFill(gpsInput, true);
-            return;
-        }
-
-        // OTROS
-        if (inicioOtrosBtn) {
-            const gpsInput = document.querySelector('input[id$="gps_inicio_otros"]');
-            if (gpsInput) requestLocationAndFill(gpsInput, true);
-            return;
-        }
-
-        // GPS de fin trabajo
-        if (finOtrosBtn) {
-            const gpsInput = document.querySelector('input[id$="gps_fin_otros"]');
-            if (gpsInput) requestLocationAndFill(gpsInput, true);
-            return;
-        }
-
-        // AYUDANTE
-        if (inicioAyudanteBtn) {
-            const gpsInput = document.querySelector('input[id$="gps_inicio_ayudante"]');
-            if (gpsInput) requestLocationAndFill(gpsInput, true);
-            return;
-        }
-
-        // GPS de fin trabajo
-        if (finAyudanteBtn) {
-            const gpsInput = document.querySelector('input[id$="gps_fin_ayudante"]');
-            if (gpsInput) requestLocationAndFill(gpsInput, true);
-            return;
+        for (const btn of buttons) {
+            if (e.target.closest(`#${btn.id}`)) {
+                const gpsInput = document.querySelector(`input[id$="${btn.inputIdSuffix}"]`);
+                if (gpsInput) requestLocationAndFill(gpsInput, true);
+                return;
+            }
         }
     });
 
     function requestLocationAndFill(input, force = false) {
         if (!navigator.geolocation) {
-            alert("⚠️ La geolocalización no es compatible con este navegador.");
+            showToast("⚠️ La geolocalización no es compatible con este navegador.");
             return;
         }
 
-        // Si ya está relleno y no se fuerza, salimos
         if (input.dataset.filled && !force) return;
 
         navigator.geolocation.getCurrentPosition(
@@ -128,14 +85,16 @@
                 switch (error.code) {
                     case error.PERMISSION_DENIED:
                         showToast(
-                            "❌ Has denegado el permiso de ubicación. Ve a los permisos del navegador y actívalo para esta página."
+                            "Has denegado el permiso de ubicación. Activa los permisos de ubicación para esta página en tu navegador."
                         );
                         break;
                     case error.POSITION_UNAVAILABLE:
-                        showToast("⚠️ No se pudo obtener la ubicación. La señal del GPS no está disponible.");
+                        showToast(
+                            "No se pudo obtener la ubicación. La señal del GPS no está disponible o es inestable."
+                        );
                         break;
                     case error.TIMEOUT:
-                        showToast("⚠️ La solicitud de ubicación ha tardado demasiado. Intenta de nuevo.");
+                        showToast("La solicitud de ubicación tardó demasiado. Intenta nuevamente.");
                         break;
                 }
             }
@@ -147,76 +106,118 @@
         const messageContainer = document.getElementById('toast-message');
 
         messageContainer.textContent = message;
-        toast.style.display = 'block';
-        toast.style.opacity = '1';
+        toast.classList.remove("toast-hidden");
+        toast.classList.add("toast-visible");
     }
 
     function hideToast() {
         const toast = document.getElementById('toast');
-        toast.style.opacity = '0';
-        setTimeout(() => {
-            toast.style.display = 'none';
-        }, 300);
+        toast.classList.remove("toast-visible");
+        toast.classList.add("toast-hidden");
     }
 
     const observer = new MutationObserver(() => {
         const inputs = document.querySelectorAll('input[id*="gps_"]');
-
         inputs.forEach((input) => {
             if (!input.dataset.filled) {
                 requestLocationAndFill(input);
-                input.dataset.filled = "true"; // Evita múltiples ejecuciones
+                input.dataset.filled = "true";
             }
         });
     });
 
     observer.observe(document.body, {
         childList: true,
-        subtree: true,
+        subtree: true
     });
 </script>
 
-<div id="toast"
-    style="
-    display: none;
-    position: fixed;
-    top: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    background-color: #1f2937;
-    color: #fff;
-    padding: 14px 20px;
-    border-radius: 8px;
-    font-size: 14px;
-    z-index: 9999;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
-    max-width: 90%;
-    width: auto;
-    text-align: center;
-">
-    <div id="toast-message" style="margin-bottom: 10px;"></div>
-    <button onclick="hideToast()"
-        style="
-        background-color: #3b82f6;
-        border: none;
-        padding: 6px 14px;
-        color: white;
-        border-radius: 6px;
-        font-size: 13px;
-        cursor: pointer;
-    ">Aceptar</button>
-</div>
-
-@php
-    $version = trim(file_get_contents(base_path('.version')));
-@endphp
-
-<div class="flex justify-center mt-10 mb-6">
-    <div class="flex flex-col items-center text-sm text-gray-500 dark:text-gray-400 space-y-1 text-center">
-        <a href="https://www.quadralia.com/" target="_blank" rel="noopener noreferrer"
-            class="hover:opacity-80 transition-opacity duration-150">
-            <img src="{{ asset('images/powered-by-quadralia.svg') }}" alt="Powered by Quadralia" class="h-6">
-        </a>
-        <span class="text-xs leading-tight">Versión {{ $version }}</span>
+<div id="toast" class="toast-hidden">
+    <div class="toast-content">
+        <div class="toast-icon">⚠️</div>
+        <div id="toast-message" class="toast-message"></div>
+    </div>
+    <div class="toast-button-container">
+        <button onclick="hideToast()" class="toast-button">Aceptar</button>
     </div>
 </div>
+
+<style>
+    #toast {
+        position: fixed;
+        top: 40px;
+        left: 50%;
+        transform: translateX(-50%) translateY(-30px);
+        background-color: #f59e0b;
+        /* amarillo warning */
+        color: #1f2937;
+        /* texto oscuro */
+        padding: 18px 24px;
+        border-radius: 12px;
+        font-size: 15px;
+        z-index: 9999;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+        opacity: 0;
+        transition: opacity 0.4s ease, transform 0.4s ease;
+        border-left: 8px solid #d97706;
+        width: auto;
+        max-width: 900px;
+        min-width: 640px;
+        text-align: left;
+    }
+
+    @media (max-width: 640px) {
+        #toast {
+            width: 90%;
+            min-width: 100px;
+        }
+    }
+
+    #toast.toast-visible {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+
+    #toast.toast-hidden {
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    .toast-content {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .toast-icon {
+        font-size: 22px;
+        flex-shrink: 0;
+    }
+
+    .toast-message {
+        flex: 1;
+        font-weight: 500;
+        line-height: 1.4;
+    }
+
+    .toast-button-container {
+        margin-top: 16px;
+        text-align: center;
+    }
+
+    .toast-button {
+        background-color: #1f2937;
+        border: none;
+        padding: 8px 20px;
+        color: white;
+        border-radius: 8px;
+        font-size: 14px;
+        cursor: pointer;
+        transition: background-color 0.3s ease, transform 0.2s ease;
+    }
+
+    .toast-button:hover {
+        background-color: #111827;
+        transform: scale(1.05);
+    }
+</style>
