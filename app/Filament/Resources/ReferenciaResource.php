@@ -302,37 +302,36 @@ class ReferenciaResource extends Resource
 
                 Forms\Components\Section::make('Tarifa')
                     ->schema([
-                        Forms\Components\Select::make('tarifa')
-                            ->label('Tarifa')
-                            ->options([
-                                'toneladas' => 'Toneladas',
-                                'm3' => 'Metros cúbicos',
+                        Forms\Components\Section::make('Tarifa')
+                            ->schema([
+                                Forms\Components\Select::make('tarifa')
+                                    ->label('Tarifa')
+                                    ->options([
+                                        'toneladas' => 'Toneladas',
+                                        'm3' => 'Metros cúbicos',
+                                        'hora' => 'Hora',
+                                    ])
+                                    ->searchable()
+                                    ->nullable()
+                                    ->reactive(),
+
+                                Forms\Components\TextInput::make('precio')
+                                    ->label(fn(callable $get) => match ($get('tarifa')) {
+                                        'toneladas' => 'Precio por tonelada',
+                                        'm3' => 'Precio por m³',
+                                        'hora' => 'Precio por hora',
+                                        default => 'Precio',
+                                    })
+                                    ->numeric()
+                                    ->nullable()
+                                    ->reactive()
+                                    ->suffix(fn(callable $get) => match ($get('tarifa')) {
+                                        'toneladas' => '€/tonelada',
+                                        'm3' => '€/m³',
+                                        'hora' => '€/hora',
+                                        default => '€',
+                                    }),
                             ])
-                            ->searchable()
-                            ->nullable()
-                            ->reactive(), // necesario para reactividad
-
-                        Forms\Components\TextInput::make('precio')
-                            ->label(fn(callable $get) => match ($get('tarifa')) {
-                                'toneladas' => 'Precio por tonelada',
-                                'm3' => 'Precio por m³',
-                                default => 'Precio',
-                            })
-                            ->numeric()
-                            ->nullable()
-                            ->reactive()
-                            ->suffix(fn(callable $get) => match ($get('tarifa')) {
-                                'toneladas' => '€/tonelada',
-                                'm3' => '€/m³',
-                                default => '€',
-                            }),
-
-                        Forms\Components\TextInput::make('precio_horas')
-                            ->label('Precio por hora')
-                            ->numeric()
-                            ->nullable()
-                            ->reactive()
-                            ->suffix('€/hora')
                     ])
                     ->columns(3)
                     ->visible(function ($get) {
@@ -989,37 +988,36 @@ class ReferenciaResource extends Resource
 
             Forms\Components\Section::make('Tarifa')
                 ->schema([
-                    Forms\Components\Select::make('tarifa')
-                        ->label('Tarifa')
-                        ->options([
-                            'toneladas' => 'Toneladas',
-                            'm3' => 'Metros cúbicos',
+                    Forms\Components\Section::make('Tarifa')
+                        ->schema([
+                            Forms\Components\Select::make('tarifa')
+                                ->label('Tarifa')
+                                ->options([
+                                    'toneladas' => 'Toneladas',
+                                    'm3' => 'Metros cúbicos',
+                                    'hora' => 'Hora',
+                                ])
+                                ->searchable()
+                                ->nullable()
+                                ->reactive(),
+
+                            Forms\Components\TextInput::make('precio')
+                                ->label(fn(callable $get) => match ($get('tarifa')) {
+                                    'toneladas' => 'Precio por tonelada',
+                                    'm3' => 'Precio por m³',
+                                    'hora' => 'Precio por hora',
+                                    default => 'Precio',
+                                })
+                                ->numeric()
+                                ->nullable()
+                                ->reactive()
+                                ->suffix(fn(callable $get) => match ($get('tarifa')) {
+                                    'toneladas' => '€/tonelada',
+                                    'm3' => '€/m³',
+                                    'hora' => '€/hora',
+                                    default => '€',
+                                }),
                         ])
-                        ->searchable()
-                        ->nullable()
-                        ->reactive(), // necesario para reactividad
-
-                    Forms\Components\TextInput::make('precio')
-                        ->label(fn(callable $get) => match ($get('tarifa')) {
-                            'toneladas' => 'Precio por tonelada',
-                            'm3' => 'Precio por m³',
-                            default => 'Precio',
-                        })
-                        ->numeric()
-                        ->nullable()
-                        ->reactive()
-                        ->suffix(fn(callable $get) => match ($get('tarifa')) {
-                            'toneladas' => '€/tonelada',
-                            'm3' => '€/m³',
-                            default => '€',
-                        }),
-
-                    Forms\Components\TextInput::make('precio_horas')
-                        ->label('Precio por hora')
-                        ->numeric()
-                        ->nullable()
-                        ->reactive()
-                        ->suffix('€/hora')
                 ])
                 ->columns(3)
                 ->visible(function ($get) {

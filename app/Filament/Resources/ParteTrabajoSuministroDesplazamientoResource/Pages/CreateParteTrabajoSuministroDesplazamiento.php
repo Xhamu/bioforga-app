@@ -62,8 +62,10 @@ class CreateParteTrabajoSuministroDesplazamiento extends CreateRecord
                             'vehiculo' => 'Vehículo',
                             'maquina' => 'Máquina',
                         ])
+                        ->validationMessages([
+                            'required' => 'El campo Medio usado es obligatorio.',
+                        ])
                         ->required()
-                        ->nullable()
                         ->reactive(), // Necesario para que actualice el valor del select
 
                     // Vehículo (visible solo si flota = vehiculo)
@@ -129,8 +131,10 @@ class CreateParteTrabajoSuministroDesplazamiento extends CreateRecord
                             'taller' => 'Taller',
                             'otro' => 'Otro',
                         ])
+                        ->validationMessages([
+                            'required' => 'El campo Destino es obligatorio.',
+                        ])
                         ->required()
-                        ->nullable()
                         ->reactive(),
 
                     Select::make('referencia_id')
@@ -168,6 +172,9 @@ class CreateParteTrabajoSuministroDesplazamiento extends CreateRecord
                     TextInput::make('gps_inicio_desplazamiento')
                         ->label('GPS')
                         ->required()
+                        ->validationMessages([
+                            'required' => 'El campo GPS es obligatorio.',
+                        ])
                         ->readOnly(fn() => !Auth::user()?->hasAnyRole(['administración', 'superadmin'])),
 
                     View::make('livewire.location-inicio-desplazamiento')

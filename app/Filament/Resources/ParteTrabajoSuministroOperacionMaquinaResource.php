@@ -382,6 +382,10 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                                             ->directory('horometros')
                                             ->required(),
 
+                                        Textarea::make('observaciones')
+                                            ->rows(4)
+                                            ->maxLength(1000),
+
                                         TextInput::make('gps_fin_trabajo')
                                             ->label('GPS')
                                             ->required()
@@ -403,6 +407,7 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                                         'consumo_cuchillas' => $data['consumo_cuchillas'] ?? null,
                                         'consumo_muelas' => $data['consumo_muelas'] ?? null,
                                         'fecha_hora_fin_trabajo' => now(),
+                                        'observaciones' => $data['observaciones'] ?? null,
                                         'gps_fin_trabajo' => $data['gps_fin_trabajo'] ?? null,
                                     ]);
 
