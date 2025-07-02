@@ -79,6 +79,11 @@ class User extends Authenticatable
         return $this->belongsToMany(Referencia::class, 'referencias_users', 'user_id', 'referencia_id')->withTimestamps()->withTrashed();
     }
 
+    public function camiones()
+    {
+        return $this->belongsToMany(\App\Models\Camion::class, 'camion_user', 'user_id', 'camion_id');
+    }
+
     public function getNombreApellidosAttribute()
     {
         return $this->name . ' ' . $this->apellidos;

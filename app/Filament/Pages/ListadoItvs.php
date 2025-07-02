@@ -99,7 +99,7 @@ class ListadoItvs extends Page implements HasTable
 
         // Paginación manual
         $page = request()->get('page', 1);
-        $perPage = 10;
+        $perPage = 50;
         $items = $combined->slice(($page - 1) * $perPage, $perPage)->values();
 
         return new LengthAwarePaginator(

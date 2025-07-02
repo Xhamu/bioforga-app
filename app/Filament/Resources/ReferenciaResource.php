@@ -302,7 +302,7 @@ class ReferenciaResource extends Resource
 
                 Forms\Components\Section::make('Tarifa')
                     ->schema([
-                        Forms\Components\Section::make('Tarifa')
+                        Forms\Components\Section::make('')
                             ->schema([
                                 Forms\Components\Select::make('tarifa')
                                     ->label('Tarifa')
@@ -354,35 +354,41 @@ class ReferenciaResource extends Resource
                         return !empty($get('referencia'));
                     }),
 
-                Forms\Components\Select::make('usuarios')
-                    ->label('Usuarios relacionados')
-                    ->multiple()
-                    ->relationship(
-                        name: 'usuarios',
-                        titleAttribute: 'name',
-                        modifyQueryUsing: function ($query, $get) {
-                            $query->orderBy('name')
-                                ->whereNull('users.deleted_at')
-                                ->whereDoesntHave(
-                                    'roles',
-                                    fn($q) =>
-                                    $q->where('name', 'superadmin')
-                                );
+                Section::make('Usuarios')
+                    ->schema([
+                        Forms\Components\Select::make('usuarios')
+                            ->label('Usuarios relacionados')
+                            ->multiple()
+                            ->relationship(
+                                name: 'usuarios',
+                                titleAttribute: 'name',
+                                modifyQueryUsing: function ($query, $get) {
+                                    $query->orderBy('name')
+                                        ->whereNull('users.deleted_at')
+                                        ->whereDoesntHave(
+                                            'roles',
+                                            fn($q) =>
+                                            $q->where('name', 'superadmin')
+                                        );
 
-                            if (!empty($get('referencia')) && strpos($get('referencia'), 'SU') === false) {
-                                // Solo si es una referencia de tipo servicio (ej: SE...)
-                                $query->where('empresa_bioforga', true);
-                            }
-                        }
-                    )
-                    ->getOptionLabelFromRecordUsing(
-                        fn($record) =>
-                        $record?->nombre_apellidos ?? '-'
-                    )
-                    ->preload()
-                    ->searchable()
-                    ->columnSpanFull()
-                    ->visible(fn($get) => !empty($get('referencia'))),
+                                    if (!empty($get('referencia')) && strpos($get('referencia'), 'SU') === false) {
+                                        // Solo si es una referencia de tipo servicio (ej: SE...)
+                                        $query->where('empresa_bioforga', true);
+                                    }
+                                }
+                            )
+                            ->getOptionLabelFromRecordUsing(
+                                fn($record) =>
+                                $record?->nombre_apellidos ?? '-'
+                            )
+                            ->preload()
+                            ->searchable()
+                            ->columnSpanFull()
+                            ->visible(fn($get) => !empty($get('referencia'))),
+                    ])
+                    ->visible(function ($get) {
+                        return !empty($get('referencia'));
+                    }),
 
                 Forms\Components\Section::make('Estado')
                     ->schema([
@@ -988,7 +994,7 @@ class ReferenciaResource extends Resource
 
             Forms\Components\Section::make('Tarifa')
                 ->schema([
-                    Forms\Components\Section::make('Tarifa')
+                    Forms\Components\Section::make('')
                         ->schema([
                             Forms\Components\Select::make('tarifa')
                                 ->label('Tarifa')
@@ -1040,35 +1046,41 @@ class ReferenciaResource extends Resource
                     return !empty($get('referencia'));
                 }),
 
-            Forms\Components\Select::make('usuarios')
-                ->label('Usuarios relacionados')
-                ->multiple()
-                ->relationship(
-                    name: 'usuarios',
-                    titleAttribute: 'name',
-                    modifyQueryUsing: function ($query, $get) {
-                        $query->orderBy('name')
-                            ->whereNull('users.deleted_at')
-                            ->whereDoesntHave(
-                                'roles',
-                                fn($q) =>
-                                $q->where('name', 'superadmin')
-                            );
+            Section::make('Usuarios')
+                ->schema([
+                    Forms\Components\Select::make('usuarios')
+                        ->label('Usuarios relacionados')
+                        ->multiple()
+                        ->relationship(
+                            name: 'usuarios',
+                            titleAttribute: 'name',
+                            modifyQueryUsing: function ($query, $get) {
+                                $query->orderBy('name')
+                                    ->whereNull('users.deleted_at')
+                                    ->whereDoesntHave(
+                                        'roles',
+                                        fn($q) =>
+                                        $q->where('name', 'superadmin')
+                                    );
 
-                        if (!empty($get('referencia')) && strpos($get('referencia'), 'SU') === false) {
-                            // Solo si es una referencia de tipo servicio (ej: SE...)
-                            $query->where('empresa_bioforga', true);
-                        }
-                    }
-                )
-                ->getOptionLabelFromRecordUsing(
-                    fn($record) =>
-                    $record?->nombre_apellidos ?? '-'
-                )
-                ->preload()
-                ->searchable()
-                ->columnSpanFull()
-                ->visible(fn($get) => !empty($get('referencia'))),
+                                if (!empty($get('referencia')) && strpos($get('referencia'), 'SU') === false) {
+                                    // Solo si es una referencia de tipo servicio (ej: SE...)
+                                    $query->where('empresa_bioforga', true);
+                                }
+                            }
+                        )
+                        ->getOptionLabelFromRecordUsing(
+                            fn($record) =>
+                            $record?->nombre_apellidos ?? '-'
+                        )
+                        ->preload()
+                        ->searchable()
+                        ->columnSpanFull()
+                        ->visible(fn($get) => !empty($get('referencia'))),
+                ])
+                ->visible(function ($get) {
+                    return !empty($get('referencia'));
+                }),
 
             Forms\Components\Section::make('Estado')
                 ->schema([

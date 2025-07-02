@@ -27,7 +27,11 @@ class ResumenPartesActivos extends Widget
             \App\Models\ParteTrabajoSuministroDesplazamiento::class => ['campo_fin' => 'fecha_hora_fin_desplazamiento', 'campo_inicio' => 'fecha_hora_inicio_desplazamiento'],
             \App\Models\ParteTrabajoSuministroOperacionMaquina::class => ['campo_fin' => 'fecha_hora_fin_trabajo', 'campo_inicio' => 'fecha_hora_inicio_trabajo'],
             \App\Models\ParteTrabajoSuministroOtros::class => ['campo_fin' => 'fecha_hora_fin_otros', 'campo_inicio' => 'fecha_hora_inicio_otros'],
-            \App\Models\ParteTrabajoSuministroTransporte::class => ['campo_fin' => 'fecha_hora_fin_carga', 'campo_inicio' => 'fecha_hora_inicio_carga'],
+            \App\Models\ParteTrabajoSuministroTransporte::class => [
+                'especial' => true,
+                'campo_fin' => 'fecha_hora_fin_carga',
+                'campo_inicio' => 'fecha_hora_inicio_carga',
+            ],
             \App\Models\ParteTrabajoTallerMaquinaria::class => ['campo_fin' => 'fecha_hora_fin_taller_maquinaria', 'campo_inicio' => 'fecha_hora_inicio_taller_maquinaria'],
             \App\Models\ParteTrabajoTallerVehiculos::class => ['campo_fin' => 'fecha_hora_fin_taller_vehiculos', 'campo_inicio' => 'fecha_hora_inicio_taller_vehiculos'],
         ];
@@ -56,9 +60,10 @@ class ResumenPartesActivos extends Widget
         $partesActivos = [];
 
         foreach ($modelos as $modelo => $campos) {
-            if (isset($campos['especial']) && $modelo === \App\Models\ParteTrabajoSuministroTransporte::class) {
+            if (isset($campos['especial']) && $campos['especial']) {
+                // Este bloque se activará correctamente ahora
                 $cargas = \App\Models\CargaTransporte::whereNull('fecha_hora_fin_carga')
-                    ->with('parteTrabajoSuministroTransporte.usuario') // OJO: cadena de relaciones
+                    ->with('parteTrabajoSuministroTransporte.usuario') // OJO: relación encadenada
                     ->get();
 
                 foreach ($cargas as $carga) {
@@ -68,18 +73,19 @@ class ResumenPartesActivos extends Widget
 
                     $partesActivos[] = [
                         'id' => $parte->id,
-                        'label' => $labels[\App\Models\ParteTrabajoSuministroTransporte::class],
-                        'slug' => $slugs[\App\Models\ParteTrabajoSuministroTransporte::class],
+                        'label' => $labels[$modelo],
+                        'slug' => $slugs[$modelo],
                         'inicio' => $carga->fecha_hora_inicio_carga,
                         'usuario_nombre' => $parte->usuario?->name ?? 'Desconocido',
                     ];
                 }
 
-                continue;
+                continue; // Salta a siguiente modelo
             }
 
+            // Resto de modelos: lógica normal
             $activos = $modelo::whereNull($campos['campo_fin'])
-                ->with('usuario') // Añade esto
+                ->with('usuario')
                 ->get();
 
             foreach ($activos as $parte) {

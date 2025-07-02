@@ -61,6 +61,11 @@ class ParteTrabajoSuministroTransporte extends Model
         return $this->belongsTo(User::class, 'usuario_id');
     }
 
+    public function almacen()
+    {
+        return $this->belongsTo(AlmacenIntermedio::class, 'almacen_id');
+    }
+
     public function camion()
     {
         return $this->belongsTo(Camion::class, 'camion_id');
