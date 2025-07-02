@@ -106,6 +106,13 @@ class AlmacenIntermedioResource extends Resource
                             ->label('Usuarios relacionados')
                             ->multiple()
                             ->relationship('usuarios', 'name')
+                            ->options(fn() => \App\Models\User::orderBy('name')
+                                ->get()
+                                ->mapWithKeys(fn($user) => [
+                                    $user->id => "{$user->name} {$user->apellidos}",
+                                ])
+                                ->toArray())
+                            ->getOptionLabelFromRecordUsing(fn($record) => "{$record->name} {$record->apellidos}")
                             ->preload()
                             ->searchable()
                             ->columnSpanFull()

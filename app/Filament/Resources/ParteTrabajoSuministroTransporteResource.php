@@ -91,9 +91,15 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                     return ['' => '- Selecciona primero un usuario -'];
                                 }
 
-                                $proveedorId = \App\Models\User::find($usuarioId)?->proveedor_id;
+                                $usuario = \App\Models\User::find($usuarioId);
 
-                                $camiones = \App\Models\Camion::where('proveedor_id', $proveedorId)->get();
+                                if ($usuario?->proveedor_id) {
+                                    // Caso con proveedor_id → buscar camiones del proveedor
+                                    $camiones = \App\Models\Camion::where('proveedor_id', $usuario->proveedor_id)->get();
+                                } else {
+                                    // Caso sin proveedor_id → buscar camiones vinculados por camion_user
+                                    $camiones = $usuario->camiones()->get();
+                                }
 
                                 if ($camiones->isEmpty()) {
                                     return ['' => '- No hay ningún camión vinculado -'];
@@ -112,9 +118,15 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                 if (!$usuarioId)
                                     return null;
 
-                                $proveedorId = \App\Models\User::find($usuarioId)?->proveedor_id;
+                                $usuario = \App\Models\User::find($usuarioId);
 
-                                $camiones = \App\Models\Camion::where('proveedor_id', $proveedorId)->get();
+                                if ($usuario?->proveedor_id) {
+                                    // Caso con proveedor_id → buscar camiones del proveedor
+                                    $camiones = \App\Models\Camion::where('proveedor_id', $usuario->proveedor_id)->get();
+                                } else {
+                                    // Caso sin proveedor_id → buscar camiones vinculados por camion_user
+                                    $camiones = $usuario->camiones()->get();
+                                }
 
                                 return $camiones->count() === 1 ? $camiones->first()->id : null;
                             })
@@ -553,7 +565,21 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                     }),
 
                 TextColumn::make('cantidad_total')
-                    ->label('Cantidad total'),
+                    ->label('Cantidad total (m³)'),
+
+                TextColumn::make('id')
+                    ->label('Destino')
+                    ->formatStateUsing(function ($record) {
+                        if ($record->cliente && $record->cliente->razon_social) {
+                            return $record->cliente->razon_social;
+                        }
+
+                        if ($record->almacen && $record->almacen->referencia) {
+                            return $record->almacen->referencia . ' (' . $record->almacen->ayuntamiento . ', ' . $record->almacen->monte_parcela .')';
+                        }
+
+                        return '- Sin destino -';
+                    }),
             ])
             ->filters([
                 Tables\Filters\TrashedFilter::make(),
