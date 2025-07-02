@@ -272,8 +272,9 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                         ->form([
                                             TextInput::make('cantidad')
                                                 ->label('Cantidad (m³)')
-                                                ->numeric()
-                                                ->required(),
+                                                ->required()
+                                                ->step(0.01)
+                                                ->dehydrateStateUsing(fn($state) => str_replace(',', '.', $state)),
 
                                             TextInput::make('gps_fin_carga')
                                                 ->label('GPS')
@@ -414,6 +415,10 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                                 ->directory('albaranes')
                                                 ->required(fn(callable $get) => $get('eleccion') === 'almacen_intermedio')
                                                 ->visible(fn(callable $get) => $get('eleccion') === 'almacen_intermedio'),
+
+                                            Textarea::make('observaciones')
+                                                ->rows(4)
+                                                ->maxLength(1000),
                                         ])
                                         ->action(function (array $data, $record) {
                                             $record->update([
@@ -423,6 +428,7 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                                 'peso_neto' => $data['peso_neto'],
                                                 'albaran' => $data['albaran'] ?? null,
                                                 'carta_porte' => $data['carta_porte'] ?? null,
+                                                'observaciones' => $data['observaciones'] ?? null,
                                             ]);
 
                                             Notification::make()

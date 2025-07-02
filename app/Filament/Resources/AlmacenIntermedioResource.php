@@ -185,9 +185,8 @@ class AlmacenIntermedioResource extends Resource
             ->where('referencia', 'like', $base . '%')
             ->count();
 
-        $sufijo = str_pad($count + 1, 3, '0', STR_PAD_LEFT);
+        $sufijo = str_pad($count + 1, 2, '0', STR_PAD_LEFT);
 
         return "{$base}{$sufijo}";
     }
-
 }

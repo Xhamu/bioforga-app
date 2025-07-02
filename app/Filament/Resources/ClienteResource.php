@@ -19,6 +19,7 @@ use Filament\Resources\Resource;
 use Filament\Support\Enums\FontWeight;
 use Filament\Tables;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Enums\FiltersLayout;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
@@ -179,6 +180,18 @@ class ClienteResource extends Resource
 
     public static function table(Table $table): Table
     {
+        $ubicaciones = collect(json_decode(File::get(resource_path('data/ubicaciones.json')), true));
+
+        $provincias = $ubicaciones->flatMap(function ($region) {
+            return collect($region['provinces'] ?? []);
+        });
+
+        $provinciasOptions = $provincias->sortBy('label')->mapWithKeys(function ($provincia) {
+            return [
+                "{$provincia['parent_code']}-{$provincia['code']}" => $provincia['label'],
+            ];
+        })->toArray();
+
         return $table
             ->columns([
                 TextColumn::make('razon_social')
@@ -194,9 +207,27 @@ class ClienteResource extends Resource
                     ->label('Teléfono')
                     ->icon('heroicon-m-phone'),
             ])
-            ->filters([
-                Tables\Filters\TrashedFilter::make(),
-            ])
+            ->filters(
+                [
+                    SelectFilter::make('tipo_cliente')
+                        ->label('Tipo de cliente')
+                        ->options([
+                            'suministro' => 'Suministro',
+                            'servicio' => 'Servicio',
+                        ])
+                        ->searchable()
+                        ->placeholder('Todos'),
+
+                    SelectFilter::make('provincia')
+                        ->label('Provincia')
+                        ->options($provinciasOptions)
+                        ->options(Provincia::orderBy('nombre')->pluck('nombre', 'id'))
+                        ->searchable()
+                        ->placeholder('Todas'),
+                ],
+                layout: FiltersLayout::AboveContent
+            )
+            ->filtersFormColumns(2)
             ->actions([
                 Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),
