@@ -49,4 +49,9 @@ class Camion extends Model
     {
         return $this->marca . ' ' . $this->modelo;
     }
+
+    public function usuarios()
+    {
+        return $this->belongsToMany(\App\Models\User::class);
+    }
 }

@@ -79,23 +79,36 @@ class CamionResource extends Resource
                             ])
                             ->columnSpan(['default' => 2, 'lg' => 1]),
 
+                        Checkbox::make('es_propio')
+                            ->label('Propio (Vehículo de la empresa)')
+                            ->reactive(),
+
                         Select::make('proveedor_id')
                             ->label(__('Proveedor'))
                             ->required(fn(callable $get) => !$get('es_propio'))
                             ->searchable()
                             ->options(fn() => \App\Models\Proveedor::where('tipo_servicio', 'logistica')->pluck('razon_social', 'id')->toArray())
-                            ->default(function () {
-                                $proveedores = \App\Models\Proveedor::where('tipo_servicio', 'logistica')->pluck('id');
-                                return $proveedores->count() === 1 ? $proveedores->first() : null;
-                            })
+                            ->visible(fn(callable $get) => !$get('es_propio'))
                             ->validationMessages([
                                 'required' => 'El :attribute es obligatorio.',
                             ])
                             ->columnSpan(['default' => 2, 'lg' => 2]),
 
-                        Checkbox::make('es_propio')
-                            ->label('Propio (Vehículo de la empresa)')
-                            ->reactive(),
+                        Select::make('usuarios')
+                            ->label('Usuarios vinculados')
+                            ->multiple()
+                            ->relationship('usuarios', 'id')
+                            ->options(fn() => \App\Models\User::orderBy('name')
+                                ->get()
+                                ->mapWithKeys(fn($user) => [
+                                    $user->id => "{$user->name} {$user->apellidos}",
+                                ])
+                                ->toArray())
+                            ->getOptionLabelFromRecordUsing(fn($record) => "{$record->name} {$record->apellidos}")
+                            ->preload()
+                            ->searchable()
+                            ->visible(fn(callable $get) => $get('es_propio'))
+                            ->columnSpan(['default' => 2, 'lg' => 2]),
 
                     ])
                     ->columns(2)
