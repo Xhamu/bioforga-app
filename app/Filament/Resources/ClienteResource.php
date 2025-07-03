@@ -25,6 +25,10 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\File;
+use Filament\Actions\Action;
+use Maatwebsite\Excel\Facades\Excel;
+use App\Exports\StockClientesServicioMainExport;
+use Filament\Notifications\Notification;
 
 class ClienteResource extends Resource
 {
@@ -232,13 +236,22 @@ class ClienteResource extends Resource
                 Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
-                    Tables\Actions\ForceDeleteBulkAction::make(),
-                    Tables\Actions\RestoreBulkAction::make(),
-                ]),
-            ])
+            ->headerActions([
+                \Filament\Tables\Actions\Action::make('exportarStockClientesServicio')
+                    ->label('Stock Clientes Servicio')
+                    ->icon('heroicon-o-document-arrow-down')
+                    ->button()
+                    ->color('gray')
+                    ->action(function () {
+                        return Excel::download(new StockClientesServicioMainExport, 'stock_clientes_servicio.xlsx');
+                    }),
+            ])->bulkActions([
+                    Tables\Actions\BulkActionGroup::make([
+                        Tables\Actions\DeleteBulkAction::make(),
+                        Tables\Actions\ForceDeleteBulkAction::make(),
+                        Tables\Actions\RestoreBulkAction::make(),
+                    ]),
+                ])
             ->defaultSort('created_at', 'desc');
     }
 
