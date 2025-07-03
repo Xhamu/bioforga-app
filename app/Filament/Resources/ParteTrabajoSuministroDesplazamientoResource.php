@@ -6,6 +6,8 @@ use App\Filament\Resources\ParteTrabajoSuministroDesplazamientoResource\Pages;
 use App\Filament\Resources\ParteTrabajoSuministroDesplazamientoResource\RelationManagers;
 use App\Models\Maquina;
 use App\Models\ParteTrabajoSuministroDesplazamiento;
+use App\Models\Referencia;
+use App\Models\Taller;
 use App\Models\User;
 use App\Models\Vehiculo;
 use Carbon\Carbon;
@@ -311,6 +313,27 @@ class ParteTrabajoSuministroDesplazamientoResource extends Resource
                         return trim("$nombre $inicialApellido");
                     })
                     ->weight(FontWeight::Bold)
+                    ->searchable(),
+
+                TextColumn::make('destino')
+                    ->label('Destino')
+                    ->formatStateUsing(function ($record) {
+                        if ($record->referencia_id) {
+                            $referencia = Referencia::find($record->referencia_id);
+                            if ($referencia) {
+                                return "{$referencia->referencia} ({$referencia->ayuntamiento}, {$referencia->monte_parcela})";
+                            }
+                        }
+
+                        if ($record->taller_id) {
+                            $taller = Taller::find($record->taller_id);
+                            if ($taller) {
+                                return "Taller: {$taller->nombre}";
+                            }
+                        }
+
+                        return '—';
+                    })
                     ->searchable(),
             ])
             ->filters([

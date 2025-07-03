@@ -516,6 +516,16 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                     ->dateTime()
                     ->timezone('Europe/Madrid'),
 
+                TextColumn::make('referencia.referencia')
+                    ->label('Referencia')
+                    ->formatStateUsing(function ($state, $record) {
+                        $referencia = $record->referencia?->referencia ?? '';
+                        $ayuntamiento = $record->referencia?->ayuntamiento ?? '';
+                        $monte_parcela = $record->referencia?->monte_parcela ?? '';
+                        return trim($referencia . ' (' . $ayuntamiento . ', ' . $monte_parcela . ')');
+                    })
+                    ->weight(FontWeight::Bold),
+
                 TextColumn::make('usuario')
                     ->label('Usuario')
                     ->formatStateUsing(function ($state, $record) {
@@ -531,7 +541,7 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                     ->formatStateUsing(function ($state, $record) {
                         $marca = $record->maquina?->marca ?? '';
                         $modelo = $record->maquina?->modelo ?? '';
-                        $tipo_trabajo = $record->maquina?->tipo_trabajo ?? '';
+                        $tipo_trabajo = ucfirst($record->maquina?->tipo_trabajo) ?? '';
                         return trim("$marca $modelo - ($tipo_trabajo)");
                     }),
             ])

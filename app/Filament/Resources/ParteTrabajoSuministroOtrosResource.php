@@ -222,7 +222,11 @@ class ParteTrabajoSuministroOtrosResource extends Resource
                         $inicialApellido = $apellido ? strtoupper(substr($apellido, 0, 1)) . '.' : '';
                         return trim("$nombre $inicialApellido");
                     })
-                    ->weight(FontWeight::Bold)
+                    ->weight(FontWeight::Bold),
+
+                TextColumn::make('descripcion')
+                    ->label('Descripción')
+                    ->limit(80)
                     ->searchable(),
             ])
             ->filters([
