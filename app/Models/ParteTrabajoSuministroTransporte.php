@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -55,6 +56,25 @@ class ParteTrabajoSuministroTransporte extends Model
     }
 
     protected $table = 'parte_trabajo_suministro_transportes';
+
+    protected function getCargasTotalesAttribute()
+    {
+        return $this->cargas
+            ->sortBy('created_at')
+            ->values()
+            ->map(function ($carga, $index) {
+                $numero = $index + 1;
+                if ($carga->referencia_id && $carga->referencia) {
+                    return $numero . '. ' . $carga->referencia->referencia .
+                        ' (' . $carga->referencia->ayuntamiento . ', ' . $carga->referencia->monte_parcela . ')';
+                } elseif ($carga->almacen_id && $carga->almacen) {
+                    return $numero . '. ' . $carga->almacen->referencia;
+                }
+                return null;
+            })
+            ->filter()
+            ->implode('<br />') ?: '-';
+    }
 
     public function usuario()
     {

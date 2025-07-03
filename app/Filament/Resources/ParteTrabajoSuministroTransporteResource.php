@@ -567,6 +567,10 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                 TextColumn::make('cantidad_total')
                     ->label('Cantidad total (m³)'),
 
+                TextColumn::make('cargas_totales')
+                    ->label('Cargas')
+                    ->html(),
+
                 TextColumn::make('id')
                     ->label('Destino')
                     ->formatStateUsing(function ($record) {
@@ -575,10 +579,10 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                         }
 
                         if ($record->almacen && $record->almacen->referencia) {
-                            return $record->almacen->referencia . ' (' . $record->almacen->ayuntamiento . ', ' . $record->almacen->monte_parcela .')';
+                            return $record->almacen->referencia . ' (' . $record->almacen->ayuntamiento . ', ' . $record->almacen->monte_parcela . ')';
                         }
 
-                        return '- Sin destino -';
+                        return '-';
                     }),
             ])
             ->filters([
