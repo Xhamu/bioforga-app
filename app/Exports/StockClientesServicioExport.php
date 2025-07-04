@@ -29,61 +29,92 @@ class StockClientesServicioExport implements FromCollection, WithTitle, WithEven
     {
         $datosCliente = collect();
 
-        // Puedes añadir aquí una cabecera con los datos del cliente si quieres
-        $datosCliente->push([
-            'Cliente' => $this->cliente->razon_social,
-            'NIF' => $this->cliente->nif,
-            'Dirección' => $this->cliente->direccion,
-            'Teléfono' => $this->cliente->telefono_principal,
-        ]);
+        // Definir columnas fijas
+        $columnas = [
+            'REFERENCIA',
+            'USUARIOS',
+            'MÁQUINA',
+            'CANTIDAD',
+            'CONSUMO',
+            'OBSERVACIONES',
+        ];
+
+        // Cabecera
+        $datosCliente->push(array_combine($columnas, [
+            'REFERENCIA',
+            'USUARIO',
+            'MÁQUINA',
+            'CANTIDAD',
+            'CONSUMO',
+            'OBSERVACIONES'
+        ]));
 
         $referencias = Referencia::where('cliente_id', $this->cliente->id)->get();
 
         if ($referencias->isEmpty()) {
-            $datosCliente->push([
-                'Referencia' => 'Este cliente no tiene referencias registradas.',
-            ]);
+            $datosCliente->push(array_combine($columnas, [
+                'Este cliente no tiene referencias registradas.',
+                '',
+                '',
+                '',
+                '',
+                ''
+            ]));
         } else {
-            $datosCliente->push([
-                'Referencia' => 'LISTADO DE REFERENCIAS Y TRABAJOS:',
-            ]);
+            $datosCliente->push(array_combine($columnas, [
+                'LISTADO DE REFERENCIAS Y TRABAJOS:',
+                '',
+                '',
+                '',
+                '',
+                ''
+            ]));
 
             foreach ($referencias as $referencia) {
                 $tituloReferencia = $referencia->referencia . ' (' . $referencia->ayuntamiento . ', ' . $referencia->monte_parcela . ')';
 
-                $datosCliente->push([
-                    'Referencia' => $tituloReferencia ?: 'Referencia sin nombre',
-                ]);
+                $datosCliente->push(array_combine($columnas, [
+                    'REF: ' . ($tituloReferencia ?: 'Referencia sin nombre'),
+                    '',
+                    '',
+                    '',
+                    '',
+                    ''
+                ]));
 
-                // Buscar trabajos realizados en esta referencia
                 $trabajos = \App\Models\ParteTrabajoSuministroOperacionMaquina::where('referencia_id', $referencia->id)
                     ->whereNotNull('fecha_hora_fin_trabajo')
                     ->get();
 
                 if ($trabajos->isEmpty()) {
-                    $datosCliente->push([
-                        'Trabajo' => 'No se han registrado trabajos en esta referencia.',
-                    ]);
+                    $datosCliente->push(array_combine($columnas, [
+                        'No se han registrado trabajos en esta referencia.',
+                        '',
+                        '',
+                        '',
+                        '',
+                        ''
+                    ]));
                 } else {
-                    // Cabecera de columnas para los trabajos
-                    $datosCliente->push([
-                        'Trabajo' => 'Fecha inicio',
-                        'Usuario' => 'Usuario',
-                        'Máquina' => 'Máquina',
-                        'Cantidad producida' => 'Cantidad',
-                        'Consumo gasoil' => 'Gasoil',
-                        'Observaciones' => 'Observaciones',
-                    ]);
+                    // Cabecera para las filas de trabajos
+                    $datosCliente->push(array_combine($columnas, [
+                        'Fecha inicio',
+                        'Usuario',
+                        'Máquina',
+                        'Cantidad',
+                        'Gasoil',
+                        'Observaciones'
+                    ]));
 
                     foreach ($trabajos as $trabajo) {
-                        $datosCliente->push([
-                            'Trabajo' => optional($trabajo->fecha_hora_inicio_trabajo)->format('d/m/Y H:i'),
-                            'Usuario' => optional($trabajo->usuario)->name ?? 'N/A',
-                            'Máquina' => optional($trabajo->maquina)->marca . ' ' . optional($trabajo->maquina)->modelo ?? 'N/A',
-                            'Cantidad producida' => ($trabajo->cantidad_producida ? $trabajo->cantidad_producida . ' ' . $trabajo->tipo_cantidad_producida : '-'),
-                            'Consumo gasoil' => $trabajo->consumo_gasoil ?? '-',
-                            'Observaciones' => $trabajo->observaciones ?? '',
-                        ]);
+                        $datosCliente->push(array_combine($columnas, [
+                            optional($trabajo->fecha_hora_inicio_trabajo)->format('d/m/Y H:i') ?? '-',
+                            (optional($trabajo->usuario)->name . ' ' . optional($trabajo->usuario)->apellidos) ?: 'N/A',
+                            (optional($trabajo->maquina)->marca . ' ' . optional($trabajo->maquina)->modelo) ?: 'N/A',
+                            $trabajo->cantidad_producida ? $trabajo->cantidad_producida . ' ' . $trabajo->tipo_cantidad_producida : '-',
+                            $trabajo->consumo_gasoil ?? '-',
+                            $trabajo->observaciones ?? '',
+                        ]));
                     }
                 }
             }
@@ -105,30 +136,24 @@ class StockClientesServicioExport implements FromCollection, WithTitle, WithEven
                 $rowCount = $sheet->getHighestRow();
 
                 $sheet->freezePane('A2');
-                $sheet->setAutoFilter('A1:W1');
+                $sheet->setAutoFilter('A1:F1');
 
                 for ($row = 2; $row <= $rowCount; $row++) {
                     $contenido = $sheet->getCell("A{$row}")->getValue();
 
-                    // Ajuste de altura si hay mucho texto
+                    // Ajuste de altura dinámico
                     $saltos = substr_count((string) $contenido, PHP_EOL);
                     $lineas = floor(strlen((string) $contenido) / 140);
                     $altura = max(15 * ($lineas + $saltos + 1), 16);
                     $sheet->getRowDimension($row)->setRowHeight($altura);
 
-                    // Pintar solo las filas que parecen ser títulos de referencias
-                    if (
-                        $contenido &&                          // No vacío
-                        !str_starts_with($contenido, 'LISTADO DE REFERENCIAS') && // No es cabecera general
-                        !str_starts_with($contenido, 'Fecha inicio') &&           // No es cabecera de trabajos
-                        !str_starts_with($contenido, 'No se han registrado') &&   // No es mensaje sin trabajos
-                        strlen($contenido) > 5                // Para evitar falsos positivos en líneas vacías o muy cortas
-                    ) {
-                        $sheet->getStyle("A{$row}:W{$row}")
+                    // Pintar líneas de referencias con 'REF:'
+                    if (str_starts_with((string) $contenido, 'REF:')) {
+                        $sheet->getStyle("A{$row}:F{$row}")
                             ->getFill()
                             ->setFillType(Fill::FILL_SOLID)
                             ->getStartColor()
-                            ->setARGB('FFE4B5'); // Color de fondo beige claro
+                            ->setARGB('FFE4B5');
                     }
                 }
             },
@@ -148,7 +173,7 @@ class StockClientesServicioExport implements FromCollection, WithTitle, WithEven
                     'bottom' => ['borderStyle' => Border::BORDER_THIN],
                 ],
             ],
-            'A:W' => [
+            'A:F' => [
                 'alignment' => [
                     'horizontal' => Alignment::HORIZONTAL_CENTER,
                     'vertical' => Alignment::VERTICAL_CENTER,
