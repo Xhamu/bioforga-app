@@ -34,8 +34,8 @@ class ParteTrabajoTallerMaquinaria extends Model
     ];
 
     protected $casts = [
-        'fecha_hora_inicio_taller_maquinaria' => 'date',
-        'fecha_hora_fin_taller_maquinaria' => 'date',
+        'fecha_hora_inicio_taller_maquinaria' => 'datetime',
+        'fecha_hora_fin_taller_maquinaria' => 'datetime',
         'trabajo_realizado' => 'array',
         'recambios_utilizados' => 'array',
     ];

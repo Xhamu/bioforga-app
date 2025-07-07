@@ -15,7 +15,7 @@ class ResumenPartesActivos extends Widget
     {
         $user = auth()->user();
 
-        return $user && $user->hasAnyRole(['superadmin', 'administracion']);
+        return $user && $user->hasAnyRole(['superadmin', 'administración']);
     }
 
 

@@ -15,6 +15,7 @@ use Filament\Facades\Filament;
 use Filament\Forms;
 use Filament\Forms\Components\Actions;
 use Filament\Forms\Components\Actions\Action;
+use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
@@ -238,9 +239,64 @@ class ParteTrabajoSuministroDesplazamientoResource extends Resource
 
                                 return new HtmlString($tabla);
                             })
+                            ->visible(fn() => !Filament::auth()->user()?->hasAnyRole(['superadmin', 'administración']))
                             ->columnSpanFull(),
                     ])
                     ->columns(1),
+
+                Section::make('Fechas y horas')
+                    ->schema([
+                        DateTimePicker::make('fecha_hora_inicio_desplazamiento')
+                            ->label('Hora de inicio desplazamiento')
+                            ->timezone('Europe/Madrid')
+                            ->suffixAction(function ($record) {
+                                if ($record?->gps_inicio_desplazamiento) {
+                                    return Actions\Action::make('ver_gps_inicio_desplazamiento')
+                                        ->icon('heroicon-o-map')
+                                        ->tooltip('Ver ubicación en Google Maps')
+                                        ->url('https://maps.google.com/?q=' . $record->gps_inicio_desplazamiento, shouldOpenInNewTab: true);
+                                }
+                                return null;
+                            }),
+
+                        DateTimePicker::make('fecha_hora_fin_desplazamiento')
+                            ->label('Hora de finalización desplazamiento')
+                            ->timezone('Europe/Madrid')
+                            ->suffixAction(function ($record) {
+                                if ($record?->gps_fin_desplazamiento) {
+                                    return Actions\Action::make('ver_gps_fin_desplazamiento')
+                                        ->icon('heroicon-o-map')
+                                        ->tooltip('Ver ubicación en Google Maps')
+                                        ->url('https://maps.google.com/?q=' . $record->gps_fin_desplazamiento, shouldOpenInNewTab: true);
+                                }
+                                return null;
+                            }),
+
+                        Placeholder::make('tiempo_total_desplazamiento')
+                            ->label('Tiempo total desplazamiento')
+                            ->content(function ($record) {
+                                if (!$record || !$record->fecha_hora_inicio_desplazamiento) {
+                                    return 'Sin iniciar';
+                                }
+
+                                $inicio = Carbon::parse($record->fecha_hora_inicio_desplazamiento)->timezone('Europe/Madrid');
+                                $fin = $record->fecha_hora_fin_desplazamiento
+                                    ? Carbon::parse($record->fecha_hora_fin_desplazamiento)->timezone('Europe/Madrid')
+                                    : Carbon::now('Europe/Madrid');
+
+                                $totalMinutos = $inicio->diffInMinutes($fin);
+                                $horas = floor($totalMinutos / 60);
+                                $minutos = $totalMinutos % 60;
+
+                                return "{$horas}h {$minutos}min";
+                            }),
+                    ])
+                    ->columns(2)
+                    ->visible(
+                        fn($record) =>
+                        Filament::auth()->user()?->hasAnyRole(['superadmin', 'administración']) &&
+                        filled($record?->fecha_hora_inicio_desplazamiento)
+                    ),
 
                 Section::make()
                     ->visible(function ($record) {

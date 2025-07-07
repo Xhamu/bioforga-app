@@ -23,6 +23,9 @@ use Filament\Tables\Columns\Layout\Panel;
 use Filament\Tables\Columns\Layout\Split;
 use Filament\Tables\Columns\Layout\Stack;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Enums\FiltersLayout;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Support\HtmlString;
 use Jenssegers\Agent\Agent;
@@ -222,9 +225,28 @@ class UserResource extends Resource
                         ->searchable()
                         ->icon('heroicon-m-phone'),
                 ])
-                ->filters([
-                    //
-                ])
+                ->filters(
+                    [
+                        TernaryFilter::make('empresa_bioforga')
+                            ->label('Empresa')
+                            ->trueLabel('Bioforga')
+                            ->falseLabel('Proveedor externo')
+                            ->placeholder('Todos')
+                            ->native(false),
+
+                        SelectFilter::make('roles')
+                            ->relationship(
+                                'roles',
+                                'name',
+                                fn(\Illuminate\Database\Eloquent\Builder $query) =>
+                                $query->where('name', '!=', 'superadmin')
+                            )
+                            ->multiple()
+                            ->preload(),
+                    ],
+                    layout: FiltersLayout::AboveContent
+                )
+                ->filtersFormColumns(2)
                 ->headerActions([
                     Action::make('exportar_partes_trabajo')
                         ->label('Exportar partes de trabajo')

@@ -4,12 +4,16 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\ParteTrabajoSuministroOperacionMaquinaResource\Pages;
 use App\Filament\Resources\ParteTrabajoSuministroOperacionMaquinaResource\RelationManagers;
+use App\Models\Maquina;
 use App\Models\ParteTrabajoSuministroOperacionMaquina;
+use App\Models\Referencia;
+use App\Models\User;
 use Carbon\Carbon;
 use Filament\Forms\Components\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Forms;
 use Filament\Forms\Components\Actions;
+use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Grid;
@@ -27,6 +31,9 @@ use Filament\Resources\Resource;
 use Filament\Support\Enums\FontWeight;
 use Filament\Tables;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Enums\FiltersLayout;
+use Filament\Tables\Filters\Filter;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
@@ -248,9 +255,113 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                 ';
                                 return new HtmlString($tabla);
                             })
+                            ->visible(function () {
+                                return !Filament::auth()->user()?->hasAnyRole(['superadmin', 'administración']);
+                            })
                             ->columnSpanFull(),
                     ])
                     ->columns(1),
+
+                Section::make('Fechas y horas')
+                    ->schema([
+                        DateTimePicker::make('fecha_hora_inicio_trabajo')
+                            ->label('Hora de inicio')
+                            ->timezone('Europe/Madrid')
+                            ->suffixAction(function ($record) {
+                                if ($record?->gps_inicio_trabajo) {
+                                    return Actions\Action::make('ver_gps_inicio')
+                                        ->icon('heroicon-o-map')
+                                        ->tooltip('Ver ubicación en Google Maps')
+                                        ->url('https://maps.google.com/?q=' . $record->gps_inicio_trabajo, shouldOpenInNewTab: true);
+                                }
+                                return null;
+                            }),
+
+                        DateTimePicker::make('fecha_hora_parada_trabajo')
+                            ->label('Hora de pausa')
+                            ->timezone('Europe/Madrid')
+                            ->suffixAction(function ($record) {
+                                if ($record?->gps_parada_trabajo) {
+                                    return Actions\Action::make('ver_gps_pausa')
+                                        ->icon('heroicon-o-map')
+                                        ->tooltip('Ver ubicación en Google Maps')
+                                        ->url('https://maps.google.com/?q=' . $record->gps_parada_trabajo, shouldOpenInNewTab: true);
+                                }
+                                return null;
+                            }),
+
+                        DateTimePicker::make('fecha_hora_reanudacion_trabajo')
+                            ->label('Hora de reanudación')
+                            ->timezone('Europe/Madrid')
+                            ->suffixAction(function ($record) {
+                                if ($record?->gps_reanudacion_trabajo) {
+                                    return Actions\Action::make('ver_gps_reanudar')
+                                        ->icon('heroicon-o-map')
+                                        ->tooltip('Ver ubicación en Google Maps')
+                                        ->url('https://maps.google.com/?q=' . $record->gps_reanudacion_trabajo, shouldOpenInNewTab: true);
+                                }
+                                return null;
+                            }),
+
+                        DateTimePicker::make('fecha_hora_fin_trabajo')
+                            ->label('Hora de finalización')
+                            ->timezone('Europe/Madrid')
+                            ->suffixAction(function ($record) {
+                                if ($record?->gps_fin_trabajo) {
+                                    return Actions\Action::make('ver_gps_fin')
+                                        ->icon('heroicon-o-map')
+                                        ->tooltip('Ver ubicación en Google Maps')
+                                        ->url('https://maps.google.com/?q=' . $record->gps_fin_trabajo, shouldOpenInNewTab: true);
+                                }
+                                return null;
+                            }),
+
+                        Placeholder::make('tiempo_total')
+                            ->label('Tiempo total')
+                            ->content(function ($record) {
+                                if (!$record || !$record->fecha_hora_inicio_trabajo) {
+                                    return 'Sin iniciar';
+                                }
+
+                                $inicio = Carbon::parse($record->fecha_hora_inicio_trabajo)->timezone('Europe/Madrid');
+                                $fin = $record->fecha_hora_fin_trabajo
+                                    ? Carbon::parse($record->fecha_hora_fin_trabajo)->timezone('Europe/Madrid')
+                                    : Carbon::now('Europe/Madrid');
+                                $parada = $record->fecha_hora_parada_trabajo
+                                    ? Carbon::parse($record->fecha_hora_parada_trabajo)->timezone('Europe/Madrid')
+                                    : null;
+                                $reanudacion = $record->fecha_hora_reanudacion_trabajo
+                                    ? Carbon::parse($record->fecha_hora_reanudacion_trabajo)->timezone('Europe/Madrid')
+                                    : null;
+
+                                $totalMinutos = 0;
+
+                                if ($record->fecha_hora_fin_trabajo) {
+                                    if ($parada && $reanudacion) {
+                                        $totalMinutos = $inicio->diffInMinutes($parada) + $reanudacion->diffInMinutes($fin);
+                                    } else {
+                                        $totalMinutos = $inicio->diffInMinutes($fin);
+                                    }
+                                } elseif ($reanudacion) {
+                                    $totalMinutos = $inicio->diffInMinutes($parada) + $reanudacion->diffInMinutes(Carbon::now('Europe/Madrid'));
+                                } elseif ($parada) {
+                                    $totalMinutos = $inicio->diffInMinutes($parada);
+                                } else {
+                                    $totalMinutos = $inicio->diffInMinutes(Carbon::now('Europe/Madrid'));
+                                }
+
+                                $horas = floor($totalMinutos / 60);
+                                $minutos = $totalMinutos % 60;
+
+                                return "{$horas}h {$minutos}min";
+                            }),
+                    ])
+                    ->columns(2)
+                    ->visible(
+                        fn($record) =>
+                        Filament::auth()->user()?->hasAnyRole(['superadmin', 'administración']) &&
+                        filled($record?->fecha_hora_inicio_trabajo)
+                    ),
 
                 Section::make()
                     ->visible(function ($record) {
@@ -511,10 +622,48 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
         return $table
             ->columns([
                 TextColumn::make('created_at')
-                    ->label('Fecha y hora')
+                    ->label('Fecha')
+                    ->date('d/m/Y')
+                    ->timezone('Europe/Madrid')
                     ->weight(FontWeight::Bold)
-                    ->dateTime()
-                    ->timezone('Europe/Madrid'),
+                    ->description(function ($record) {
+                        $inicio = $record->created_at
+                            ? $record->created_at->timezone('Europe/Madrid')
+                            : null;
+
+                        $fin = $record->fecha_hora_fin_trabajo
+                            ? Carbon::parse($record->fecha_hora_fin_trabajo)->timezone('Europe/Madrid')
+                            : null;
+
+                        if (!$inicio) {
+                            return '-';
+                        }
+
+                        $inicioStr = $inicio->format('H:i');
+                        $finStr = $fin ? $fin->format('H:i') : '-';
+
+                        // Si el fin existe y cae en un día distinto al inicio, añade la fecha
+                        if ($fin && $inicio->format('d/m/Y') !== $fin->format('d/m/Y')) {
+                            $finStr = $fin->format('d/m/Y') . ' ' . $fin->format('H:i');
+                        }
+
+                        return "Inicio: $inicioStr | Fin: $finStr";
+                    })
+                    ->sortable()
+                    ->tooltip(function ($record) {
+                        // Tooltip con fecha y horas completas
+                        $inicio = $record->created_at
+                            ? $record->created_at->timezone('Europe/Madrid')->format('d/m/Y H:i')
+                            : '-';
+
+                        $fin = $record->fecha_hora_fin_trabajo
+                            ? Carbon::parse($record->fecha_hora_fin_trabajo)
+                                ->timezone('Europe/Madrid')
+                                ->format('d/m/Y H:i')
+                            : '-';
+
+                        return "Inicio: $inicio\nFin: $fin";
+                    }),
 
                 TextColumn::make('referencia.referencia')
                     ->label('Referencia')
@@ -522,9 +671,19 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                         $referencia = $record->referencia?->referencia ?? '';
                         $ayuntamiento = $record->referencia?->ayuntamiento ?? '';
                         $monte_parcela = $record->referencia?->monte_parcela ?? '';
-                        return trim($referencia . ' (' . $ayuntamiento . ', ' . $monte_parcela . ')');
+                        return trim("$referencia ($ayuntamiento, $monte_parcela)");
                     })
-                    ->weight(FontWeight::Bold),
+                    ->limit(35)
+                    ->tooltip(fn($record) => trim(($record->referencia?->referencia ?? '') . ' (' . ($record->referencia?->ayuntamiento ?? '') . ', ' . ($record->referencia?->monte_parcela ?? '') . ')'))
+                    ->weight(FontWeight::Bold)
+                    ->sortable(),
+
+                TextColumn::make('referencia.cliente.razon_social')
+                    ->label('Cliente')
+                    ->limit(25)
+                    ->tooltip(fn($state) => $state)
+                    ->weight(FontWeight::Bold)
+                    ->sortable(),
 
                 TextColumn::make('usuario')
                     ->label('Usuario')
@@ -534,20 +693,146 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                         $inicialApellido = $apellido ? strtoupper(substr($apellido, 0, 1)) . '.' : '';
                         return trim("$nombre $inicialApellido");
                     })
-                    ->weight(FontWeight::Bold),
+                    ->limit(20)
+                    ->tooltip(fn($record) => ($record->usuario?->name ?? '') . ' ' . ($record->usuario?->apellidos ?? ''))
+                    ->weight(FontWeight::Bold)
+                    ->sortable(),
 
                 TextColumn::make('maquina')
                     ->label('Máquina')
                     ->formatStateUsing(function ($state, $record) {
                         $marca = $record->maquina?->marca ?? '';
                         $modelo = $record->maquina?->modelo ?? '';
-                        $tipo_trabajo = ucfirst($record->maquina?->tipo_trabajo) ?? '';
-                        return trim("$marca $modelo - ($tipo_trabajo)");
-                    }),
+                        return trim("$marca $modelo");
+                    })
+                    ->limit(25)
+                    ->tooltip(fn($record) => ($record->maquina?->marca ?? '') . ' ' . ($record->maquina?->modelo ?? ''))
+                    ->toggleable()
+                    ->sortable(),
+
+                TextColumn::make('horas_rotor')
+                    ->label('Horas rotor')
+                    ->alignCenter(),
+
+                TextColumn::make('produccion')
+                    ->label('Producción')
+                    ->alignCenter(),
             ])
-            ->filters([
-                Tables\Filters\TrashedFilter::make(),
-            ])
+            ->filters(
+                [
+                    Filter::make('created_at')
+                        ->columns(2)
+                        ->form([
+                            DatePicker::make('created_from')
+                                ->label('Desde'),
+
+                            DatePicker::make('created_until')
+                                ->label('Hasta'),
+                        ])
+                        ->query(function ($query, array $data) {
+                            return $query
+                                ->when($data['created_from'], fn($query, $date) => $query->whereDate('created_at', '>=', $date))
+                                ->when($data['created_until'], fn($query, $date) => $query->whereDate('created_at', '<=', $date));
+                        }),
+
+                    SelectFilter::make('usuario_id')
+                        ->label('Usuario')
+                        ->options(function () {
+                            $usuariosIds = ParteTrabajoSuministroOperacionMaquina::query()
+                                ->distinct()
+                                ->pluck('usuario_id')
+                                ->filter()
+                                ->unique();
+
+                            return User::query()
+                                ->whereIn('id', $usuariosIds)
+                                ->orderBy('name')
+                                ->get()
+                                ->mapWithKeys(fn($usuario) => [
+                                    $usuario->id => trim($usuario->name . ' ' . ($usuario->apellidos ?? '')),
+                                ])
+                                ->toArray();
+                        })
+                        ->searchable()
+                        ->preload()
+                        ->placeholder('Todos'),
+
+                    SelectFilter::make('cliente_id')
+                        ->label('Cliente')
+                        ->relationship(
+                            'referencia.cliente',
+                            'razon_social',
+                            fn($query) => $query->whereIn(
+                                'id',
+                                Referencia::query()
+                                    ->whereIn(
+                                        'id',
+                                        ParteTrabajoSuministroOperacionMaquina::query()->distinct()->pluck('referencia_id')
+                                    )
+                                    ->pluck('cliente_id')
+                                    ->filter()
+                                    ->unique()
+                            )
+                        )
+                        ->searchable()
+                        ->preload()
+                        ->placeholder('Todos'),
+
+                    SelectFilter::make('referencia_id')
+                        ->label('Referencia')
+                        ->options(function () {
+                            $referenciaIds = ParteTrabajoSuministroOperacionMaquina::query()
+                                ->distinct()
+                                ->pluck('referencia_id')
+                                ->filter()
+                                ->unique();
+
+                            return Referencia::query()
+                                ->whereIn('id', $referenciaIds)
+                                ->orderBy('referencia')
+                                ->get()
+                                ->mapWithKeys(fn($referencia) => [
+                                    $referencia->id => trim(
+                                        $referencia->referencia . ' (' .
+                                        ($referencia->ayuntamiento ?? '-') . ', ' .
+                                        ($referencia->monte_parcela ?? '-') . ')'
+                                    ),
+                                ])
+                                ->toArray();
+                        })
+                        ->searchable()
+                        ->preload()
+                        ->columnSpan(2)
+                        ->placeholder('Todas'),
+
+                    SelectFilter::make('maquina_id')
+                        ->label('Máquina')
+                        ->options(function () {
+                            $maquinaIds = ParteTrabajoSuministroOperacionMaquina::query()
+                                ->distinct()
+                                ->pluck('maquina_id')
+                                ->filter()
+                                ->unique();
+
+                            return Maquina::query()
+                                ->whereIn('id', $maquinaIds)
+                                ->orderBy('marca')
+                                ->orderBy('modelo')
+                                ->get()
+                                ->mapWithKeys(fn($maquina) => [
+                                    $maquina->id => trim(
+                                        ($maquina->marca ?? '-') . ' ' . ($maquina->modelo ?? '-')
+                                    ),
+                                ])
+                                ->toArray();
+                        })
+                        ->searchable()
+                        ->preload()
+                        ->placeholder('Todas'),
+                ],
+                layout: FiltersLayout::AboveContent
+            )
+            ->filtersFormColumns(3)
             ->actions([
                 Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),

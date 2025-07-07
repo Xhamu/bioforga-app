@@ -4,9 +4,12 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\ReferenciaResource\Pages;
 use App\Filament\Resources\ReferenciaResource\RelationManagers;
+use App\Models\Cliente;
+use App\Models\Proveedor;
 use App\Models\Referencia;
 use App\Models\User;
 use Filament\Forms;
+use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Livewire;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
@@ -502,20 +505,42 @@ class ReferenciaResource extends Resource
                         ->label('Balance de Masas')
                         ->icon('heroicon-m-document-arrow-down')
                         ->color('gray')
-                        ->action(function () {
-                            $hayDatos = \App\Models\CargaTransporte::exists();
+                        ->modalWidth('md')
+                        ->modalHeading('Selecciona el periodo para exportar')
+                        ->modalSubmitActionLabel('Exportar')
+                        ->form([
+                            DatePicker::make('fecha_inicio')
+                                ->label('Fecha inicio')
+                                ->default(now()->subDays(30)->startOfDay())
+                                ->required(),
+                            DatePicker::make('fecha_fin')
+                                ->label('Fecha fin')
+                                ->default(now()->endOfDay())
+                                ->required(),
+                        ])
+                        ->action(function (array $data) {
+                            $fechaInicio = $data['fecha_inicio'];
+                            $fechaFin = $data['fecha_fin'];
+
+                            $hayDatos = \App\Models\CargaTransporte::whereBetween('fecha_hora_inicio_carga', [
+                                $fechaInicio,
+                                $fechaFin,
+                            ])->exists();
 
                             if (!$hayDatos) {
                                 Notification::make()
                                     ->title('Sin datos')
-                                    ->body('No hay cargas registradas para exportar.')
+                                    ->body('No hay cargas registradas en el periodo seleccionado.')
                                     ->warning()
                                     ->send();
                                 return;
                             }
 
                             $filename = 'balance-de-masas-' . now()->format('Y-m-d') . '.xlsx';
-                            return \Maatwebsite\Excel\Facades\Excel::download(new \App\Exports\BalanceDeMasasExport, $filename);
+                            return \Maatwebsite\Excel\Facades\Excel::download(
+                                new \App\Exports\BalanceDeMasasExport($fechaInicio, $fechaFin),
+                                $filename
+                            );
                         })
                         ->after(function () {
                             Notification::make()
@@ -631,29 +656,114 @@ class ReferenciaResource extends Resource
                                 return $query;
                             })
                             ->placeholder('Todos'),
+
+                        SelectFilter::make('interviniente')
+                            ->label('Interviniente')
+                            ->options(function () {
+                                // Leer el valor actual del filtro tipo_referencia desde la request de Filament
+                                $tipoReferencia = request()->input('tableFilters.tipo_referencia.value');
+
+                                if ($tipoReferencia === 'suministro') {
+                                    // Solo proveedores
+                                    return \App\Models\Proveedor::query()
+                                        ->orderBy('razon_social')
+                                        ->get()
+                                        ->mapWithKeys(fn($proveedor) => [
+                                            'proveedor_' . $proveedor->id => $proveedor->razon_social,
+                                        ])
+                                        ->toArray();
+                                }
+
+                                if ($tipoReferencia === 'servicio') {
+                                    // Solo clientes
+                                    return \App\Models\Cliente::query()
+                                        ->orderBy('razon_social')
+                                        ->get()
+                                        ->mapWithKeys(fn($cliente) => [
+                                            'cliente_' . $cliente->id => $cliente->razon_social,
+                                        ])
+                                        ->toArray();
+                                }
+
+                                // Si no hay tipo_referencia → mostrar ambos
+                                $proveedores = \App\Models\Proveedor::query()
+                                    ->orderBy('razon_social')
+                                    ->get()
+                                    ->mapWithKeys(fn($proveedor) => [
+                                        'proveedor_' . $proveedor->id => $proveedor->razon_social,
+                                    ]);
+
+                                $clientes = \App\Models\Cliente::query()
+                                    ->orderBy('razon_social')
+                                    ->get()
+                                    ->mapWithKeys(fn($cliente) => [
+                                        'cliente_' . $cliente->id => $cliente->razon_social,
+                                    ]);
+
+                                return $proveedores->merge($clientes)->toArray();
+                            })
+                            ->searchable()
+                            ->placeholder('Todos')
+                            ->query(function ($query, array $data) {
+                                if (!empty($data['value'])) {
+                                    [$tipo, $id] = explode('_', $data['value']);
+
+                                    if ($tipo === 'proveedor') {
+                                        return $query->where('proveedor_id', $id);
+                                    }
+
+                                    if ($tipo === 'cliente') {
+                                        return $query->where('cliente_id', $id);
+                                    }
+                                }
+
+                                return $query;
+                            }),
                     ],
                     layout: FiltersLayout::AboveContent
                 )
-                ->filtersFormColumns(2)
+                ->filtersFormColumns(3)
                 ->headerActions([
                     Action::make('exportar_balance_masas')
                         ->label('Balance de Masas')
                         ->icon('heroicon-m-document-arrow-down')
                         ->color('gray')
-                        ->action(function () {
-                            $hayDatos = \App\Models\CargaTransporte::exists();
+                        ->modalWidth('md')
+                        ->modalHeading('Selecciona el periodo para exportar')
+                        ->modalSubmitActionLabel('Exportar')
+                        ->form([
+                            DatePicker::make('fecha_inicio')
+                                ->label('Fecha inicio')
+                                ->default(now()->subDays(30)->startOfDay())
+                                ->required(),
+                            DatePicker::make('fecha_fin')
+                                ->label('Fecha fin')
+                                ->default(now()->endOfDay())
+                                ->required(),
+                        ])
+                        ->action(function (array $data) {
+                            $fechaInicio = $data['fecha_inicio'];
+                            $fechaFin = $data['fecha_fin'];
+
+                            $hayDatos = \App\Models\CargaTransporte::whereBetween('fecha_hora_inicio_carga', [
+                                $fechaInicio,
+                                $fechaFin,
+                            ])->exists();
 
                             if (!$hayDatos) {
                                 Notification::make()
                                     ->title('Sin datos')
-                                    ->body('No hay cargas registradas para exportar.')
+                                    ->body('No hay cargas registradas en el periodo seleccionado.')
                                     ->warning()
                                     ->send();
                                 return;
                             }
 
                             $filename = 'balance-de-masas-' . now()->format('Y-m-d') . '.xlsx';
-                            return \Maatwebsite\Excel\Facades\Excel::download(new \App\Exports\BalanceDeMasasExport, $filename);
+                            return \Maatwebsite\Excel\Facades\Excel::download(
+                                new \App\Exports\BalanceDeMasasExport($fechaInicio, $fechaFin),
+                                $filename
+                            );
                         })
                         ->after(function () {
                             Notification::make()
@@ -727,14 +837,14 @@ class ReferenciaResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->when(
+            /*->when(
                 !auth()->user()->hasAnyRole(['superadmin', 'administración', 'administrador']),
                 fn($query) => $query->whereHas(
                     'usuarios',
                     fn($q) =>
                     $q->where('users.id', auth()->id())
                 )
-            )
+            )*/
             ->withoutGlobalScopes([
                 SoftDeletingScope::class,
             ]);

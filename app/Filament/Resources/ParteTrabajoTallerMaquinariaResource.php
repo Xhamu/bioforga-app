@@ -10,6 +10,7 @@ use Filament\Facades\Filament;
 use Filament\Forms;
 use Filament\Forms\Components\Actions;
 use Filament\Forms\Components\Actions\Action;
+use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
@@ -203,10 +204,65 @@ class ParteTrabajoTallerMaquinariaResource extends Resource
 
                                 return new HtmlString($tabla);
                             })
+                            ->visible(fn() => Filament::auth()->user()?->hasAnyRole(['superadmin', 'administración']))
                             ->columnSpanFull(),
                     ])
                     ->columns(1),
 
+                Section::make('Fechas y horas')
+                    ->schema([
+                        DateTimePicker::make('fecha_hora_inicio_taller_maquinaria')
+                            ->label('Hora de inicio taller maquinaria')
+                            ->timezone('Europe/Madrid')
+                            ->suffixAction(function ($record) {
+                                if ($record?->gps_inicio_taller_maquinaria) {
+                                    return Actions\Action::make('ver_gps_inicio_taller_maquinaria')
+                                        ->icon('heroicon-o-map')
+                                        ->tooltip('Ver ubicación en Google Maps')
+                                        ->url('https://maps.google.com/?q=' . $record->gps_inicio_taller_maquinaria, shouldOpenInNewTab: true);
+                                }
+                                return null;
+                            }),
+
+                        DateTimePicker::make('fecha_hora_fin_taller_maquinaria')
+                            ->label('Hora de finalización taller maquinaria')
+                            ->timezone('Europe/Madrid')
+                            ->suffixAction(function ($record) {
+                                if ($record?->gps_fin_taller_maquinaria) {
+                                    return Actions\Action::make('ver_gps_fin_taller_maquinaria')
+                                        ->icon('heroicon-o-map')
+                                        ->tooltip('Ver ubicación en Google Maps')
+                                        ->url('https://maps.google.com/?q=' . $record->gps_fin_taller_maquinaria, shouldOpenInNewTab: true);
+                                }
+                                return null;
+                            }),
+
+                        Placeholder::make('tiempo_total_taller_maquinaria')
+                            ->label('Tiempo total taller maquinaria')
+                            ->content(function ($record) {
+                                if (!$record || !$record->fecha_hora_inicio_taller_maquinaria) {
+                                    return 'Sin iniciar';
+                                }
+
+                                $inicio = Carbon::parse($record->fecha_hora_inicio_taller_maquinaria)->timezone('Europe/Madrid');
+                                $fin = $record->fecha_hora_fin_taller_maquinaria
+                                    ? Carbon::parse($record->fecha_hora_fin_taller_maquinaria)->timezone('Europe/Madrid')
+                                    : Carbon::now('Europe/Madrid');
+
+                                $totalMinutos = $inicio->diffInMinutes($fin);
+                                $horas = floor($totalMinutos / 60);
+                                $minutos = $totalMinutos % 60;
+
+                                return "{$horas}h {$minutos}min";
+                            }),
+                    ])
+                    ->columns(2)
+                    ->visible(
+                        fn($record) =>
+                        Filament::auth()->user()?->hasAnyRole(['superadmin', 'administración']) &&
+                        filled($record?->fecha_hora_inicio_taller_maquinaria)
+                    ),
+                    
                 Section::make()
                     ->visible(function ($record) {
                         if (!$record)
