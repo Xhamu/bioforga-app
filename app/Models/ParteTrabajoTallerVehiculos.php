@@ -34,8 +34,8 @@ class ParteTrabajoTallerVehiculos extends Model
     ];
 
     protected $casts = [
-        'fecha_hora_inicio_taller_vehiculos' => 'date',
-        'fecha_hora_fin_taller_vehiculos' => 'date',
+        'fecha_hora_inicio_taller_vehiculos' => 'datetime',
+        'fecha_hora_fin_taller_vehiculos' => 'datetime',
     ];
 
     public function getActivitylogOptions(): LogOptions

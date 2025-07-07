@@ -308,6 +308,19 @@ class ProveedorResource extends Resource
                     TextColumn::make('email')
                         ->searchable()
                         ->icon('heroicon-m-envelope'),
+
+                    TextColumn::make('tipo_servicio')
+                        ->label('Tipo de proveedor')
+                        ->sortable()
+                        ->badge()
+                        ->color('primary'),
+
+                    TextColumn::make('provincia')
+                        ->label('Provincia')
+                        ->searchable()
+                        ->formatStateUsing(function ($state) {
+                            return Provincia::find($state)?->nombre ?? 'Desconocida';
+                        }),
                 ])
                 ->filters(
                     [

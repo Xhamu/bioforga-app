@@ -10,6 +10,7 @@ use Filament\Facades\Filament;
 use Filament\Forms;
 use Filament\Forms\Components\Actions;
 use Filament\Forms\Components\Actions\Action;
+use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
@@ -145,6 +146,60 @@ class ParteTrabajoTallerVehiculosResource extends Resource
                     ])
                     ->columns(1),
 
+                Section::make('Fechas y horas')
+                    ->schema([
+                        DateTimePicker::make('fecha_hora_inicio_taller_vehiculos')
+                            ->label('Hora de inicio taller vehiculos')
+                            ->timezone('Europe/Madrid')
+                            ->suffixAction(function ($record) {
+                                if ($record?->gps_inicio_taller_vehiculos) {
+                                    return Actions\Action::make('ver_gps_inicio_taller_vehiculos')
+                                        ->icon('heroicon-o-map')
+                                        ->tooltip('Ver ubicación en Google Maps')
+                                        ->url('https://maps.google.com/?q=' . $record->gps_inicio_taller_vehiculos, shouldOpenInNewTab: true);
+                                }
+                                return null;
+                            }),
+
+                        DateTimePicker::make('fecha_hora_fin_taller_vehiculos')
+                            ->label('Hora de finalización taller vehiculos')
+                            ->timezone('Europe/Madrid')
+                            ->suffixAction(function ($record) {
+                                if ($record?->gps_fin_taller_vehiculos) {
+                                    return Actions\Action::make('ver_gps_fin_taller_vehiculos')
+                                        ->icon('heroicon-o-map')
+                                        ->tooltip('Ver ubicación en Google Maps')
+                                        ->url('https://maps.google.com/?q=' . $record->gps_fin_taller_vehiculos, shouldOpenInNewTab: true);
+                                }
+                                return null;
+                            }),
+
+                        Placeholder::make('tiempo_total_taller_vehiculos')
+                            ->label('Tiempo total taller vehiculos')
+                            ->content(function ($record) {
+                                if (!$record || !$record->fecha_hora_inicio_taller_vehiculos) {
+                                    return 'Sin iniciar';
+                                }
+
+                                $inicio = Carbon::parse($record->fecha_hora_inicio_taller_vehiculos)->timezone('Europe/Madrid');
+                                $fin = $record->fecha_hora_fin_taller_vehiculos
+                                    ? Carbon::parse($record->fecha_hora_fin_taller_vehiculos)->timezone('Europe/Madrid')
+                                    : Carbon::now('Europe/Madrid');
+
+                                $totalMinutos = $inicio->diffInMinutes($fin);
+                                $horas = floor($totalMinutos / 60);
+                                $minutos = $totalMinutos % 60;
+
+                                return "{$horas}h {$minutos}min";
+                            }),
+                    ])
+                    ->columns(2)
+                    ->visible(
+                        fn($record) =>
+                        Filament::auth()->user()?->hasAnyRole(['superadmin', 'administración']) &&
+                        filled($record?->fecha_hora_inicio_taller_vehiculos)
+                    ),
+
                 Section::make('')
                     ->schema([
                         Placeholder::make('')
@@ -208,6 +263,7 @@ class ParteTrabajoTallerVehiculosResource extends Resource
                             })
                             ->columnSpanFull(),
                     ])
+                    ->visible(fn() => !Filament::auth()->user()?->hasAnyRole(['superadmin', 'administración']))
                     ->columns(1),
 
                 Section::make()

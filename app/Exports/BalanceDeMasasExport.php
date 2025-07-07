@@ -15,7 +15,6 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
-use function PHPUnit\Framework\isNull;
 
 class BalanceDeMasasExport implements FromCollection, WithHeadings, WithMapping, WithTitle, ShouldAutoSize, WithEvents, WithStyles
 {
@@ -23,13 +22,17 @@ class BalanceDeMasasExport implements FromCollection, WithHeadings, WithMapping,
 
     public function __construct()
     {
-        $this->agrupado = CargaTransporte::with([
+        $cargas = CargaTransporte::with([
             'referencia',
+            'almacen',
             'parteTrabajoSuministroTransporte.usuario',
             'parteTrabajoSuministroTransporte.camion',
             'parteTrabajoSuministroTransporte.cliente',
-            'almacen'
-        ])->get()->groupBy('referencia_id');
+        ])->get();
+
+        $this->agrupado = $cargas->groupBy(function ($carga) {
+            return $carga->referencia_id ?? $carga->almacen_id;
+        });
     }
 
     public function collection()
@@ -37,92 +40,114 @@ class BalanceDeMasasExport implements FromCollection, WithHeadings, WithMapping,
         $filas = collect();
 
         foreach ($this->agrupado as $referenciaId => $cargas) {
-            $ref = $cargas->first()->referencia;
-            $cantidadAprox = $ref?->cantidad_aprox ?? 0;
-            $totalCargado = $cargas->sum('cantidad');
-            $saldo = $cantidadAprox - $totalCargado;
+            $ref = $cargas->first()->referencia ?? $cargas->first()->almacen;
+
+            $totalCargadoReferencia = $cargas->sum('cantidad');
 
             $filas->push([
-                'Referencia' => $ref?->referencia ?? 'Sin referencia',
-                'Cantidad Aprox' => $cantidadAprox,
+                'Referencia' => $ref?->referencia ?? $ref?->almacen,
+                'Lugar' => '',
                 'Fecha Inicio' => '',
                 'Ubicación Inicio' => '',
                 'Fecha Fin' => '',
                 'Ubicación Fin' => '',
                 'Cantidad Carga' => '',
+                'Cantidad Carga Tn' => '',
                 'Transportista' => '',
                 'Camión' => '',
                 'Destino' => '',
+                'Conversor a Tn' => '',
             ]);
 
             foreach ($cargas as $carga) {
                 $parte = $carga->parteTrabajoSuministroTransporte;
 
-                if (!$parte || $parte->trashed()) {
+                if (!$parte || $parte->trashed())
                     continue;
-                }
+
+                $ayuntamiento = optional($carga->referencia)?->ayuntamiento ?? optional($carga->almacen)?->ayuntamiento ?? '—';
+                $monteParcela = optional($carga->referencia)?->monte_parcela ?? optional($carga->almacen)?->monte_parcela ?? '—';
+
+                $lugar = "{$ayuntamiento}, {$monteParcela}";
 
                 $filas->push([
                     'Referencia' => '',
-                    'Cantidad Aprox' => '-- CARGA --',
+                    'Lugar' => $lugar,
                     'Fecha Inicio' => optional($carga->fecha_hora_inicio_carga)?->format('d/m/Y H:i'),
-                    'Ubicación Inicio' => $carga->gps_inicio_carga
-                        ? '=HYPERLINK("https://maps.google.com/?q=' . $carga->gps_inicio_carga . '", "Ver mapa")'
-                        : '',
+                    'Ubicación Inicio' => $carga->gps_inicio_carga ? '=HYPERLINK("https://maps.google.com/?q=' . $carga->gps_inicio_carga . '", "Ver mapa")' : '',
                     'Fecha Fin' => optional($carga->fecha_hora_fin_carga)?->format('d/m/Y H:i'),
-                    'Ubicación Fin' => $carga->gps_fin_carga
-                        ? '=HYPERLINK("https://maps.google.com/?q=' . $carga->gps_fin_carga . '", "Ver mapa")'
-                        : '',
+                    'Ubicación Fin' => $carga->gps_fin_carga ? '=HYPERLINK("https://maps.google.com/?q=' . $carga->gps_fin_carga . '", "Ver mapa")' : '',
                     'Cantidad Carga' => $carga->cantidad,
+                    'Cantidad Carga Tn' => '', // fórmula en AfterSheet
                     'Transportista' => optional($parte->usuario)?->name . ' ' . optional($parte->usuario)?->apellidos ?? '—',
-                    'Camión' => optional($parte->camion)?->marca . ' ' . optional($parte->camion)?->modelo ?? '—',
+                    'Camión' => optional($parte->camion)?->matricula_cabeza ?? '—',
                     'Destino' => optional($parte->cliente)?->razon_social ?? optional($carga->almacen)?->nombre ?? '—',
+                    'Conversor a Tn' => '',
                 ]);
             }
 
             $filas->push([
                 'Referencia' => 'TOTAL CARGADO',
-                'Cantidad Aprox' => $totalCargado,
+                'Lugar' => '',
                 'Fecha Inicio' => '',
                 'Ubicación Inicio' => '',
                 'Fecha Fin' => '',
                 'Ubicación Fin' => '',
-                'Cantidad Carga' => 'SALDO',
-                'Transportista' => $saldo,
+                'Cantidad Carga' => $totalCargadoReferencia,
+                'Cantidad Carga Tn' => round($totalCargadoReferencia * 23, 2),
+                'Transportista' => '',
                 'Camión' => '',
                 'Destino' => '',
+                'Conversor a Tn' => '',
             ]);
 
             $filas->push(array_fill_keys([
                 'Referencia',
-                'Cantidad Aprox',
+                'Lugar',
                 'Fecha Inicio',
                 'Ubicación Inicio',
                 'Fecha Fin',
                 'Ubicación Fin',
                 'Cantidad Carga',
+                'Cantidad Carga Tn',
                 'Transportista',
                 'Camión',
-                'Destino'
+                'Destino',
+                'Conversor a Tn'
             ], null));
         }
 
-        // Añadir fila de resumen global
-        $totalAprox = $this->agrupado->map(fn($cargas) => optional($cargas->first()->referencia)?->cantidad_aprox ?? 0)->sum();
-        $totalCargado = $this->agrupado->flatMap(fn($cargas) => $cargas)->sum('cantidad');
-        $saldoGlobal = $totalAprox - $totalCargado;
+        $totalGlobal = CargaTransporte::sum('cantidad');
 
         $filas->push([
             'Referencia' => 'RESUMEN GLOBAL',
-            'Cantidad Aprox' => $totalAprox,
+            'Lugar' => '',
             'Fecha Inicio' => '',
             'Ubicación Inicio' => '',
             'Fecha Fin' => '',
             'Ubicación Fin' => '',
-            'Cantidad Carga' => $totalCargado,
-            'Transportista' => 'SALDO GLOBAL',
-            'Camión' => $saldoGlobal,
+            'Cantidad Carga' => $totalGlobal,
+            'Cantidad Carga Tn' => round($totalGlobal * 23, 2),
+            'Transportista' => '',
+            'Camión' => '',
             'Destino' => '',
+            'Conversor a Tn' => '',
+        ]);
+
+        // Fila final con el conversor global
+        $filas->push([
+            'Referencia' => 'CONVERSOR A TN GLOBAL',
+            'Lugar' => '',
+            'Fecha Inicio' => '',
+            'Ubicación Inicio' => '',
+            'Fecha Fin' => '',
+            'Ubicación Fin' => '',
+            'Cantidad Carga' => '',
+            'Cantidad Carga Tn' => '',
+            'Transportista' => '',
+            'Camión' => '',
+            'Destino' => '',
+            'Conversor a Tn' => 23,
         ]);
 
         return $filas;
@@ -132,15 +157,17 @@ class BalanceDeMasasExport implements FromCollection, WithHeadings, WithMapping,
     {
         return [
             'REFERENCIA',
-            'CANTIDAD APROX.',
+            'LUGAR',
             'INICIO',
             'UBICACIÓN INICIO',
             'FIN',
             'UBICACIÓN FIN',
-            'CANTIDAD CARGADA',
+            'CANTIDAD CARGADA (m3)',
+            'CANTIDAD CARGADA (Tn)',
             'USUARIO',
             'CAMIÓN',
             'DESTINO',
+            'CONVERSOR A TN'
         ];
     }
 
@@ -151,7 +178,7 @@ class BalanceDeMasasExport implements FromCollection, WithHeadings, WithMapping,
 
     public function title(): string
     {
-        return 'BALANCE MASAS';
+        return 'BALANCE DE MASAS';
     }
 
     public function registerEvents(): array
@@ -162,30 +189,20 @@ class BalanceDeMasasExport implements FromCollection, WithHeadings, WithMapping,
                 $rowCount = $sheet->getHighestRow();
 
                 $sheet->freezePane('A2');
-                $sheet->setAutoFilter('A1:J1');
+                $sheet->setAutoFilter('A1:L1');
 
-                for ($row = 2; $row <= $rowCount; $row++) {
-                    $contenido = $sheet->getCell("H{$row}")->getValue();
-                    $saltos = substr_count((string) $contenido, PHP_EOL);
-                    $lineas = floor(strlen((string) $contenido) / 100);
-                    $altura = max(15 * ($lineas + $saltos + 1), 16);
-                    $sheet->getRowDimension($row)->setRowHeight($altura);
+                // Calcular fila del conversor global
+                $conversorRow = $rowCount;
+
+                for ($row = 2; $row < $conversorRow; $row++) {
+                    $cantidadCarga = $sheet->getCell("G{$row}")->getValue();
 
                     $colA = $sheet->getCell("A{$row}")->getValue();
-                    $colB = $sheet->getCell("B{$row}")->getValue();
-
-                    $style = $sheet->getStyle("A{$row}:J{$row}");
+                    $style = $sheet->getStyle("A{$row}:L{$row}");
 
                     if (!empty($colA)) {
-                        $style->getFill()
-                            ->setFillType(Fill::FILL_SOLID)
-                            ->getStartColor()
-                            ->setRGB('D9D9D9');
+                        $style->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('D9D9D9');
                         $style->getFont()->setBold(true);
-                    }
-
-                    if ($colB === '-- CARGA --') {
-                        $style->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('E8F0FE');
                     }
 
                     if ($colA === 'TOTAL CARGADO') {
@@ -195,6 +212,11 @@ class BalanceDeMasasExport implements FromCollection, WithHeadings, WithMapping,
                     if ($colA === 'RESUMEN GLOBAL') {
                         $style->getFont()->setBold(true)->setSize(10);
                         $style->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('FFD54F');
+                    }
+
+                    // Filas de detalle: poner fórmula en I solo si tienen cantidad
+                    if (!empty($cantidadCarga)) {
+                        $sheet->setCellValue("H{$row}", "=G{$row}*\$L\${$conversorRow}");
                     }
                 }
             },
@@ -217,7 +239,7 @@ class BalanceDeMasasExport implements FromCollection, WithHeadings, WithMapping,
                     'bottom' => ['borderStyle' => Border::BORDER_THIN],
                 ],
             ],
-            'A:J' => [
+            'A:L' => [
                 'font' => ['size' => 8],
                 'alignment' => [
                     'horizontal' => Alignment::HORIZONTAL_CENTER,

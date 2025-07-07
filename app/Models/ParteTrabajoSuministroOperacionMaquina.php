@@ -88,6 +88,11 @@ class ParteTrabajoSuministroOperacionMaquina extends Model
 
     protected $table = 'parte_trabajo_suministro_operacion_maquina';
 
+    protected function getProduccionAttribute()
+    {
+        return $this->cantidad_producida . ' ' . $this->tipo_cantidad_producida;
+    }
+
     public function usuario()
     {
         return $this->belongsTo(User::class, 'usuario_id');
