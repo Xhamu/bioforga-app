@@ -839,10 +839,25 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                     ->label(fn() => request('trashed') === 'true' ? 'Ver activos' : 'Ver eliminados')
                     ->icon(fn() => request('trashed') === 'true' ? 'heroicon-o-eye' : 'heroicon-o-trash')
                     ->color(fn() => request('trashed') === 'true' ? 'gray' : 'danger')
-                    ->url(fn() => request()->fullUrlWithQuery([
-                        'trashed' => request('trashed') === 'true' ? null : 'true',
-                    ]))
-                    ->visible(fn() => Filament::auth()->user()?->hasRole('superadmin')),
+                    ->visible(fn() => Filament::auth()->user()?->hasRole('superadmin'))
+                    ->action(function () {
+                        $verEliminados = request('trashed') !== 'true';
+
+                        if ($verEliminados && ParteTrabajoSuministroOperacionMaquina::onlyTrashed()->count() === 0) {
+                            Notification::make()
+                                ->title('No hay registros eliminados')
+                                ->body('Actualmente no existen registros en la papelera.')
+                                ->warning()
+                                ->send();
+
+                            return;
+                        }
+
+                        // Redirige a la misma URL con o sin `trashed=true`
+                        return redirect()->to(request()->fullUrlWithQuery([
+                            'trashed' => $verEliminados ? 'true' : null,
+                        ]));
+                    }),
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),
@@ -884,6 +899,8 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
 
         if (request('trashed') === 'true') {
             $query->onlyTrashed();
+        } else {
+            $query->whereNull('deleted_at'); // <- esto faltaba
         }
 
         $user = Filament::auth()->user();
