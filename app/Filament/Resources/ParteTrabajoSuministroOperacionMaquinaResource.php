@@ -34,6 +34,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Enums\FiltersLayout;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
@@ -359,8 +360,9 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                     ->columns(2)
                     ->visible(
                         fn($record) =>
-                        Filament::auth()->user()?->hasAnyRole(['superadmin', 'administración']) &&
-                        filled($record?->fecha_hora_inicio_trabajo)
+                        $record &&
+                        $record->exists &&
+                        Filament::auth()->user()?->hasAnyRole(['superadmin', 'administración'])
                     ),
 
                 Section::make()
@@ -621,18 +623,18 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
     {
         return $table
             ->columns([
-                TextColumn::make('created_at')
+                TextColumn::make('fecha_hora_inicio_trabajo')
                     ->label('Fecha')
                     ->date('d/m/Y')
                     ->timezone('Europe/Madrid')
                     ->weight(FontWeight::Bold)
                     ->description(function ($record) {
-                        $inicio = $record->created_at
-                            ? $record->created_at->timezone('Europe/Madrid')
+                        $inicio = $record->fecha_hora_inicio_trabajo
+                            ? $record->fecha_hora_inicio_trabajo
                             : null;
 
                         $fin = $record->fecha_hora_fin_trabajo
-                            ? Carbon::parse($record->fecha_hora_fin_trabajo)->timezone('Europe/Madrid')
+                            ? Carbon::parse($record->fecha_hora_fin_trabajo)
                             : null;
 
                         if (!$inicio) {
@@ -652,13 +654,12 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                     ->sortable()
                     ->tooltip(function ($record) {
                         // Tooltip con fecha y horas completas
-                        $inicio = $record->created_at
-                            ? $record->created_at->timezone('Europe/Madrid')->format('d/m/Y H:i')
+                        $inicio = $record->fecha_hora_inicio_trabajo
+                            ? $record->fecha_hora_inicio_trabajo->format('d/m/Y H:i')
                             : '-';
 
                         $fin = $record->fecha_hora_fin_trabajo
                             ? Carbon::parse($record->fecha_hora_fin_trabajo)
-                                ->timezone('Europe/Madrid')
                                 ->format('d/m/Y H:i')
                             : '-';
 
@@ -673,13 +674,13 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                         $monte_parcela = $record->referencia?->monte_parcela ?? '';
                         return trim("$referencia ($ayuntamiento, $monte_parcela)");
                     })
-                    ->limit(35)
+                    ->limit(25)
                     ->tooltip(fn($record) => trim(($record->referencia?->referencia ?? '') . ' (' . ($record->referencia?->ayuntamiento ?? '') . ', ' . ($record->referencia?->monte_parcela ?? '') . ')'))
                     ->weight(FontWeight::Bold)
                     ->sortable(),
 
-                TextColumn::make('referencia.cliente.razon_social')
-                    ->label('Cliente')
+                TextColumn::make('interviniente')
+                    ->label('Interviniente')
                     ->limit(25)
                     ->tooltip(fn($state) => $state)
                     ->weight(FontWeight::Bold)
@@ -693,7 +694,7 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                         $inicialApellido = $apellido ? strtoupper(substr($apellido, 0, 1)) . '.' : '';
                         return trim("$nombre $inicialApellido");
                     })
-                    ->limit(20)
+                    ->limit(15)
                     ->tooltip(fn($record) => ($record->usuario?->name ?? '') . ' ' . ($record->usuario?->apellidos ?? ''))
                     ->weight(FontWeight::Bold)
                     ->sortable(),
@@ -705,13 +706,13 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                         $modelo = $record->maquina?->modelo ?? '';
                         return trim("$marca $modelo");
                     })
-                    ->limit(25)
+                    ->limit(15)
                     ->tooltip(fn($record) => ($record->maquina?->marca ?? '') . ' ' . ($record->maquina?->modelo ?? ''))
                     ->toggleable()
                     ->sortable(),
 
-                TextColumn::make('horas_rotor')
-                    ->label('Horas rotor')
+                TextColumn::make('horas_rotor_encendido')
+                    ->label('Horas rotor / encendido')
                     ->alignCenter(),
 
                 TextColumn::make('produccion')
@@ -720,7 +721,7 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
             ])
             ->filters(
                 [
-                    Filter::make('created_at')
+                    Filter::make('fecha_hora_inicio_trabajo')
                         ->columns(2)
                         ->form([
                             DatePicker::make('created_from')
@@ -731,8 +732,8 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                         ])
                         ->query(function ($query, array $data) {
                             return $query
-                                ->when($data['created_from'], fn($query, $date) => $query->whereDate('created_at', '>=', $date))
-                                ->when($data['created_until'], fn($query, $date) => $query->whereDate('created_at', '<=', $date));
+                                ->when($data['created_from'], fn($query, $date) => $query->whereDate('fecha_hora_inicio_trabajo', '>=', $date))
+                                ->when($data['created_until'], fn($query, $date) => $query->whereDate('fecha_hora_inicio_trabajo', '<=', $date));
                         }),
 
                     SelectFilter::make('usuario_id')
@@ -833,6 +834,16 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                 layout: FiltersLayout::AboveContent
             )
             ->filtersFormColumns(3)
+            ->headerActions([
+                Tables\Actions\Action::make('toggle_trashed')
+                    ->label(fn() => request('trashed') === 'true' ? 'Ver activos' : 'Ver eliminados')
+                    ->icon(fn() => request('trashed') === 'true' ? 'heroicon-o-eye' : 'heroicon-o-trash')
+                    ->color(fn() => request('trashed') === 'true' ? 'gray' : 'danger')
+                    ->url(fn() => request()->fullUrlWithQuery([
+                        'trashed' => request('trashed') === 'true' ? null : 'true',
+                    ]))
+                    ->visible(fn() => Filament::auth()->user()?->hasRole('superadmin')),
+            ])
             ->actions([
                 Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),
@@ -870,6 +881,10 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
             ->withoutGlobalScopes([
                 SoftDeletingScope::class,
             ]);
+
+        if (request('trashed') === 'true') {
+            $query->onlyTrashed();
+        }
 
         $user = Filament::auth()->user();
         $rolesPermitidos = ['superadmin', 'administración', 'administrador'];

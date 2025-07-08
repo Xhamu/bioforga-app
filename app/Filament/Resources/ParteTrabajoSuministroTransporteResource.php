@@ -14,8 +14,12 @@ use Awcodes\TableRepeater\Header;
 use Filament\Facades\Filament;
 use Filament\Forms;
 use Filament\Forms\Components\Actions\Action;
+use Filament\Forms\Components\DatePicker;
 use Filament\Resources\Resource;
 use Filament\Tables;
+use Filament\Tables\Enums\FiltersLayout;
+use Filament\Tables\Filters\Filter;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
@@ -585,8 +589,133 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                         return '-';
                     }),
             ])
-            ->filters([
-                Tables\Filters\TrashedFilter::make(),
+            ->filters(
+                [
+                    Filter::make('fecha_hora_inicio_carga')
+                        ->columns(2)
+                        ->form([
+                            DatePicker::make('created_from')->label('Desde'),
+                            DatePicker::make('created_until')->label('Hasta'),
+                        ])
+                        ->query(function ($query, array $data) {
+                            return $query->whereHas('cargas', function ($q) use ($data) {
+                                $q->when($data['created_from'], fn($q, $date) => $q->whereDate('fecha_hora_inicio_carga', '>=', $date))
+                                    ->when($data['created_until'], fn($q, $date) => $q->whereDate('fecha_hora_inicio_carga', '<=', $date));
+                            });
+                        }),
+
+                    SelectFilter::make('cliente_id')
+                        ->label('Cliente')
+                        ->relationship(
+                            'referencia.cliente',
+                            'razon_social',
+                            fn($query) => $query->whereIn(
+                                'id',
+                                Referencia::query()
+                                    ->whereIn(
+                                        'id',
+                                        ParteTrabajoSuministroTransporte::query()->distinct()->pluck('referencia_id')
+                                    )
+                                    ->pluck('cliente_id')
+                                    ->filter()
+                                    ->unique()
+                            )
+                        )
+                        ->searchable()
+                        ->preload()
+                        ->placeholder('Todos'),
+
+                    SelectFilter::make('usuario_id')
+                        ->label('Usuario')
+                        ->options(function () {
+                            $usuarioIds = ParteTrabajoSuministroTransporte::query()
+                                ->distinct()
+                                ->pluck('usuario_id')
+                                ->filter()
+                                ->unique();
+
+                            return \App\Models\User::query()
+                                ->whereIn('id', $usuarioIds)
+                                ->orderBy('name')
+                                ->get()
+                                ->mapWithKeys(fn($usuario) => [
+                                    $usuario->id => trim($usuario->name . ' ' . ($usuario->apellidos ?? '')),
+                                ])
+                                ->toArray();
+                        })
+                        ->searchable()
+                        ->preload()
+                        ->placeholder('Todos'),
+
+                    SelectFilter::make('referencia_id')
+                        ->label('Referencia')
+                        ->options(function () {
+                            $referenciaIds = \App\Models\CargaTransporte::query()
+                                ->whereNotNull('referencia_id')
+                                ->distinct()
+                                ->pluck('referencia_id')
+                                ->filter()
+                                ->unique();
+
+                            return Referencia::query()
+                                ->whereIn('id', $referenciaIds)
+                                ->orderBy('referencia')
+                                ->get()
+                                ->mapWithKeys(fn($referencia) => [
+                                    $referencia->id => trim(
+                                        $referencia->referencia . ' (' .
+                                        ($referencia->ayuntamiento ?? '-') . ', ' .
+                                        ($referencia->monte_parcela ?? '-') . ')'
+                                    ),
+                                ])
+                                ->toArray();
+                        })
+                        ->searchable()
+                        ->preload()
+                        ->columnSpan(2)
+                        ->placeholder('Todas')
+                        ->query(function ($query, $data) {
+                            return $query->when($data['value'], function ($query, $value) {
+                                $query->whereHas('cargas', function ($subQuery) use ($value) {
+                                    $subQuery->where('referencia_id', $value);
+                                });
+                            });
+                        }),
+
+                    SelectFilter::make('camion_id')
+                        ->label('Camión')
+                        ->options(function () {
+                            $camionIds = ParteTrabajoSuministroTransporte::query()
+                                ->distinct()
+                                ->pluck('camion_id')
+                                ->filter()
+                                ->unique();
+
+                            return Camion::query()
+                                ->whereIn('id', $camionIds)
+                                ->orderBy('matricula_cabeza')
+                                ->get()
+                                ->mapWithKeys(fn($camion) => [
+                                    $camion->id => $camion->matricula_cabeza,
+                                ])
+                                ->toArray();
+                        })
+                        ->searchable()
+                        ->preload()
+                        ->placeholder('Todos')
+                ],
+                layout: FiltersLayout::AboveContent
+            )
+            ->filtersFormColumns(3)
+            ->headerActions([
+                Tables\Actions\Action::make('toggle_trashed')
+                    ->label(fn() => request('trashed') === 'true' ? 'Ver activos' : 'Ver eliminados')
+                    ->icon(fn() => request('trashed') === 'true' ? 'heroicon-o-eye' : 'heroicon-o-trash')
+                    ->color(fn() => request('trashed') === 'true' ? 'gray' : 'danger')
+                    ->url(fn() => request()->fullUrlWithQuery([
+                        'trashed' => request('trashed') === 'true' ? null : 'true',
+                    ]))
+                    ->visible(fn() => Filament::auth()->user()?->hasRole('superadmin')),
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),
@@ -629,6 +758,10 @@ class ParteTrabajoSuministroTransporteResource extends Resource
             ->withoutGlobalScopes([
                 SoftDeletingScope::class,
             ]);
+
+        if (request('trashed') === 'true') {
+            $query->onlyTrashed();
+        }
 
         $user = Filament::auth()->user();
         $rolesPermitidos = ['superadmin', 'administración', 'administrador'];
