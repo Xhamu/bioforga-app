@@ -105,7 +105,7 @@ class ReferenciaResource extends Resource
                             $contadorInt = (int) $contador;
 
                             do {
-                                $contadorFormateado = str_pad($contadorInt, 3, '0', STR_PAD_LEFT);
+                                $contadorFormateado = str_pad($contadorInt, 2, '0', STR_PAD_LEFT);
                                 $nuevaReferencia = $sector . 'SU' . $state . $fecha . $contadorFormateado;
 
                                 $existe = Referencia::where('referencia', $nuevaReferencia)->exists();
@@ -141,7 +141,7 @@ class ReferenciaResource extends Resource
 
                                 $contador = 1;
                                 do {
-                                    $contadorStr = str_pad($contador, 3, '0', STR_PAD_LEFT);
+                                    $contadorStr = str_pad($contador, 2, '0', STR_PAD_LEFT);
                                     $nuevaReferencia = "{$provincia}{$ayuntamiento}{$fecha}{$contadorStr}";
 
                                     $existe = Referencia::where('referencia', $nuevaReferencia)->exists();
@@ -167,7 +167,7 @@ class ReferenciaResource extends Resource
 
                                 $contador = 1;
                                 do {
-                                    $contadorStr = str_pad($contador, 3, '0', STR_PAD_LEFT);
+                                    $contadorStr = str_pad($contador, 2, '0', STR_PAD_LEFT);
                                     $nuevaReferencia = "{$provincia}{$ayuntamiento}{$fecha}{$contadorStr}";
 
                                     $existe = Referencia::where('referencia', $nuevaReferencia)->exists();
@@ -270,6 +270,7 @@ class ReferenciaResource extends Resource
                                 'puntal' => 'Puntal',
                                 'copas' => 'Copas',
                                 'rama' => 'Rama',
+                                'raices' => 'Raíces',
                             ])
                             ->required(),
 
@@ -905,7 +906,7 @@ class ReferenciaResource extends Resource
                         $contadorInt = (int) $contador;
 
                         do {
-                            $contadorFormateado = str_pad($contadorInt, 3, '0', STR_PAD_LEFT);
+                            $contadorFormateado = str_pad($contadorInt, 2, '0', STR_PAD_LEFT);
                             $nuevaReferencia = $sector . 'SU' . $state . $fecha . $contadorFormateado;
 
                             $existe = Referencia::where('referencia', $nuevaReferencia)->exists();
@@ -941,7 +942,7 @@ class ReferenciaResource extends Resource
 
                             $contador = 1;
                             do {
-                                $contadorStr = str_pad($contador, 3, '0', STR_PAD_LEFT);
+                                $contadorStr = str_pad($contador, 2, '0', STR_PAD_LEFT);
                                 $nuevaReferencia = "{$provincia}{$ayuntamiento}{$fecha}{$contadorStr}";
 
                                 $existe = Referencia::where('referencia', $nuevaReferencia)->exists();
@@ -967,7 +968,7 @@ class ReferenciaResource extends Resource
 
                             $contador = 1;
                             do {
-                                $contadorStr = str_pad($contador, 3, '0', STR_PAD_LEFT);
+                                $contadorStr = str_pad($contador, 2, '0', STR_PAD_LEFT);
                                 $nuevaReferencia = "{$provincia}{$ayuntamiento}{$fecha}{$contadorStr}";
 
                                 $existe = Referencia::where('referencia', $nuevaReferencia)->exists();
@@ -1069,6 +1070,7 @@ class ReferenciaResource extends Resource
                             'puntal' => 'Puntal',
                             'copas' => 'Copas',
                             'rama' => 'Rama',
+                            'raices' => 'Raíces',
                         ])
                         ->required(),
 

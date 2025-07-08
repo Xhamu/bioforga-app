@@ -93,6 +93,38 @@ class ParteTrabajoSuministroOperacionMaquina extends Model
         return $this->cantidad_producida . ' ' . $this->tipo_cantidad_producida;
     }
 
+    protected function getHorasRotorEncendidoAttribute()
+    {
+        if ($this->horas_rotor) {
+            return $this->horas_rotor;
+        } else {
+            return $this->horas_encendido;
+        }
+    }
+
+    public function getIntervinienteAttribute(): ?string
+    {
+        if ($this->referencia) {
+            if ($this->referencia->cliente_id) {
+                return $this->referencia->cliente?->razon_social;
+            }
+
+            if ($this->referencia->proveedor_id) {
+                return $this->referencia->proveedor?->razon_social;
+            }
+        } else {
+            if ($this->cliente_id) {
+                return $this->cliente?->razon_social;
+            }
+
+            if ($this->proveedor_id) {
+                return $this->proveedor?->razon_social;
+            }
+        }
+
+        return null;
+    }
+
     public function usuario()
     {
         return $this->belongsTo(User::class, 'usuario_id');

@@ -262,7 +262,7 @@ class ParteTrabajoTallerMaquinariaResource extends Resource
                         Filament::auth()->user()?->hasAnyRole(['superadmin', 'administración']) &&
                         filled($record?->fecha_hora_inicio_taller_maquinaria)
                     ),
-                    
+
                 Section::make()
                     ->visible(function ($record) {
                         if (!$record)
@@ -337,7 +337,7 @@ class ParteTrabajoTallerMaquinariaResource extends Resource
     {
         return $table
             ->columns([
-                TextColumn::make('created_at')
+                TextColumn::make('fecha_hora_inicio_taller_maquinaria')
                     ->label('Fecha y hora')
                     ->weight(FontWeight::Bold)
                     ->dateTime()

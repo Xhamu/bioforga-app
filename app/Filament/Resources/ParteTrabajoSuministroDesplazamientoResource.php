@@ -354,7 +354,7 @@ class ParteTrabajoSuministroDesplazamientoResource extends Resource
     {
         return $table
             ->columns([
-                TextColumn::make('created_at')
+                TextColumn::make('fecha_hora_inicio_desplazamiento')
                     ->label('Fecha y hora')
                     ->weight(FontWeight::Bold)
                     ->dateTime()
