@@ -625,16 +625,16 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
             ->columns([
                 TextColumn::make('fecha_hora_inicio_trabajo')
                     ->label('Fecha')
-                    ->date('d/m/Y')
-                    ->timezone('Europe/Madrid')
+                    ->date('d/m/Y') // Este sí se transforma con ->timezone()
+                    ->timezone('Europe/Madrid') // Solo aplica a ->date()
                     ->weight(FontWeight::Bold)
                     ->description(function ($record) {
                         $inicio = $record->fecha_hora_inicio_trabajo
-                            ? $record->fecha_hora_inicio_trabajo
+                            ? $record->fecha_hora_inicio_trabajo->copy()->setTimezone('Europe/Madrid')
                             : null;
 
                         $fin = $record->fecha_hora_fin_trabajo
-                            ? Carbon::parse($record->fecha_hora_fin_trabajo)
+                            ? Carbon::parse($record->fecha_hora_fin_trabajo)->setTimezone('Europe/Madrid')
                             : null;
 
                         if (!$inicio) {
@@ -644,7 +644,6 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                         $inicioStr = $inicio->format('H:i');
                         $finStr = $fin ? $fin->format('H:i') : '-';
 
-                        // Si el fin existe y cae en un día distinto al inicio, añade la fecha
                         if ($fin && $inicio->format('d/m/Y') !== $fin->format('d/m/Y')) {
                             $finStr = $fin->format('d/m/Y') . ' ' . $fin->format('H:i');
                         }
@@ -653,14 +652,12 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                     })
                     ->sortable()
                     ->tooltip(function ($record) {
-                        // Tooltip con fecha y horas completas
                         $inicio = $record->fecha_hora_inicio_trabajo
-                            ? $record->fecha_hora_inicio_trabajo->format('d/m/Y H:i')
+                            ? $record->fecha_hora_inicio_trabajo->copy()->setTimezone('Europe/Madrid')->format('d/m/Y H:i')
                             : '-';
 
                         $fin = $record->fecha_hora_fin_trabajo
-                            ? Carbon::parse($record->fecha_hora_fin_trabajo)
-                                ->format('d/m/Y H:i')
+                            ? Carbon::parse($record->fecha_hora_fin_trabajo)->setTimezone('Europe/Madrid')->format('d/m/Y H:i')
                             : '-';
 
                         return "Inicio: $inicio\nFin: $fin";
@@ -712,7 +709,7 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                     ->sortable(),
 
                 TextColumn::make('horas_rotor_encendido')
-                    ->label('Horas rotor / encendido')
+                    ->label('Horas rotor / servicio')
                     ->alignCenter(),
 
                 TextColumn::make('produccion')
@@ -870,6 +867,8 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                     Tables\Actions\RestoreBulkAction::make(),
                 ]),
             ])
+            ->paginated(true)
+            ->paginationPageOptions([50, 100, 200])
             ->defaultSort('created_at', 'desc');
     }
 
@@ -904,7 +903,7 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
         }
 
         $user = Filament::auth()->user();
-        $rolesPermitidos = ['superadmin', 'administración', 'administrador'];
+        $rolesPermitidos = ['superadmin', 'administración', 'administrador', 'técnico'];
 
         if (!$user->hasAnyRole($rolesPermitidos)) {
             $query->where('usuario_id', $user->id);
@@ -920,6 +919,6 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
         return $user->hasRole('operarios')
             ? \App\Models\User::query()->where('id', $user->id)
             : \App\Models\User::query()->whereHas('roles', fn($q) =>
-                $q->whereIn('name', ['administración', 'administrador', 'operarios']));
+                $q->whereIn('name', ['administración', 'administrador', 'operarios', 'proveedor de servicio']));
     }
 }

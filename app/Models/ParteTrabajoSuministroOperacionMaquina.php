@@ -94,13 +94,18 @@ class ParteTrabajoSuministroOperacionMaquina extends Model
     }
 
     protected function getHorasRotorEncendidoAttribute()
-    {
-        if ($this->horas_rotor) {
-            return $this->horas_rotor;
-        } else {
-            return $this->horas_encendido;
-        }
+{
+    if ($this->horas_rotor) {
+        return $this->horas_rotor;
     }
+
+    if ($this->horas_encendido) {
+        return $this->horas_encendido;
+    }
+
+    return '—'; // O "0h", o simplemente 0
+}
+
 
     public function getIntervinienteAttribute(): ?string
     {

@@ -139,6 +139,8 @@ class TallerResource extends Resource
                 ]),
             ])
             ->striped()
+            ->paginated(true)
+            ->paginationPageOptions([50, 100, 200])
             ->defaultSort('created_at', 'desc');
     }
 

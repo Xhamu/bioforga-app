@@ -177,9 +177,9 @@ class CreateParteTrabajoSuministroOperacionMaquina extends CreateRecord
     {
         $user = Filament::auth()->user();
 
-        return $user->hasRole('operarios')
+        return $user->hasAnyRole(['operarios', 'proveedor de servicio'])
             ? User::query()->where('id', $user->id)
             : User::query()->whereHas('roles', fn($q) =>
-                $q->whereIn('name', ['administración', 'administrador', 'operarios']));
+                $q->whereIn('name', ['administración', 'administrador', 'operarios', 'proveedor de servicio']));
     }
 }

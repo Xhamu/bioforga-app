@@ -34,7 +34,7 @@
                                 </td>
 
                                 <td class="px-4 py-2 align-middle whitespace-nowrap hidden sm:table-cell">
-                                    {{ $parte['inicio'] ? \Carbon\Carbon::parse($parte['inicio'])->format('d/m/Y H:i') : '—' }}
+                                    {{ $parte['inicio'] ? \Carbon\Carbon::parse($parte['inicio'])->timezone('Europe/Madrid')->format('d/m/Y H:i') : '—' }}
                                 </td>
 
                                 <td class="px-4 py-2 align-middle whitespace-nowrap sm:text-left text-right">

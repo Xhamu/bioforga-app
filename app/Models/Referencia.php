@@ -79,17 +79,14 @@ class Referencia extends Model
         return $this->hasMany(Factura::class);
     }
 
-    public function getEstadoMostrarAttribute()
+    public function getEstadoMostrarAttribute(): string
     {
-        $estado = $this->estado;
-
-        if ($estado === 'abierto') {
-            return 'Abierto';
-        } else if ($estado === 'en_proceso') {
-            return 'En proceso';
-        } else if ($estado === 'cerrado') {
-            return 'Cerrado';
-        }
+        return match ($this->estado) {
+            'abierto' => 'Abierto',
+            'en_proceso' => 'En proceso',
+            'cerrado' => 'Cerrado',
+            default => ucfirst($this->estado ?? 'Desconocido'),
+        };
     }
 
     public function getIntervinienteAttribute(): string

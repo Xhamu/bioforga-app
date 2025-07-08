@@ -94,7 +94,10 @@ class ResumenPartesActivos extends Widget
                     'label' => $labels[$modelo],
                     'slug' => $slugs[$modelo],
                     'inicio' => $parte->{$campos['campo_inicio']} ?? null,
-                    'usuario_nombre' => $parte->usuario?->name ?? 'Desconocido',
+                    'usuario_nombre' => $parte->usuario
+                        ? trim($parte->usuario->name . ' ' . strtoupper(substr($parte->usuario->apellidos ?? '', 0, 1)) . '.')
+                        : 'Desconocido',
+
                 ];
             }
         }
