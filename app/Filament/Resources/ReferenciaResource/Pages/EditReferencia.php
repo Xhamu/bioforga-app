@@ -13,6 +13,8 @@ class EditReferencia extends EditRecord
 {
     protected static string $resource = ReferenciaResource::class;
 
+    protected string $estadoAnterior;
+
     protected function getHeaderActions(): array
     {
         return [
@@ -47,7 +49,7 @@ class EditReferencia extends EditRecord
 
                                         return (object) [
                                             'referencias' => $cargas->pluck('referencia.referencia')->filter()->unique()->values(),
-                                            'cliente' => $parte?->cliente?->razon_social ?? 'N/D',
+                                            'cliente' => $parte?->cliente?->razon_social ?? '-',
                                             'inicio' => $cargas->min('fecha_hora_inicio_carga'),
                                             'fin' => $cargas->max('fecha_hora_fin_carga'),
                                             'cantidad_total' => $cargas->sum('cantidad'),
@@ -94,9 +96,29 @@ class EditReferencia extends EditRecord
         ]);
     }
 
+    protected function mutateFormDataBeforeSave(array $data): array
+    {
+        $this->estadoAnterior = $this->record->estado ?? null; // guarda estado antes de guardar
+        return $data;
+    }
+
     protected function afterSave(): void
     {
         $this->record->usuarios()->sync($this->data['usuarios'] ?? []);
-    }
 
+        // Si el estado ha cambiado a "cerrado", desvincular usuarios
+        if (
+            $this->estadoAnterior !== 'cerrado' &&
+            $this->record->estado === 'cerrado'
+        ) {
+            $this->record->usuarios()->detach();
+
+            // Opcional: notificación visual
+            \Filament\Notifications\Notification::make()
+                ->title('Usuarios desvinculados')
+                ->body('Al cerrar la referencia, se han desvinculado todos los usuarios.')
+                ->success()
+                ->send();
+        }
+    }
 }

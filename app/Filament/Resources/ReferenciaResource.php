@@ -191,8 +191,8 @@ class ReferenciaResource extends Resource
                             ->label('Sector')
                             ->searchable()
                             ->options([
-                                '01' => 'Zona Norte',
-                                '02' => 'Zona Sur',
+                                '01' => 'Zona Norte Galicia',
+                                '02' => 'Zona Sur Galicia',
                                 '03' => 'Andalucía Oriental',
                                 '04' => 'Andalucía Occidental',
                                 '05' => 'Otros',
@@ -483,8 +483,8 @@ class ReferenciaResource extends Resource
                             ->multiple()
                             ->searchable()
                             ->options([
-                                '01' => 'Zona Norte',
-                                '02' => 'Zona Sur',
+                                '01' => 'Zona Norte Galicia',
+                                '02' => 'Zona Sur Galicia',
                                 '03' => 'Andalucía Oriental',
                                 '04' => 'Andalucía Occidental',
                                 '05' => 'Otros',
@@ -592,6 +592,8 @@ class ReferenciaResource extends Resource
                         Tables\Actions\RestoreBulkAction::make(),
                     ]),
                 ])
+                ->paginated(true)
+                ->paginationPageOptions([50, 100, 200])
                 ->defaultSort('created_at', 'desc');
         } else {
             return $table
@@ -614,7 +616,14 @@ class ReferenciaResource extends Resource
                         ->icon('heroicon-m-building-office'),
 
                     TextColumn::make('estado_mostrar')
-                        ->label('Estado'),
+                        ->label('Estado')
+                        ->badge()
+                        ->color(fn($record) => match ($record->estado) {
+                            'abierto' => 'success',
+                            'en_proceso' => 'warning',
+                            'cerrado' => 'danger',
+                            default => 'secondary',
+                        })
                 ])
                 ->filters(
                     [
@@ -643,8 +652,8 @@ class ReferenciaResource extends Resource
                             ->multiple()
                             ->searchable()
                             ->options([
-                                '01' => 'Zona Norte',
-                                '02' => 'Zona Sur',
+                                '01' => 'Zona Norte Galicia',
+                                '02' => 'Zona Sur Galicia',
                                 '03' => 'Andalucía Oriental',
                                 '04' => 'Andalucía Occidental',
                                 '05' => 'Otros',
@@ -815,6 +824,8 @@ class ReferenciaResource extends Resource
                         Tables\Actions\RestoreBulkAction::make(),
                     ]),
                 ])
+                ->paginated(true)
+                ->paginationPageOptions([50, 100, 200])
                 ->defaultSort('created_at', 'desc');
         }
     }
@@ -992,8 +1003,8 @@ class ReferenciaResource extends Resource
                         ->label('Sector')
                         ->searchable()
                         ->options([
-                            '01' => 'Zona Norte',
-                            '02' => 'Zona Sur',
+                            '01' => 'Zona Norte Galicia',
+                            '02' => 'Zona Sur Galicia',
                             '03' => 'Andalucía Oriental',
                             '04' => 'Andalucía Occidental',
                             '05' => 'Otros',

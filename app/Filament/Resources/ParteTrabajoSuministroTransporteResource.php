@@ -744,7 +744,7 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                 ]),
             ])
             ->paginated(true)
-            ->paginationPageOptions([15, 30, 50])
+            ->paginationPageOptions([50, 100, 200])
             ->defaultSort('created_at', 'desc');
     }
 
@@ -781,7 +781,7 @@ class ParteTrabajoSuministroTransporteResource extends Resource
         }
 
         $user = Filament::auth()->user();
-        $rolesPermitidos = ['superadmin', 'administración', 'administrador'];
+        $rolesPermitidos = ['superadmin', 'administración', 'administrador', 'técnico'];
 
         if (!$user->hasAnyRole($rolesPermitidos)) {
             $query->where('usuario_id', $user->id);

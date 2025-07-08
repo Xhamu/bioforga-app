@@ -83,6 +83,8 @@ class PaisResource extends Resource
                     Tables\Actions\RestoreBulkAction::make(),
                 ]),
             ])
+            ->paginated(true)
+            ->paginationPageOptions([50, 100, 200])
             ->defaultSort('nombre', 'asc');
     }
 

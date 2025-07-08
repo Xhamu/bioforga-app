@@ -359,6 +359,8 @@ class ParteTrabajoAyudanteResource extends Resource
                     Tables\Actions\RestoreBulkAction::make(),
                 ]),
             ])
+            ->paginated(true)
+            ->paginationPageOptions([50, 100, 200])
             ->defaultSort('created_at', 'desc');
     }
 
@@ -384,7 +386,7 @@ class ParteTrabajoAyudanteResource extends Resource
         $query = parent::getEloquentQuery()->withoutGlobalScopes([SoftDeletingScope::class]);
 
         $user = Filament::auth()->user();
-        $rolesPermitidos = ['superadmin', 'administración', 'administrador'];
+        $rolesPermitidos = ['superadmin', 'administración', 'administrador', 'técnico'];
 
         if (!$user->hasAnyRole($rolesPermitidos)) {
             $query->where('usuario_id', $user->id);

@@ -202,6 +202,8 @@ class UserResource extends Resource
                         Tables\Actions\DeleteBulkAction::make(),
                     ]),
                 ])
+                ->paginated(true)
+                ->paginationPageOptions([50, 100, 200])
                 ->defaultSort('created_at', 'desc');
         } else {
             return $table
@@ -339,6 +341,8 @@ class UserResource extends Resource
                         Tables\Actions\DeleteBulkAction::make(),
                     ]),
                 ])
+                ->paginated(true)
+                ->paginationPageOptions([50, 100, 200])
                 ->defaultSort('created_at', 'desc');
         }
     }
