@@ -77,10 +77,36 @@ class EditReferencia extends EditRecord
                                     ->default(now())
                                     ->nullable(),
 
+                                Forms\Components\Select::make('tipo')
+                                    ->options([
+                                        'horas' => 'Horas',
+                                        'toneladas' => 'Tn',
+                                    ])
+                                    ->label('Tipo')
+                                    ->searchable()
+                                    ->nullable()
+                                    ->reactive(),
+
                                 Forms\Components\TextInput::make('importe')
-                                    ->label('Importe / Tn (€)')
+                                    ->label(fn(callable $get) => match ($get('tipo')) {
+                                        'horas' => 'Importe / hora',
+                                        'toneladas' => 'Importe / tonelada',
+                                        default => 'Importe',
+                                    })
                                     ->numeric()
-                                    ->prefix('€')
+                                    ->nullable()
+                                    ->suffix(function (callable $get) {
+                                        return match ($get('tipo')) {
+                                            'horas' => '€/hora',
+                                            'toneladas' => '€/tn',
+                                            default => '€',
+                                        };
+                                    }),
+
+                                Forms\Components\TextInput::make('importe_sin_iva')
+                                    ->label('Importe sin IVA')
+                                    ->numeric()
+                                    ->suffix('€')
                                     ->nullable(),
 
                                 Forms\Components\Textarea::make('notas')
@@ -119,6 +145,8 @@ class EditReferencia extends EditRecord
                 ->body('Al cerrar la referencia, se han desvinculado todos los usuarios.')
                 ->success()
                 ->send();
+
+            redirect('/referencias');
         }
     }
 }

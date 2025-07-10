@@ -125,7 +125,14 @@ class StockClientesServicioExport implements FromCollection, WithTitle, WithEven
 
     public function title(): string
     {
-        return substr($this->cliente->razon_social, 0, 31);
+        // Evita los errores al abrir debido a los caracteres no válidos de los proveedores.
+        $raw = substr($this->cliente->razon_social, 0, 31);
+
+        $sanitized = str_replace([':', '\\', '/', '?', '*', '[', ']'], '', $raw);
+
+        $sanitized = preg_replace('/[\x00-\x1F]/u', '', $sanitized);
+
+        return $sanitized ?: 'SinNombre';
     }
 
     public function registerEvents(): array

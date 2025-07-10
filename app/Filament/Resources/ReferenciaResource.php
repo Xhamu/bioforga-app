@@ -374,16 +374,12 @@ class ReferenciaResource extends Resource
                                             fn($q) =>
                                             $q->where('name', 'superadmin')
                                         );
-
-                                    if (!empty($get('referencia')) && strpos($get('referencia'), 'SU') === false) {
-                                        // Solo si es una referencia de tipo servicio (ej: SE...)
-                                        $query->where('empresa_bioforga', true);
-                                    }
                                 }
                             )
                             ->getOptionLabelFromRecordUsing(
                                 fn($record) =>
-                                $record?->nombre_apellidos ?? '-'
+                                $record?->nombre_apellidos .
+                                ($record?->proveedor_id ? ' (' . optional($record->proveedor)->razon_social . ')' : ' (Bioforga)') ?? '-'
                             )
                             ->preload()
                             ->searchable()
@@ -615,15 +611,22 @@ class ReferenciaResource extends Resource
                         ->label('Interviniente')
                         ->icon('heroicon-m-building-office'),
 
-                    TextColumn::make('estado_mostrar')
+                    TextColumn::make('estado')
                         ->label('Estado')
                         ->badge()
-                        ->color(fn($record) => match ($record->estado) {
+                        ->sortable()
+                        ->color(fn($state) => match ($state) {
                             'abierto' => 'success',
                             'en_proceso' => 'warning',
                             'cerrado' => 'danger',
                             default => 'secondary',
                         })
+                        ->formatStateUsing(fn($state) => match ($state) {
+                            'abierto' => 'Abierto',
+                            'en_proceso' => 'En proceso',
+                            'cerrado' => 'Cerrado',
+                            default => ucfirst($state ?? 'Desconocido'),
+                        }),
                 ])
                 ->filters(
                     [
@@ -1185,16 +1188,12 @@ class ReferenciaResource extends Resource
                                         fn($q) =>
                                         $q->where('name', 'superadmin')
                                     );
-
-                                if (!empty($get('referencia')) && strpos($get('referencia'), 'SU') === false) {
-                                    // Solo si es una referencia de tipo servicio (ej: SE...)
-                                    $query->where('empresa_bioforga', true);
-                                }
                             }
                         )
                         ->getOptionLabelFromRecordUsing(
                             fn($record) =>
-                            $record?->nombre_apellidos ?? '-'
+                            $record?->nombre_apellidos .
+                            ($record?->proveedor_id ? ' (' . optional($record->proveedor)->razon_social . ')' : ' (Bioforga)') ?? '-'
                         )
                         ->preload()
                         ->searchable()

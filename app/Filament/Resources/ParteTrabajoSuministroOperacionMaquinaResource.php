@@ -776,6 +776,30 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                         ->preload()
                         ->placeholder('Todos'),
 
+                    SelectFilter::make('tipo_referencia')
+                        ->label('Tipo de referencia')
+                        ->searchable()
+                        ->options([
+                            'suministro' => 'Suministro',
+                            'servicio' => 'Servicio',
+                        ])
+                        ->query(function (Builder $query, array $data): Builder {
+                            if ($data['value'] === 'suministro') {
+                                return $query->whereHas('referencia', function (Builder $q) {
+                                    $q->whereNotNull('formato');
+                                });
+                            }
+
+                            if ($data['value'] === 'servicio') {
+                                return $query->whereHas('referencia', function (Builder $q) {
+                                    $q->whereNotNull('tipo_servicio');
+                                });
+                            }
+
+                            return $query;
+                        })
+                        ->placeholder('Todas'),
+
                     SelectFilter::make('referencia_id')
                         ->label('Referencia')
                         ->options(function () {
@@ -800,7 +824,6 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                         })
                         ->searchable()
                         ->preload()
-                        ->columnSpan(2)
                         ->placeholder('Todas'),
 
                     SelectFilter::make('maquina_id')

@@ -90,21 +90,29 @@ class ParteTrabajoSuministroOperacionMaquina extends Model
 
     protected function getProduccionAttribute()
     {
-        return $this->cantidad_producida . ' ' . $this->tipo_cantidad_producida;
+        if ($this->cantidad_producida) {
+            return $this->cantidad_producida . ' ' . $this->tipo_cantidad_producida;
+        }
+
+        return '—';
     }
 
     protected function getHorasRotorEncendidoAttribute()
-{
-    if ($this->horas_rotor) {
-        return $this->horas_rotor;
-    }
+    {
+        if ($this->horas_rotor) {
+            return $this->horas_rotor;
+        }
 
-    if ($this->horas_encendido) {
-        return $this->horas_encendido;
-    }
+        if ($this->horas_encendido) {
+            return $this->horas_encendido;
+        }
 
-    return '—'; // O "0h", o simplemente 0
-}
+        if ($this->horas_trabajo) {
+            return $this->horas_trabajo;
+        }
+
+        return '—'; // O "0h", o simplemente 0
+    }
 
 
     public function getIntervinienteAttribute(): ?string
