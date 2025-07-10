@@ -48,6 +48,20 @@ class AdminPanelProvider extends PanelProvider
 
             ->renderHook('panels::page.end', fn() => view('components.gps-global-script'))
             ->renderHook('panels::auth.login.form.after', fn() => view('components.gps-global-script'))
+            ->renderHook('panels::body.start', function () {
+                if (!auth()->user()?->hasRole('superadmin')) {
+                    return <<<HTML
+            <style>
+                li[data-group-label="Ajustes generales"] {
+                    display: none !important;
+                }
+            </style>
+        HTML;
+                }
+
+                return null;
+            })
+
 
             ->renderHook(
                 'panels::body.start',
@@ -62,7 +76,7 @@ class AdminPanelProvider extends PanelProvider
             )
 
             ->plugins([
-                //\TomatoPHP\FilamentPWA\FilamentPWAPlugin::make(),
+                \TomatoPHP\FilamentPWA\FilamentPWAPlugin::make(),
                 FilamentShieldPlugin::make()
                     ->gridColumns([
                         'default' => 1,

@@ -38,7 +38,7 @@ class ActivityLogResource extends Resource
                         'deleted' => 'Eliminación',
                         'login' => 'Inicio de sesión',
                         'logout' => 'Cierre de sesión',
-                        'impersonation' => 'Suplantación',
+                        'impersonation' => 'Impersonación',
                         default => ucfirst($state),
                     })
                     ->badge()
@@ -176,6 +176,7 @@ class ActivityLogResource extends Resource
                     ->badge()
                     ->color('gray'),
             ])
+            ->paginationPageOptions([50, 100, 200])
             ->defaultSort('created_at', 'desc')
             ->headerActions([
                 Action::make('exportar')

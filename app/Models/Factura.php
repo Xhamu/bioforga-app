@@ -17,6 +17,9 @@ class Factura extends Model
         'fecha',
         'importe',
         'notas',
+        'tipo',
+        'cantidad',
+        'importe_sin_iva'
     ];
 
     protected $table = 'facturas';

@@ -105,6 +105,7 @@
                         <th class="px-4 py-3 text-left font-medium text-gray-700">Máquina</th>
                         <th class="px-4 py-3 text-left font-medium text-gray-700">Tipo de trabajo</th>
                         <th class="px-4 py-3 text-left font-medium text-gray-700">Cantidad</th>
+                        <th class="px-4 py-3 text-left font-medium text-gray-700">Horas rotor / servicio</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
@@ -118,7 +119,11 @@
                             <td class="px-4 py-3 text-gray-800">
                                 {{ $parte->maquina?->marca . ' ' . $parte->maquina?->modelo ?? 'Sin asignar' }}</td>
                             <td class="px-4 py-3 text-gray-800">{{ ucfirst($parte->tipo_trabajo) ?? 'N/D' }}</td>
-                            <td class="px-4 py-3 text-gray-800">{{ $parte->cantidad_producida }} {{ $parte->tipo_cantidad_producida }}</td>
+                            <td class="px-4 py-3 text-gray-800">{{ $parte->cantidad_producida }}
+                                {{ $parte->tipo_cantidad_producida }}</td>
+                            <td class="px-4 py-3 text-gray-800">
+                                {{ $parte->horas_rotor ?? ($parte->horas_encendido ?? $parte->horas_trabajo) }}
+                            </td>
                         </tr>
                     @endforeach
                 </tbody>

@@ -75,23 +75,41 @@ class CargasRelationManager extends RelationManager
         return $table
             ->recordTitle(fn($record) => $record->referencia?->referencia ?? $record->almacen?->referencia ?? 'Carga')
             ->columns([
-                Tables\Columns\TextColumn::make('referencia.referencia')
-                    ->label('Referencia')
-                    ->searchable(),
-
-                Tables\Columns\TextColumn::make('almacen.referencia')
-                    ->label('Almacén intermedio')
-                    ->searchable(),
+                Tables\Columns\TextColumn::make('referencia_completa')
+                    ->label('Referencia / Almacén')
+                    ->searchable(query: function ($query, $search) {
+                        $query
+                            ->whereHas('referencia', fn($q) => $q->where('referencia', 'like', "%{$search}%"))
+                            ->orWhereHas('almacen', fn($q) => $q->where('referencia', 'like', "%{$search}%"));
+                    }),
 
                 Tables\Columns\TextColumn::make('fecha_hora_inicio_carga')
                     ->label('Inicio carga')
                     ->sortable()
                     ->formatStateUsing(fn($state) => \Carbon\Carbon::parse($state)->timezone('Europe/Madrid')->format('d/m/Y H:i')),
 
+                Tables\Columns\TextColumn::make('gps_inicio_carga')
+                    ->label('Inicio carga')
+                    ->formatStateUsing(function ($state) {
+                        return $state
+                            ? '<a href="https://www.google.com/maps/search/?api=1&query=' . urlencode($state) . '" target="_blank" class="text-primary-600 hover:underline">Ver ubicación</a>'
+                            : '-';
+                    })
+                    ->html(),
+
                 Tables\Columns\TextColumn::make('fecha_hora_fin_carga')
                     ->label('Fin carga')
                     ->sortable()
                     ->formatStateUsing(fn($state) => \Carbon\Carbon::parse($state)->timezone('Europe/Madrid')->format('d/m/Y H:i')),
+
+                Tables\Columns\TextColumn::make('gps_fin_carga')
+                    ->label('Fin carga')
+                    ->formatStateUsing(function ($state) {
+                        return $state
+                            ? '<a href="https://www.google.com/maps/search/?api=1&query=' . urlencode($state) . '" target="_blank" class="text-primary-600 hover:underline">Ver ubicación</a>'
+                            : '-';
+                    })
+                    ->html(),
 
                 Tables\Columns\TextColumn::make('cantidad')
                     ->label('Cantidad (m³)')

@@ -52,29 +52,23 @@ class PartesTrabajoActivos extends Widget
 
         foreach ($modelos as $modelo => $campos) {
             if ($modelo === \App\Models\ParteTrabajoSuministroTransporte::class) {
-                // Cargas relacionadas con partes sin finalizar
-                $cargas = \App\Models\CargaTransporte::whereNull('fecha_hora_fin_carga')
-                    ->whereHas('parteTrabajoSuministroTransporte', function ($query) use ($userId) {
-                        $query->where('usuario_id', $userId);
-                    })
-                    ->with('parteTrabajoSuministroTransporte')
+                // Considerar como activo si cliente_id es null
+                $partes = $modelo::whereNull('cliente_id')
+                    ->where('usuario_id', $userId)
                     ->get();
 
-                foreach ($cargas as $carga) {
-                    $parte = $carga->parteTrabajoSuministroTransporte;
-
+                foreach ($partes as $parte) {
                     $partesActivos[] = [
                         'id' => $parte->id,
-                        'modelo' => \App\Models\ParteTrabajoSuministroTransporte::class,
-                        'label' => $labels[\App\Models\ParteTrabajoSuministroTransporte::class],
-                        'slug' => $slugs[\App\Models\ParteTrabajoSuministroTransporte::class],
-                        'inicio' => $carga->fecha_hora_inicio_carga,
+                        'modelo' => $modelo,
+                        'label' => $labels[$modelo],
+                        'slug' => $slugs[$modelo],
+                        'inicio' => $parte->created_at->timezone('Europe/Madrid'),
                     ];
                 }
 
-                $totalActivos += $cargas->count();
-
-                continue; // Saltamos al siguiente modelo
+                $totalActivos += $partes->count();
+                continue;
             }
 
             // Resto de modelos normales

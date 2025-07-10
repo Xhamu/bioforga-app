@@ -62,12 +62,9 @@ class ResumenPartesActivos extends Widget
         foreach ($modelos as $modelo => $campos) {
             if (isset($campos['especial']) && $campos['especial']) {
                 // Este bloque se activará correctamente ahora
-                $cargas = \App\Models\CargaTransporte::whereNull('fecha_hora_fin_carga')
-                    ->with('parteTrabajoSuministroTransporte.usuario') // OJO: relación encadenada
-                    ->get();
+                $partes = $modelo::whereNull('cliente_id')->get();
 
-                foreach ($cargas as $carga) {
-                    $parte = $carga->parteTrabajoSuministroTransporte;
+                foreach ($partes as $parte) {
                     if (!$parte)
                         continue;
 
@@ -75,8 +72,10 @@ class ResumenPartesActivos extends Widget
                         'id' => $parte->id,
                         'label' => $labels[$modelo],
                         'slug' => $slugs[$modelo],
-                        'inicio' => $carga->fecha_hora_inicio_carga,
-                        'usuario_nombre' => $parte->usuario?->name ?? 'Desconocido',
+                        'inicio' => $parte->created_at->timezone('Europe/Madrid'),
+                        'usuario_nombre' => $parte->usuario
+                            ? trim($parte->usuario->name . ' ' . strtoupper(substr($parte->usuario->apellidos ?? '', 0, 1)) . '.')
+                            : 'Desconocido',
                     ];
                 }
 
@@ -97,7 +96,6 @@ class ResumenPartesActivos extends Widget
                     'usuario_nombre' => $parte->usuario
                         ? trim($parte->usuario->name . ' ' . strtoupper(substr($parte->usuario->apellidos ?? '', 0, 1)) . '.')
                         : 'Desconocido',
-
                 ];
             }
         }
