@@ -53,7 +53,8 @@ class PartesTrabajoActivos extends Widget
         foreach ($modelos as $modelo => $campos) {
             if ($modelo === \App\Models\ParteTrabajoSuministroTransporte::class) {
                 // Considerar como activo si cliente_id es null
-                $partes = $modelo::whereNull('cliente_id')
+                $partes = $modelo::whereNull('almacen_id')
+                    ->whereNull('cliente_id')
                     ->where('usuario_id', $userId)
                     ->get();
 

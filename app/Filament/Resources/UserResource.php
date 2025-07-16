@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\UserResource\Pages;
 use App\Filament\Resources\UserResource\Pages\ListUserActivities;
 use App\Models\Maquina;
+use App\Models\Referencia;
 use App\Models\User;
 use App\Models\Vehiculo;
 use Filament\Forms;
@@ -29,6 +30,9 @@ use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Support\HtmlString;
 use Jenssegers\Agent\Agent;
+use Filament\Forms\Components\Tabs;
+use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Section;
 
 class UserResource extends Resource
 {
@@ -37,122 +41,139 @@ class UserResource extends Resource
     protected static ?string $slug = 'usuarios';
     public static ?string $label = 'usuario';
     public static ?string $pluralLabel = 'Usuarios';
+
     public static function form(Form $form): Form
     {
-        return $form
-            ->schema([
-                Forms\Components\Section::make('Datos personales')
+        return $form->schema([
+            Tabs::make('Formulario')->tabs([
+                Tabs\Tab::make('Información')
                     ->schema([
-                        TextInput::make('name')
-                            ->label(__('Nombre'))
-                            ->rules('required')
-                            ->required()
-                            ->columnSpan(1)
-                            ->validationMessages([
-                                'required' => 'El :attribute es obligatorio.',
-                            ]),
+                        Section::make('Datos personales')
+                            ->schema([
+                                TextInput::make('name')
+                                    ->label('Nombre')
+                                    ->rules('required')
+                                    ->required()
+                                    ->columnSpan(1)
+                                    ->validationMessages([
+                                        'required' => 'El :attribute es obligatorio.',
+                                    ]),
 
-                        TextInput::make('apellidos')
-                            ->label(__('Apellidos'))
-                            ->rules('required')
-                            ->required()
-                            ->columnSpan(2)
-                            ->validationMessages([
-                                'required' => 'Los :attribute son obligatorios.',
-                            ]),
+                                TextInput::make('apellidos')
+                                    ->label('Apellidos')
+                                    ->rules('required')
+                                    ->required()
+                                    ->columnSpan(2)
+                                    ->validationMessages([
+                                        'required' => 'Los :attribute son obligatorios.',
+                                    ]),
 
-                        TextInput::make('nif')
-                            ->label(__('NIF'))
-                            ->rules('required')
-                            ->required()
-                            ->columnSpan(1)
-                            ->validationMessages([
-                                'required' => 'El NIF es obligatorio.',
-                            ]),
+                                TextInput::make('nif')
+                                    ->label('NIF')
+                                    ->rules('required')
+                                    ->required()
+                                    ->columnSpan(1)
+                                    ->validationMessages([
+                                        'required' => 'El NIF es obligatorio.',
+                                    ]),
 
-                        TextInput::make('email')
-                            ->label(__('Correo electrónico'))
-                            ->email()
-                            ->required()
-                            ->rules('required')
-                            ->columnSpan(1)
-                            ->validationMessages([
-                                'email' => 'No es :attribute válido.',
-                                'required' => 'El correo electrónico es obligatorio.'
-                            ]),
+                                TextInput::make('email')
+                                    ->label('Correo electrónico')
+                                    ->email()
+                                    ->required()
+                                    ->rules('required')
+                                    ->columnSpan(1)
+                                    ->validationMessages([
+                                        'email' => 'No es :attribute válido.',
+                                        'required' => 'El correo electrónico es obligatorio.',
+                                    ]),
 
-                        TextInput::make('telefono')
-                            ->label('Teléfono')
-                            ->nullable()
-                            ->columnSpan(1),
-                    ])
-                    ->columns([
-                        'sm' => 1,
-                        'md' => 3,
-                    ]),
-
-                Forms\Components\Section::make('Empresa')
-                    ->schema([
-                        Checkbox::make('empresa_bioforga')
-                            ->label('BIOFORGA')
-                            ->default(true)
-                            ->reactive(),
-
-                        Select::make('proveedor_id')
-                            ->label('Otro/a')
-                            ->searchable()
-                            ->preload()
-                            ->options(function () {
-                                return \App\Models\Proveedor::all()->pluck('razon_social', 'id')->toArray();
-                            })
-                            ->visible(fn($get) => !$get('empresa_bioforga')),
-                    ])
-                    ->columns([
-                        'sm' => 1,
-                        'md' => 2,
-                    ]),
-
-                Forms\Components\Section::make('Acceso')
-                    ->schema([
-                        TextInput::make('password')
-                            ->label(__('Contraseña'))
-                            ->password()
-                            ->rules(function ($get) {
-                                return $get('id') ? 'nullable' : 'required';
-                            })
-                            ->default(function ($get) {
-                                return $get('password') ? '******' : '';
-                            })
-                            ->autocomplete('new-password')
-                            ->validationMessages([
-                                'required' => 'La :attribute es obligatoria.',
-                            ]),
-
-                        Forms\Components\Select::make('roles')
-                            ->relationship('roles', 'name')
-                            ->multiple()
-                            ->preload()
-                            ->searchable()
-                            ->options(
-                                \Spatie\Permission\Models\Role::where('name', '!=', 'superadmin')->pluck('name', 'id')
-                            ),
-
-                        /*Forms\Components\Select::make('sector')
-                            ->label('Sector')
-                            ->searchable()
-                            ->options([
-                                '01' => 'Zona Norte',
-                                '02' => 'Zona Sur',
-                                '03' => 'Andalucía Oriental',
-                                '04' => 'Andalucía Occidental',
-                                '05' => 'Otros',
+                                TextInput::make('telefono')
+                                    ->label('Teléfono')
+                                    ->nullable()
+                                    ->columnSpan(1),
                             ])
-                            ->visible(function ($get) {
-                                return !empty($get('roles'));
-                            }),*/
-                    ])
-                    ->columns(1),
-            ]);
+                            ->columns([
+                                'sm' => 1,
+                                'md' => 3,
+                            ]),
+
+                        Section::make('Empresa')
+                            ->schema([
+                                Checkbox::make('empresa_bioforga')
+                                    ->label('BIOFORGA')
+                                    ->default(true)
+                                    ->reactive(),
+
+                                Select::make('proveedor_id')
+                                    ->label('Otro/a')
+                                    ->searchable()
+                                    ->preload()
+                                    ->options(fn() => \App\Models\Proveedor::all()->pluck('razon_social', 'id')->toArray())
+                                    ->visible(fn($get) => !$get('empresa_bioforga')),
+                            ])
+                            ->columns([
+                                'sm' => 1,
+                                'md' => 2,
+                            ]),
+
+                        Section::make('Acceso')
+                            ->schema([
+                                TextInput::make('password')
+                                    ->label('Contraseña')
+                                    ->password()
+                                    ->rules(fn($get) => $get('id') ? 'nullable' : 'required')
+                                    ->default(fn($get) => $get('password') ? '******' : '')
+                                    ->autocomplete('new-password')
+                                    ->validationMessages([
+                                        'required' => 'La :attribute es obligatoria.',
+                                    ]),
+
+                                Select::make('roles')
+                                    ->relationship('roles', 'name')
+                                    ->multiple()
+                                    ->preload()
+                                    ->searchable()
+                                    ->options(
+                                        \Spatie\Permission\Models\Role::where('name', '!=', 'superadmin')->pluck('name', 'id')
+                                    ),
+                            ])
+                    ]),
+
+                Tabs\Tab::make('Vinculaciones')->schema([
+                    // REFERENCIAS
+                    Select::make('referencias')
+                        ->label('Referencias vinculadas')
+                        ->relationship('referencias', 'referencia')
+                        ->multiple()
+                        ->preload()
+                        ->searchable()
+                        ->getOptionLabelFromRecordUsing(function (Referencia $referencia) {
+                            $razon = $referencia->proveedor?->razon_social
+                                ?? $referencia->cliente?->razon_social
+                                ?? 'Sin interviniente';
+
+                            $ubicacion = trim("{$referencia->monte_parcela}, {$referencia->ayuntamiento}");
+                            return "{$referencia->referencia} ({$ubicacion}) | {$razon}";
+                        })
+                        ->columnSpanFull(),
+
+                    // CAMIONES
+                    Select::make('camiones')
+                        ->label('Camiones vinculados')
+                        ->relationship('camiones', 'marca')
+                        ->multiple()
+                        ->preload()
+                        ->searchable()
+                        ->getOptionLabelFromRecordUsing(function (\App\Models\Camion $camion) {
+                            return "[{$camion->matricula_cabeza}] {$camion->marca} {$camion->modelo}";
+                        })
+                        ->columnSpanFull(),
+                ])
+
+            ])
+                ->columnSpanFull(),
+        ]);
     }
 
     public static function table(Table $table): Table

@@ -8,6 +8,8 @@ use App\Filament\Resources\ParteTrabajoSuministroTransporteResource\RelationMana
 use App\Models\AlmacenIntermedio;
 use App\Models\Camion;
 use App\Models\ParteTrabajoSuministroTransporte;
+use App\Models\Poblacion;
+use App\Models\Provincia;
 use App\Models\Referencia;
 use Awcodes\TableRepeater\Components\TableRepeater;
 use Awcodes\TableRepeater\Header;
@@ -522,7 +524,7 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                             ->openable()
                             ->required()
                             ->columnSpanFull()
-                            ->visible(fn($record) => $record?->cliente_id !== null),
+                            ->visible(fn($record) => $record?->almacen_id !== null),
                     ])
                     ->columns([
                         'default' => 1,
@@ -530,7 +532,6 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                     ]),
 
                 Section::make('Observaciones')
-                    ->visible(fn($record) => $record && $record->cliente_id !== null)
                     ->schema([
                         Textarea::make('observaciones')
                             ->rows(4)
@@ -545,9 +546,17 @@ class ParteTrabajoSuministroTransporteResource extends Resource
             ->columns([
                 TextColumn::make('created_at')
                     ->label('Fecha y hora')
-                    ->weight(FontWeight::Bold)
-                    ->dateTime()
-                    ->timezone('Europe/Madrid'),
+                    ->formatStateUsing(function ($state, $record) {
+                        $primeraCarga = $record->cargas
+                                ?->sortBy('created_at')
+                                ?->first();
+
+                        return $primeraCarga?->fecha_hora_inicio_carga
+                            ? $primeraCarga->fecha_hora_inicio_carga->timezone('Europe/Madrid')->format('d/m/Y H:i')
+                            : '-';
+                    })
+                    ->sortable()
+                    ->weight(FontWeight::Bold),
 
                 TextColumn::make('usuario')
                     ->label('Usuario')
@@ -568,22 +577,43 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                         return trim("[$matricula_cabeza] - $marca $modelo");
                     }),
 
-                TextColumn::make('cantidad_total')
-                    ->label('Cantidad total (m³)'),
-
                 TextColumn::make('cargas_totales')
                     ->label('Cargas')
                     ->html(),
 
                 TextColumn::make('id')
                     ->label('Destino')
+                    ->html()
                     ->formatStateUsing(function ($record) {
+                        $cantidad = $record->cantidad_total ? number_format($record->cantidad_total, 2, ',', '.') . ' m³' : '-';
+                        $peso = $record->peso_neto ? number_format($record->peso_neto, 0, ',', '.') . ' kg' : '-';
+
                         if ($record->cliente && $record->cliente->razon_social) {
-                            return $record->cliente->razon_social;
+                            $provincia = Provincia::find($record->cliente->provincia);
+
+                            $poblacion = Poblacion::find($record->cliente->poblacion);
+
+                            $ubicacion = "{$provincia->nombre}, {$poblacion->nombre}";
+                            return <<<HTML
+                                <div class="leading-5">
+                                    <strong>{$record->cliente->razon_social}</strong><br>
+                                    <span class="text-gray-700">Ubicación:</span> $ubicacion<br>
+                                    <span class="text-gray-700">Cantidad:</span> $cantidad<br>
+                                    <span class="text-gray-700">Peso neto:</span> $peso
+                                </div>
+                            HTML;
                         }
 
                         if ($record->almacen && $record->almacen->referencia) {
-                            return $record->almacen->referencia . ' (' . $record->almacen->ayuntamiento . ', ' . $record->almacen->monte_parcela . ')';
+                            $ubicacion = "{$record->almacen->ayuntamiento}, {$record->almacen->monte_parcela}";
+                            return <<<HTML
+                                <div class="leading-5">
+                                    <strong>{$record->almacen->referencia}</strong><br>
+                                    <span class="text-gray-700">Ubicación:</span> $ubicacion<br>
+                                    <span class="text-gray-700">Cantidad:</span> $cantidad<br>
+                                    <span class="text-gray-700">Peso neto:</span> $peso
+                                </div>
+                            HTML;
                         }
 
                         return '-';
@@ -598,27 +628,34 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                             DatePicker::make('created_until')->label('Hasta'),
                         ])
                         ->query(function ($query, array $data) {
-                            return $query->whereHas('cargas', function ($q) use ($data) {
-                                $q->when($data['created_from'], fn($q, $date) => $q->whereDate('fecha_hora_inicio_carga', '>=', $date))
-                                    ->when($data['created_until'], fn($q, $date) => $q->whereDate('fecha_hora_inicio_carga', '<=', $date));
-                            });
+                            $hasFrom = !empty($data['created_from']);
+                            $hasUntil = !empty($data['created_until']);
+
+                            if ($hasFrom || $hasUntil) {
+                                $query->whereHas('cargas', function ($q) use ($data, $hasFrom, $hasUntil) {
+                                    if ($hasFrom) {
+                                        $q->whereDate('fecha_hora_inicio_carga', '>=', $data['created_from']);
+                                    }
+                                    if ($hasUntil) {
+                                        $q->whereDate('fecha_hora_inicio_carga', '<=', $data['created_until']);
+                                    }
+                                });
+                            }
+
+                            return $query;
                         }),
 
                     SelectFilter::make('cliente_id')
                         ->label('Cliente')
                         ->relationship(
-                            'referencia.cliente',
+                            'cliente', // relación directa, no a través de referencia
                             'razon_social',
                             fn($query) => $query->whereIn(
                                 'id',
-                                Referencia::query()
-                                    ->whereIn(
-                                        'id',
-                                        ParteTrabajoSuministroTransporte::query()->distinct()->pluck('referencia_id')
-                                    )
+                                ParteTrabajoSuministroTransporte::query()
+                                    ->whereNotNull('cliente_id')
+                                    ->distinct()
                                     ->pluck('cliente_id')
-                                    ->filter()
-                                    ->unique()
                             )
                         )
                         ->searchable()
@@ -776,8 +813,6 @@ class ParteTrabajoSuministroTransporteResource extends Resource
 
         if (request('trashed') === 'true') {
             $query->onlyTrashed();
-        } else {
-            $query->whereNull('deleted_at'); // <- esto faltaba
         }
 
         $user = Filament::auth()->user();

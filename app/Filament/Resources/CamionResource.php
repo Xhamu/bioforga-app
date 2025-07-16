@@ -171,6 +171,9 @@ class CamionResource extends Resource
                     TextColumn::make('matricula_remolque')
                         ->label('Matrícula remolque')
                         ->searchable(),
+
+                    TextColumn::make('proveedor_mostrar')
+                        ->label('Proveedor'),
                 ])
                 ->filters([
                     Tables\Filters\TrashedFilter::make(),

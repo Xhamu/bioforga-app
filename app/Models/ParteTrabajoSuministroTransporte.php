@@ -64,16 +64,35 @@ class ParteTrabajoSuministroTransporte extends Model
             ->values()
             ->map(function ($carga, $index) {
                 $numero = $index + 1;
+
+                // Determinar origen
                 if ($carga->referencia_id && $carga->referencia) {
-                    return $numero . '. ' . $carga->referencia->referencia .
-                        ' (' . $carga->referencia->ayuntamiento . ', ' . $carga->referencia->monte_parcela . ')';
+                    $origen = $carga->referencia->referencia . ' (' . $carga->referencia->ayuntamiento . ', ' . $carga->referencia->monte_parcela . ')';
                 } elseif ($carga->almacen_id && $carga->almacen) {
-                    return $numero . '. ' . $carga->almacen->referencia;
+                    $origen =  $carga->almacen->referencia . ' (' . $carga->almacen->ayuntamiento . ', ' . $carga->almacen->monte_parcela . ')';
+                } else {
+                    $origen = '-';
                 }
-                return null;
+
+                // Cantidad
+                $cantidad = number_format($carga->cantidad ?? 0, 2, ',', '.') . ' m³';
+
+                // Horas
+                $inicio = optional($carga->fecha_hora_inicio_carga)?->timezone('Europe/Madrid')->format('H:i') ?? '-';
+                $fin = optional($carga->fecha_hora_fin_carga)?->timezone('Europe/Madrid')->format('H:i') ?? '-';
+
+                return <<<HTML
+                    <div class="mb-2 leading-5">
+                        <strong>Carga $numero</strong><br>
+                        <span class="text-gray-700"></span> $origen<br>
+                        <span class="text-gray-700">Cantidad:</span> $cantidad<br>
+                        <span class="text-gray-700">Inicio:</span> $inicio<br>
+                        <span class="text-gray-700">Fin:</span> $fin
+                    </div>
+                HTML;
             })
             ->filter()
-            ->implode('<br />') ?: '-';
+            ->implode('<hr class="my-2 border-gray-200" />') ?: '-';
     }
 
     public function usuario()

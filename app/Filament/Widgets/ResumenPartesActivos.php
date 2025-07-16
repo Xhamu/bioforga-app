@@ -62,7 +62,7 @@ class ResumenPartesActivos extends Widget
         foreach ($modelos as $modelo => $campos) {
             if (isset($campos['especial']) && $campos['especial']) {
                 // Este bloque se activará correctamente ahora
-                $partes = $modelo::whereNull('cliente_id')->get();
+                $partes = $modelo::whereNull('cliente_id')->whereNull('almacen_id')->get();
 
                 foreach ($partes as $parte) {
                     if (!$parte)
