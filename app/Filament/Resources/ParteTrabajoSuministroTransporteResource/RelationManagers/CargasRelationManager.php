@@ -48,6 +48,7 @@ class CargasRelationManager extends RelationManager
 
                 Forms\Components\DateTimePicker::make('fecha_hora_inicio_carga')
                     ->label('Fecha/Hora inicio carga')
+                    ->timezone('Europe/Madrid')
                     ->required(),
 
                 Forms\Components\TextInput::make('gps_inicio_carga')
@@ -56,6 +57,7 @@ class CargasRelationManager extends RelationManager
 
                 Forms\Components\DateTimePicker::make('fecha_hora_fin_carga')
                     ->label('Fecha/Hora fin carga')
+                    ->timezone('Europe/Madrid')
                     ->required(),
 
                 Forms\Components\TextInput::make('gps_fin_carga')

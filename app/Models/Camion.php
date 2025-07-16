@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use function PHPUnit\Framework\isNull;
 
 
 class Camion extends Model
@@ -53,5 +54,16 @@ class Camion extends Model
     public function usuarios()
     {
         return $this->belongsToMany(\App\Models\User::class);
+    }
+
+    protected function getProveedorMostrarAttribute()
+    {
+        if (!is_null($this->proveedor_id)) {
+            $proveedor = Proveedor::find($this->proveedor_id);
+
+            return $proveedor->razon_social;
+        }
+
+        return 'Bioforga';
     }
 }

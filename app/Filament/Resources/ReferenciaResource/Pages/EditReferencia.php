@@ -116,7 +116,21 @@ class EditReferencia extends EditRecord
                             ->columns(2) // Opcional: puedes poner en columnas si quieres ahorrar espacio
                             ->defaultItems(1) // Opcional: cuántas facturas se muestran por defecto
                             ->createItemButtonLabel('Añadir factura'),
-                    ])
+                    ]),
+
+                Tabs\Tab::make('Historial de cambios')
+                    ->schema([
+                        Forms\Components\View::make('filament.resources.referencia-resource.partials.historial-cambios')
+                            ->viewData([
+                                'logs' => \Spatie\Activitylog\Models\Activity::where('subject_type', \App\Models\Referencia::class)
+                                    ->where('subject_id', $this->record?->id)
+                                    ->latest()
+                                    ->take(20)
+                                    ->get(),
+                            ])
+                            ->columnSpanFull(),
+                    ]),
+
             ])
                 ->columnSpanFull(),
         ]);

@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\ReferenciaResource\Pages;
+use App\Filament\Resources\ReferenciaResource\Pages\ListReferencias;
 use App\Filament\Resources\ReferenciaResource\RelationManagers;
 use App\Models\Cliente;
 use App\Models\Proveedor;
