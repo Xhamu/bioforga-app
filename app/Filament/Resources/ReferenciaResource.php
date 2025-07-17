@@ -418,6 +418,21 @@ class ReferenciaResource extends Resource
                     ->visible(function ($get) {
                         return !empty($get('referencia'));
                     }),
+
+                Forms\Components\Section::make('Facturación')
+                    ->schema([
+                        Forms\Components\Select::make('estado_facturacion')
+                            ->label('Estado Facturación')
+                            ->searchable()
+                            ->options([
+                                'completa' => 'Completa',
+                                'parcial' => 'Parcial',
+                                'no_facturada' => 'No facturada',
+                            ]),
+                    ])->columns(1)
+                    ->visible(function ($get) {
+                        return !empty($get('referencia'));
+                    }),
             ]);
     }
 
@@ -628,6 +643,15 @@ class ReferenciaResource extends Resource
                             'cerrado' => 'Cerrado',
                             default => ucfirst($state ?? 'Desconocido'),
                         }),
+
+                    TextColumn::make('estado_facturacion')
+                        ->label('Facturación')
+                        ->badge()
+                        ->color(fn(string $state) => match ($state) {
+                            'completa' => 'success',
+                            'parcial' => 'warning',
+                            'no_facturada' => 'gray',
+                        }),
                 ])
                 ->filters(
                     [
@@ -733,10 +757,27 @@ class ReferenciaResource extends Resource
 
                                 return $query;
                             }),
+
+                        SelectFilter::make('estado')
+                            ->label('Estado')
+                            ->searchable()
+                            ->options([
+                                'abierto' => 'Abierto',
+                                'en_proceso' => 'En proceso',
+                                'cerrado' => 'Cerrado',
+                            ])
+                            ->query(function ($query, array $data) {
+                                if (!empty($data['value'])) {
+                                    return $query->where('estado', $data['value']);
+                                }
+
+                                return $query;
+                            })
+                            ->placeholder('Todos'),
                     ],
                     layout: FiltersLayout::AboveContent
                 )
-                ->filtersFormColumns(3)
+                ->filtersFormColumns(2)
                 ->headerActions([
                     Action::make('exportar_balance_masas')
                         ->label('Balance de Masas')
@@ -852,18 +893,14 @@ class ReferenciaResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()
-            /*->when(
-                !auth()->user()->hasAnyRole(['superadmin', 'administración', 'administrador']),
-                fn($query) => $query->whereHas(
-                    'usuarios',
-                    fn($q) =>
-                    $q->where('users.id', auth()->id())
-                )
-            )*/
-            ->withoutGlobalScopes([
-                SoftDeletingScope::class,
-            ]);
+        $user = auth()->user();
+
+        if ($user->hasRole('técnico') && $user->sector) {
+            return parent::getEloquentQuery()
+                ->where('sector', $user->sector);
+        }
+
+        return parent::getEloquentQuery(); // Administración u otros
     }
 
     public static function generalFormSchema(): array
@@ -1228,6 +1265,21 @@ class ReferenciaResource extends Resource
 
                     Forms\Components\Textarea::make('observaciones')
                         ->nullable(),
+                ])->columns(1)
+                ->visible(function ($get) {
+                    return !empty($get('referencia'));
+                }),
+
+            Forms\Components\Section::make('Facturación')
+                ->schema([
+                    Forms\Components\Select::make('estado_facturacion')
+                        ->label('Estado Facturación')
+                        ->searchable()
+                        ->options([
+                            'completa' => 'Completa',
+                            'parcial' => 'Parcial',
+                            'no_facturada' => 'No facturada',
+                        ]),
                 ])->columns(1)
                 ->visible(function ($get) {
                     return !empty($get('referencia'));
