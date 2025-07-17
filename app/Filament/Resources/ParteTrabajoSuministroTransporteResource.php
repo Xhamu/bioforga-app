@@ -586,7 +586,7 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                     ->html()
                     ->formatStateUsing(function ($record) {
                         $cantidad = $record->cantidad_total ? number_format($record->cantidad_total, 2, ',', '.') . ' m³' : '-';
-                        $peso = $record->peso_neto ? number_format($record->peso_neto, 0, ',', '.') . ' kg' : '-';
+                        $peso = $record->peso_neto ? number_format($record->peso_neto, 0, ',', '.') . ' Tn' : '-';
 
                         if ($record->cliente && $record->cliente->razon_social) {
                             $provincia = Provincia::find($record->cliente->provincia);
