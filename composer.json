@@ -18,6 +18,7 @@
         "psr/simple-cache": "^2.0",
         "pxlrbt/filament-activity-log": "^1.1",
         "pxlrbt/filament-excel": "^2.4",
+        "spatie/image": "^3.8",
         "spatie/laravel-activitylog": "^4.10",
         "stechstudio/filament-impersonate": "^3.15",
         "tomatophp/filament-pwa": "^1.0"
