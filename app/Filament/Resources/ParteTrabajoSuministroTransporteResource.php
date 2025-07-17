@@ -471,7 +471,7 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                     ->schema([
                         Select::make('cliente_id')
                             ->label('Cliente')
-                            ->options(fn() => \App\Models\Cliente::pluck('razon_social', 'id'))
+                            ->options(fn() => \App\Models\Cliente::where('tipo_cliente', 'suministro')->pluck('razon_social', 'id'))
                             ->searchable()
                             ->preload()
                             ->visible(fn($record) => $record?->cliente_id !== null),
@@ -781,8 +781,7 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                 ]),
             ])
             ->paginated(true)
-            ->paginationPageOptions([50, 100, 200])
-            ->defaultSort('created_at', 'desc');
+            ->paginationPageOptions([50, 100, 200]);
     }
 
     public static function getRelations(): array
@@ -807,6 +806,10 @@ class ParteTrabajoSuministroTransporteResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         $query = parent::getEloquentQuery()
+            // ORDENAR POR FECHA DE PRIMERA CARGA
+            ->withMin('cargas', 'fecha_hora_inicio_carga')
+            ->orderBy('cargas_min_fecha_hora_inicio_carga', 'desc')
+            // 
             ->withoutGlobalScopes([
                 SoftDeletingScope::class,
             ]);
@@ -820,6 +823,13 @@ class ParteTrabajoSuministroTransporteResource extends Resource
 
         if (!$user->hasAnyRole($rolesPermitidos)) {
             $query->where('usuario_id', $user->id);
+        }
+
+        if ($user->hasRole('técnico') && $user->sector) {
+            // Mostrar solo partes con cargas que tengan referencias del sector del técnico
+            $query->whereHas('cargas.referencia', function (Builder $q) use ($user) {
+                $q->where('sector', $user->sector);
+            });
         }
 
         return $query;

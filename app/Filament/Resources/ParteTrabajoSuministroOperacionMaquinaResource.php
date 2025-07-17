@@ -915,21 +915,26 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         $query = parent::getEloquentQuery()
-            ->withoutGlobalScopes([
-                SoftDeletingScope::class,
-            ]);
+            ->withoutGlobalScopes([SoftDeletingScope::class]);
 
         if (request('trashed') === 'true') {
             $query->onlyTrashed();
         } else {
-            $query->whereNull('deleted_at'); // <- esto faltaba
+            $query->whereNull('deleted_at');
         }
 
         $user = Filament::auth()->user();
         $rolesPermitidos = ['superadmin', 'administración', 'administrador', 'técnico'];
 
         if (!$user->hasAnyRole($rolesPermitidos)) {
-            $query->where('usuario_id', $user->id);
+            return $query->where('usuario_id', $user->id);
+        }
+
+        // Técnicos solo ven partes de referencias de su sector
+        if ($user->hasRole('técnico') && $user->sector) {
+            $query->whereHas('referencia', function (Builder $q) use ($user) {
+                $q->where('sector', $user->sector);
+            });
         }
 
         return $query;

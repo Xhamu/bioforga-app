@@ -117,6 +117,23 @@ class UserResource extends Resource
                                 'md' => 2,
                             ]),
 
+                        Section::make('Sector')
+                            ->schema([
+                                Select::make('sector')
+                                    ->label('')
+                                    ->options([
+                                        '01' => 'Zona Norte Galicia',
+                                        '02' => 'Zona Sur Galicia',
+                                        '03' => 'Andalucía Oriental',
+                                        '04' => 'Andalucía Occidental',
+                                        '05' => 'Otros',
+                                    ])
+                                    ->nullable()
+                                    ->searchable()
+                                    ->columnSpan(1),
+                            ])
+                            ->visible(fn($livewire) => $livewire->record?->hasRole('técnico') ?? true),
+
                         Section::make('Acceso')
                             ->schema([
                                 TextInput::make('password')

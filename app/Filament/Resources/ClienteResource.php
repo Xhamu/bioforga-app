@@ -8,6 +8,7 @@ use App\Models\Cliente;
 use App\Models\Pais;
 use App\Models\Poblacion;
 use App\Models\Provincia;
+use Filament\Facades\Filament;
 use Filament\Forms;
 use Filament\Forms\Components\Grid;
 use Filament\Forms\Components\Hidden;
@@ -21,6 +22,7 @@ use Filament\Tables;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Enums\FiltersLayout;
 use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
@@ -228,6 +230,10 @@ class ClienteResource extends Resource
                         ->options(Provincia::orderBy('nombre')->pluck('nombre', 'id'))
                         ->searchable()
                         ->placeholder('Todas'),
+
+                    TrashedFilter::make()
+                        ->columnSpanFull()
+                        ->visible(fn() => Filament::auth()->user()?->hasRole('superadmin')),
                 ],
                 layout: FiltersLayout::AboveContent
             )
@@ -280,5 +286,6 @@ class ClienteResource extends Resource
             ->withoutGlobalScopes([
                 SoftDeletingScope::class,
             ]);
+
     }
 }

@@ -109,9 +109,16 @@ class EditReferencia extends EditRecord
                                     ->suffix('€')
                                     ->nullable(),
 
+                                Forms\Components\TextInput::make('cantidad')
+                                    ->label('Cantidad')
+                                    ->numeric()
+                                    ->step(0.01)
+                                    ->nullable(),
+
                                 Forms\Components\Textarea::make('notas')
                                     ->label('Notas')
-                                    ->nullable(),
+                                    ->nullable()
+                                    ->columnSpanFull(),
                             ])
                             ->columns(2) // Opcional: puedes poner en columnas si quieres ahorrar espacio
                             ->defaultItems(1) // Opcional: cuántas facturas se muestran por defecto

@@ -8,6 +8,7 @@ use App\Models\Pais;
 use App\Models\Poblacion;
 use App\Models\Proveedor;
 use App\Models\Provincia;
+use Filament\Facades\Filament;
 use Filament\Forms;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Repeater;
@@ -27,6 +28,7 @@ use Filament\Tables\Columns\Layout\Stack;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Enums\FiltersLayout;
 use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
@@ -281,6 +283,17 @@ class ProveedorResource extends Resource
                             ])
                             ->searchable()
                             ->placeholder('Todos'),
+
+                        SelectFilter::make('provincia')
+                            ->label('Provincia')
+                            ->options($provinciasOptions)
+                            ->options(Provincia::orderBy('nombre')->pluck('nombre', 'id'))
+                            ->searchable()
+                            ->placeholder('Todas'),
+
+                        TrashedFilter::make()
+                            ->columnSpanFull()
+                            ->visible(fn() => Filament::auth()->user()?->hasRole('superadmin')),
                     ],
                     layout: FiltersLayout::AboveContent
                 )
@@ -344,6 +357,10 @@ class ProveedorResource extends Resource
                             ->options(Provincia::orderBy('nombre')->pluck('nombre', 'id'))
                             ->searchable()
                             ->placeholder('Todas'),
+
+                        TrashedFilter::make()
+                            ->columnSpanFull()
+                            ->visible(fn() => Filament::auth()->user()?->hasRole('superadmin')),
                     ],
                     layout: FiltersLayout::AboveContent
                 )

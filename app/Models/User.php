@@ -34,6 +34,7 @@ class User extends Authenticatable
         'empresa_bioforga',
         'proveedor_id',
         'telefono',
+        'sector',
     ];
 
     /**

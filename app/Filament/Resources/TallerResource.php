@@ -8,6 +8,7 @@ use App\Models\Pais;
 use App\Models\Poblacion;
 use App\Models\Provincia;
 use App\Models\Taller;
+use Filament\Facades\Filament;
 use Filament\Forms;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
@@ -20,6 +21,7 @@ use Filament\Tables;
 use Filament\Tables\Columns\Layout\Split;
 use Filament\Tables\Columns\Layout\Stack;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
@@ -127,7 +129,9 @@ class TallerResource extends Resource
                     ->icon('heroicon-m-map-pin'),
             ])
             ->filters([
-                // Filtros si los necesitas
+                TrashedFilter::make()
+                    ->columnSpanFull()
+                    ->visible(fn() => Filament::auth()->user()?->hasRole('superadmin')),
             ])
             ->actions([
                 //Tables\Actions\ViewAction::make(),
@@ -143,7 +147,6 @@ class TallerResource extends Resource
             ->paginationPageOptions([50, 100, 200])
             ->defaultSort('created_at', 'desc');
     }
-
 
     public static function getRelations(): array
     {

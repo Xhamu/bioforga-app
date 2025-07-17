@@ -69,7 +69,7 @@ class ParteTrabajoSuministroTransporte extends Model
                 if ($carga->referencia_id && $carga->referencia) {
                     $origen = $carga->referencia->referencia . ' (' . $carga->referencia->ayuntamiento . ', ' . $carga->referencia->monte_parcela . ')';
                 } elseif ($carga->almacen_id && $carga->almacen) {
-                    $origen =  $carga->almacen->referencia . ' (' . $carga->almacen->ayuntamiento . ', ' . $carga->almacen->monte_parcela . ')';
+                    $origen = $carga->almacen->referencia . ' (' . $carga->almacen->ayuntamiento . ', ' . $carga->almacen->monte_parcela . ')';
                 } else {
                     $origen = '-';
                 }
@@ -79,7 +79,13 @@ class ParteTrabajoSuministroTransporte extends Model
 
                 // Horas
                 $inicio = optional($carga->fecha_hora_inicio_carga)?->timezone('Europe/Madrid')->format('H:i') ?? '-';
-                $fin = optional($carga->fecha_hora_fin_carga)?->timezone('Europe/Madrid')->format('H:i') ?? '-';
+                $fin = $carga->fecha_hora_fin_carga
+                    ? $carga->fecha_hora_fin_carga->timezone('Europe/Madrid')->format('H:i')
+                    : null;
+
+                $finHtml = $fin
+                    ? "<span class=\"text-gray-700\">Fin:</span> $fin<br>"
+                    : '';
 
                 return <<<HTML
                     <div class="mb-2 leading-5">
@@ -87,7 +93,7 @@ class ParteTrabajoSuministroTransporte extends Model
                         <span class="text-gray-700"></span> $origen<br>
                         <span class="text-gray-700">Cantidad:</span> $cantidad<br>
                         <span class="text-gray-700">Inicio:</span> $inicio<br>
-                        <span class="text-gray-700">Fin:</span> $fin
+                        $finHtml
                     </div>
                 HTML;
             })
