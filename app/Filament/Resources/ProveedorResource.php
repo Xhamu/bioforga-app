@@ -268,6 +268,7 @@ class ProveedorResource extends Resource
                             ]),
                     ])->collapsed(false),
                 ])
+                ->persistFiltersInSession()
                 ->filters(
                     [
                         SelectFilter::make('tipo_servicio')
@@ -335,6 +336,7 @@ class ProveedorResource extends Resource
                             return Provincia::find($state)?->nombre ?? 'Desconocida';
                         }),
                 ])
+                ->persistFiltersInSession()
                 ->filters(
                     [
                         SelectFilter::make('tipo_servicio')

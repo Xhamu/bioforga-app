@@ -499,6 +499,7 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                         TextInput::make('peso_neto')
                             ->label('Peso neto (Tn)')
                             ->numeric()
+                            ->step(0.01)
                             ->required(),
 
                         TextInput::make('cantidad_total')
@@ -564,9 +565,11 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                         $nombre = $record->usuario?->name ?? '';
                         $apellido = $record->usuario?->apellidos ?? '';
                         $inicialApellido = $apellido ? strtoupper(substr($apellido, 0, 1)) . '.' : '';
-                        return trim("$nombre $inicialApellido");
+                        $proveedor = $record->usuario?->proveedor?->razon_social ?? '';
+
+                        return "<span class='font-bold'>$nombre $inicialApellido</span><br><span class='text-sm text-gray-600'>$proveedor</span>";
                     })
-                    ->weight(FontWeight::Bold),
+                    ->html(),
 
                 TextColumn::make('camion')
                     ->label('Camión')
@@ -586,7 +589,7 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                     ->html()
                     ->formatStateUsing(function ($record) {
                         $cantidad = $record->cantidad_total ? number_format($record->cantidad_total, 2, ',', '.') . ' m³' : '-';
-                        $peso = $record->peso_neto ? number_format($record->peso_neto, 0, ',', '.') . ' Tn' : '-';
+                        $peso = $record->peso_neto ? number_format($record->peso_neto, 2, ',', '.') . ' Tn' : '-';
 
                         if ($record->cliente && $record->cliente->razon_social) {
                             $provincia = Provincia::find($record->cliente->provincia);
@@ -619,6 +622,7 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                         return '-';
                     }),
             ])
+            ->persistFiltersInSession()
             ->filters(
                 [
                     Filter::make('fecha_hora_inicio_carga')
@@ -645,23 +649,6 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                             return $query;
                         }),
 
-                    SelectFilter::make('cliente_id')
-                        ->label('Cliente')
-                        ->relationship(
-                            'cliente', // relación directa, no a través de referencia
-                            'razon_social',
-                            fn($query) => $query->whereIn(
-                                'id',
-                                ParteTrabajoSuministroTransporte::query()
-                                    ->whereNotNull('cliente_id')
-                                    ->distinct()
-                                    ->pluck('cliente_id')
-                            )
-                        )
-                        ->searchable()
-                        ->preload()
-                        ->placeholder('Todos'),
-
                     SelectFilter::make('usuario_id')
                         ->label('Usuario')
                         ->options(function () {
@@ -677,6 +664,28 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                 ->get()
                                 ->mapWithKeys(fn($usuario) => [
                                     $usuario->id => trim($usuario->name . ' ' . ($usuario->apellidos ?? '')),
+                                ])
+                                ->toArray();
+                        })
+                        ->searchable()
+                        ->preload()
+                        ->placeholder('Todos'),
+
+                    SelectFilter::make('camion_id')
+                        ->label('Camión')
+                        ->options(function () {
+                            $camionIds = ParteTrabajoSuministroTransporte::query()
+                                ->distinct()
+                                ->pluck('camion_id')
+                                ->filter()
+                                ->unique();
+
+                            return Camion::query()
+                                ->whereIn('id', $camionIds)
+                                ->orderBy('matricula_cabeza')
+                                ->get()
+                                ->mapWithKeys(fn($camion) => [
+                                    $camion->id => $camion->matricula_cabeza,
                                 ])
                                 ->toArray();
                         })
@@ -709,7 +718,7 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                         })
                         ->searchable()
                         ->preload()
-                        ->columnSpan(2)
+                        ->columnSpan(1)
                         ->placeholder('Todas')
                         ->query(function ($query, $data) {
                             return $query->when($data['value'], function ($query, $value) {
@@ -719,27 +728,43 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                             });
                         }),
 
-                    SelectFilter::make('camion_id')
-                        ->label('Camión')
-                        ->options(function () {
-                            $camionIds = ParteTrabajoSuministroTransporte::query()
-                                ->distinct()
-                                ->pluck('camion_id')
-                                ->filter()
-                                ->unique();
-
-                            return Camion::query()
-                                ->whereIn('id', $camionIds)
-                                ->orderBy('matricula_cabeza')
-                                ->get()
-                                ->mapWithKeys(fn($camion) => [
-                                    $camion->id => $camion->matricula_cabeza,
-                                ])
-                                ->toArray();
-                        })
+                    SelectFilter::make('destino_filter')
+                        ->label('Destino')
+                        ->options([
+                            'almacen' => 'Almacén intermedio',
+                            'cliente' => 'Cliente',
+                        ])
                         ->searchable()
                         ->preload()
                         ->placeholder('Todos')
+                        ->modifyQueryUsing(function ($query, $state) {
+                            $value = $state['value'] ?? null;
+
+                            if ($value === 'almacen') {
+                                $query->whereNotNull('almacen_id')->whereNull('cliente_id');
+                            } elseif ($value === 'cliente') {
+                                $query->whereNull('almacen_id')->whereNotNull('cliente_id');
+                            }
+
+                            return $query;
+                        }),
+
+                    SelectFilter::make('cliente_id')
+                        ->label('Cliente')
+                        ->relationship(
+                            'cliente', // relación directa, no a través de referencia
+                            'razon_social',
+                            fn($query) => $query->whereIn(
+                                'id',
+                                ParteTrabajoSuministroTransporte::query()
+                                    ->whereNotNull('cliente_id')
+                                    ->distinct()
+                                    ->pluck('cliente_id')
+                            )
+                        )
+                        ->searchable()
+                        ->preload()
+                        ->placeholder('Todos'),
                 ],
                 layout: FiltersLayout::AboveContent
             )
