@@ -213,6 +213,7 @@ class ClienteResource extends Resource
                     ->label('Teléfono')
                     ->icon('heroicon-m-phone'),
             ])
+            ->persistFiltersInSession()
             ->filters(
                 [
                     SelectFilter::make('tipo_cliente')

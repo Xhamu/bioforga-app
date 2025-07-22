@@ -24,6 +24,7 @@ use Filament\Tables\Columns\Layout\Split;
 use Filament\Tables\Columns\Layout\Stack;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Enums\FiltersLayout;
+use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
@@ -468,8 +469,29 @@ class ReferenciaResource extends Resource
                             ]),
                     ])->collapsed(false),
                 ])
+                ->persistFiltersInSession()
                 ->filters(
                     [
+                        Filter::make('fecha_creacion')
+                            ->label('Fecha de creación')
+                            ->form([
+                                DatePicker::make('desde')->label('Fecha de creación - Desde'),
+                                DatePicker::make('hasta')->label('Fecha de creación - Hasta'),
+                            ])
+                            ->columns(2)
+                            ->query(function ($query, array $data) {
+                                if (!empty($data['desde'])) {
+                                    $query->whereDate('created_at', '>=', $data['desde']);
+                                }
+
+                                if (!empty($data['hasta'])) {
+                                    $query->whereDate('created_at', '<=', $data['hasta']);
+                                }
+
+                                return $query;
+                            }),
+
+
                         SelectFilter::make('tipo_referencia')
                             ->label('Tipo de referencia')
                             ->options([
@@ -490,6 +512,26 @@ class ReferenciaResource extends Resource
                             ->searchable()
                             ->placeholder('Todos'),
 
+                        SelectFilter::make('formato')
+                            ->label('Formato')
+                            ->options([
+                                'CA' => 'Cargador',
+                                'SA' => 'Saca',
+                                'EX' => 'Explotación',
+                                'OT' => 'Otros',
+                            ])
+                            ->searchable()
+                            ->placeholder('Todos')
+                            ->query(function ($query, array $data) {
+                                $formato = $data['value'] ?? null;
+
+                                if ($formato) {
+                                    return $query->where('formato', $formato);
+                                }
+
+                                return $query;
+                            }),
+
                         SelectFilter::make('sector')
                             ->label('Sector')
                             ->multiple()
@@ -504,6 +546,86 @@ class ReferenciaResource extends Resource
                             ->query(function ($query, array $data) {
                                 if (!empty($data['values'])) {
                                     return $query->whereIn('sector', $data['values']);
+                                }
+
+                                return $query;
+                            })
+                            ->placeholder('Todos'),
+
+                        SelectFilter::make('interviniente')
+                            ->label('Interviniente')
+                            ->options(function () {
+                                // Leer el valor actual del filtro tipo_referencia desde la request de Filament
+                                $tipoReferencia = request()->input('tableFilters.tipo_referencia.value');
+
+                                if ($tipoReferencia === 'suministro') {
+                                    // Solo proveedores
+                                    return \App\Models\Proveedor::query()
+                                        ->orderBy('razon_social')
+                                        ->get()
+                                        ->mapWithKeys(fn($proveedor) => [
+                                            'proveedor_' . $proveedor->id => $proveedor->razon_social,
+                                        ])
+                                        ->toArray();
+                                }
+
+                                if ($tipoReferencia === 'servicio') {
+                                    // Solo clientes
+                                    return \App\Models\Cliente::query()
+                                        ->orderBy('razon_social')
+                                        ->get()
+                                        ->mapWithKeys(fn($cliente) => [
+                                            'cliente_' . $cliente->id => $cliente->razon_social,
+                                        ])
+                                        ->toArray();
+                                }
+
+                                // Si no hay tipo_referencia → mostrar ambos
+                                $proveedores = \App\Models\Proveedor::query()
+                                    ->orderBy('razon_social')
+                                    ->get()
+                                    ->mapWithKeys(fn($proveedor) => [
+                                        'proveedor_' . $proveedor->id => $proveedor->razon_social,
+                                    ]);
+
+                                $clientes = \App\Models\Cliente::query()
+                                    ->orderBy('razon_social')
+                                    ->get()
+                                    ->mapWithKeys(fn($cliente) => [
+                                        'cliente_' . $cliente->id => $cliente->razon_social,
+                                    ]);
+
+                                return $proveedores->merge($clientes)->toArray();
+                            })
+                            ->searchable()
+                            ->placeholder('Todos')
+                            ->query(function ($query, array $data) {
+                                if (!empty($data['value'])) {
+                                    [$tipo, $id] = explode('_', $data['value']);
+
+                                    if ($tipo === 'proveedor') {
+                                        return $query->where('proveedor_id', $id);
+                                    }
+
+                                    if ($tipo === 'cliente') {
+                                        return $query->where('cliente_id', $id);
+                                    }
+                                }
+
+                                return $query;
+                            }),
+
+                        SelectFilter::make('estado')
+                            ->label('Estado')
+                            ->searchable()
+                            ->options([
+                                'abierto' => 'Abierto',
+                                'en_proceso' => 'En proceso',
+                                'cerrado' => 'Cerrado',
+                            ])
+                            ->query(function ($query, array $data) {
+                                if (!empty($data['value'])) {
+                                    return $query->where('estado', $data['value']);
                                 }
 
                                 return $query;
@@ -653,8 +775,29 @@ class ReferenciaResource extends Resource
                             'no_facturada' => 'gray',
                         }),
                 ])
+                ->persistFiltersInSession()
                 ->filters(
                     [
+                        Filter::make('fecha_creacion')
+                            ->label('Fecha de creación')
+                            ->form([
+                                DatePicker::make('desde')->label('Fecha de creación - Desde'),
+                                DatePicker::make('hasta')->label('Fecha de creación - Hasta'),
+                            ])
+                            ->columns(2)
+                            ->query(function ($query, array $data) {
+                                if (!empty($data['desde'])) {
+                                    $query->whereDate('created_at', '>=', $data['desde']);
+                                }
+
+                                if (!empty($data['hasta'])) {
+                                    $query->whereDate('created_at', '<=', $data['hasta']);
+                                }
+
+                                return $query;
+                            }),
+
+
                         SelectFilter::make('tipo_referencia')
                             ->label('Tipo de referencia')
                             ->options([
@@ -674,6 +817,26 @@ class ReferenciaResource extends Resource
                             })
                             ->searchable()
                             ->placeholder('Todos'),
+
+                        SelectFilter::make('formato')
+                            ->label('Formato')
+                            ->options([
+                                'CA' => 'Cargador',
+                                'SA' => 'Saca',
+                                'EX' => 'Explotación',
+                                'OT' => 'Otros',
+                            ])
+                            ->searchable()
+                            ->placeholder('Todos')
+                            ->query(function ($query, array $data) {
+                                $formato = $data['value'] ?? null;
+
+                                if ($formato) {
+                                    return $query->where('formato', $formato);
+                                }
+
+                                return $query;
+                            }),
 
                         SelectFilter::make('sector')
                             ->label('Sector')

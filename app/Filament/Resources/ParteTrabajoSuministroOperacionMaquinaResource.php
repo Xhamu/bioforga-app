@@ -716,6 +716,7 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                     ->label('Producción')
                     ->alignCenter(),
             ])
+            ->persistFiltersInSession()
             ->filters(
                 [
                     Filter::make('fecha_hora_inicio_trabajo')

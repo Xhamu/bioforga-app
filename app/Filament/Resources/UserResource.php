@@ -227,13 +227,107 @@ class UserResource extends Resource
                             ]),
                     ])->collapsed(false),
                 ])
-                ->filters([
-                    Tables\Filters\TrashedFilter::make(),
-                ])
+                ->persistFiltersInSession()
+                ->filters(
+                    [
+                        TernaryFilter::make('empresa_bioforga')
+                            ->label('Empresa')
+                            ->trueLabel('Bioforga')
+                            ->falseLabel('Proveedor externo')
+                            ->placeholder('Todos')
+                            ->native(false),
+
+                        SelectFilter::make('roles')
+                            ->relationship(
+                                'roles',
+                                'name',
+                                fn(\Illuminate\Database\Eloquent\Builder $query) =>
+                                $query->where('name', '!=', 'superadmin')
+                            )
+                            ->multiple()
+                            ->preload(),
+                    ],
+                    layout: FiltersLayout::AboveContent
+                )
+                ->filtersFormColumns(2)
                 ->actions([
-                    \STS\FilamentImpersonate\Tables\Actions\Impersonate::make(),
+                    \STS\FilamentImpersonate\Tables\Actions\Impersonate::make()
+                        ->label('Impersonar')
+                        ->after(function ($record) {
+                            $suplantador = auth()->user();
+                            $suplantado = $record;
+
+                            activity()
+                                ->causedBy($suplantador)
+                                ->performedOn($suplantado)
+                                ->withProperties([
+                                    'impersonator_id' => $suplantador->id,
+                                    'impersonator_name' => $suplantador->nombre_apellidos ?? $suplantador->name,
+                                    'impersonated_id' => $suplantado->id,
+                                    'impersonated_name' => $suplantado->nombre_apellidos ?? $suplantado->name,
+                                    'ip' => request()->ip(),
+                                    'user_agent' => request()->userAgent(),
+                                ])
+                                ->log('impersonation');
+                        }),
+
                     Tables\Actions\EditAction::make(),
-                    Tables\Actions\DeleteAction::make(),
+
+                    Tables\Actions\DeleteAction::make()
+                        ->before(function ($record, $action) {
+                            // Máquinas vinculadas
+                            $maquinas = Maquina::where('operario_id', $record->id)->get();
+
+                            if ($maquinas->isNotEmpty()) {
+                                $listaMaquinas = $maquinas
+                                    ->map(fn($m) => "<li><strong>{$m->marca} {$m->modelo}</strong></li>")
+                                    ->implode('');
+
+                                Notification::make()
+                                    ->title('No se puede eliminar')
+                                    ->danger()
+                                    ->icon('heroicon-o-exclamation-circle')
+                                    ->body(new HtmlString(
+                                        "Este usuario está asignado como operario en las siguientes máquinas:<br><ul>{$listaMaquinas}</ul>No se puede eliminar mientras tenga estas vinculaciones."
+                                    ))
+                                    ->duration(10000)
+                                    ->send();
+
+                                $action->cancel();
+                                return;
+                            }
+
+                            // Vehículos vinculados
+                            $vehiculos = Vehiculo::whereJsonContains('conductor_habitual', (string) $record->id)->get();
+
+                            if ($vehiculos->isNotEmpty()) {
+                                $listaVehiculos = $vehiculos
+                                    ->map(fn($v) => "<li><strong>{$v->marca} {$v->modelo} ({$v->matricula})</strong></li>")
+                                    ->implode('');
+
+                                Notification::make()
+                                    ->title('No se puede eliminar')
+                                    ->icon('heroicon-o-exclamation-circle')
+                                    ->danger()
+                                    ->body(new HtmlString(
+                                        "Este usuario figura como conductor habitual en los siguientes vehículos:<br><ul>{$listaVehiculos}</ul>No se puede eliminar mientras esté asignado."
+                                    ))
+                                    ->duration(10000)
+                                    ->send();
+
+                                $action->cancel();
+                            }
+                        })
+                        ->requiresConfirmation()
+                        ->modalHeading('¿Estás seguro de que quieres eliminar este usuario?')
+                        ->modalDescription('Esta acción no se puede deshacer. Asegúrate de que el usuario no tenga datos relacionados.'),
+
+                    Action::make('activities')
+                        ->label('Actividad')
+                        ->icon('heroicon-o-clock')
+                        ->url(fn($record) => static::getUrl('activities', ['record' => $record]))
+                        ->openUrlInNewTab()
+                        ->visible(fn() => auth()->user()?->hasRole('superadmin')),
                 ])
                 ->bulkActions([
                     Tables\Actions\BulkActionGroup::make([
@@ -265,6 +359,7 @@ class UserResource extends Resource
                         ->searchable()
                         ->icon('heroicon-m-phone'),
                 ])
+                ->persistFiltersInSession()
                 ->filters(
                     [
                         TernaryFilter::make('empresa_bioforga')
@@ -298,6 +393,7 @@ class UserResource extends Resource
                 ])
                 ->actions([
                     \STS\FilamentImpersonate\Tables\Actions\Impersonate::make()
+                        ->label('Impersonar')
                         ->after(function ($record) {
                             $suplantador = auth()->user();
                             $suplantado = $record;
