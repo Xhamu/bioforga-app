@@ -86,18 +86,18 @@ class MaquinaResource extends Resource
                                 ])
                                 ->columnSpan(['default' => 2, 'lg' => 1]),
 
-                            Select::make('operario_id')
-                                ->label(__('Operario'))
-                                ->required()
-                                ->rules('required')
+                            Select::make('operarios')
+                                ->label(__('Operarios'))
+                                ->relationship(
+                                    'operarios',
+                                    'name',
+                                    fn($query) =>
+                                    $query->whereDoesntHave('roles', fn($q) => $q->where('name', 'superadmin'))
+                                )
+                                ->getOptionLabelFromRecordUsing(fn($record) => "{$record->name} {$record->apellidos}")
+                                ->multiple()
+                                ->preload()
                                 ->searchable()
-                                ->options(function () {
-                                    return \App\Models\User::all()->pluck('name', 'id')->toArray();
-                                })
-                                ->validationMessages([
-                                    'required' => 'El :attribute es obligatorio.',
-                                ])
-                                ->columnSpan(['default' => 2, 'lg' => 1]),
                         ])
                         ->columns(2)
                         ->columnSpan(2),
@@ -238,25 +238,18 @@ class MaquinaResource extends Resource
                                 ])
                                 ->columnSpan(['default' => 2, 'lg' => 1]),
 
-                            Select::make('operario_id')
-                                ->label(__('Operario'))
-                                ->required()
-                                ->rules('required')
+                            Select::make('operarios')
+                                ->label(__('Operarios'))
+                                ->relationship(
+                                    'operarios',
+                                    'name',
+                                    fn($query) =>
+                                    $query->whereDoesntHave('roles', fn($q) => $q->where('name', 'superadmin'))
+                                )
+                                ->getOptionLabelFromRecordUsing(fn($record) => "{$record->name} {$record->apellidos}")
+                                ->multiple()
+                                ->preload()
                                 ->searchable()
-                                ->options(function () {
-                                    return \App\Models\User::whereDoesntHave('roles', function ($query) {
-                                        $query->where('name', 'superadmin');
-                                    })
-                                        ->get()
-                                        ->mapWithKeys(fn($user) => [
-                                            $user->id => $user->name . ' ' . $user->apellidos
-                                        ])
-                                        ->toArray();
-                                })
-                                ->validationMessages([
-                                    'required' => 'El :attribute es obligatorio.',
-                                ])
-                                ->columnSpan(['default' => 2, 'lg' => 1]),
                         ])
                         ->columns(2)
                         ->columnSpan(2),
@@ -477,7 +470,7 @@ class MaquinaResource extends Resource
         $rolesPermitidos = ['superadmin', 'administración', 'administrador'];
 
         if (!$user->hasAnyRole($rolesPermitidos)) {
-            $query->where('operario_id', $user->id);
+            $query->whereHas('operarios', fn($q) => $q->where('users.id', $user->id));
         }
 
         return $query;

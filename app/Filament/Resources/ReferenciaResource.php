@@ -832,6 +832,11 @@ class ReferenciaResource extends Resource
                     TextColumn::make('estado_facturacion')
                         ->label('Facturación')
                         ->badge()
+                        ->formatStateUsing(fn($state) => match ($state) {
+                            'completa' => 'Completa',
+                            'parcial' => 'Parcial',
+                            'no_facturada' => 'No facturada',
+                        })
                         ->color(fn(string $state) => match ($state) {
                             'completa' => 'success',
                             'parcial' => 'warning',
