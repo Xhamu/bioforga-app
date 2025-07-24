@@ -49,7 +49,8 @@ class Referencia extends Model
         'finca',
         'precio',
         'precio_horas',
-        'estado_facturacion'
+        'estado_facturacion',
+        'tipo_cantidad',
     ];
 
     public function getActivitylogOptions(): LogOptions
