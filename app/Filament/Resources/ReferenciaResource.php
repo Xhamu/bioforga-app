@@ -276,6 +276,15 @@ class ReferenciaResource extends Resource
                             ])
                             ->required(),
 
+                        Select::make('tipo_cantidad')
+                            ->label('Tipo de cantidad')
+                            ->options([
+                                'toneladas' => 'Toneladas',
+                                'camiones' => 'Camiones',
+                            ])
+                            ->searchable()
+                            ->required(),
+
                         Forms\Components\TextInput::make('cantidad_aprox')
                             ->label('Cantidad (aprox.)')
                             ->numeric()
@@ -301,7 +310,7 @@ class ReferenciaResource extends Resource
                             ->label('¿Guía de sanidad?')
                             ->reactive(),
 
-                    ])->columns(3)
+                    ])->columns(2)
                     ->visible(function ($get) {
                         return !empty($get('referencia'));
                     }),
@@ -465,6 +474,24 @@ class ReferenciaResource extends Resource
                                     TextColumn::make('interviniente')
                                         ->label('Interviniente')
                                         ->icon('heroicon-m-building-office'),
+
+                                    TextColumn::make('cantidad_aprox')
+                                        ->label('Cantidad (aprox.)')
+                                        ->formatStateUsing(function ($record) {
+                                            if ($record->cantidad_aprox === null) {
+                                                return null;
+                                            }
+
+                                            // Formatear número: 2 decimales, ',' como decimal y '.' como miles
+                                            $cantidad = number_format($record->cantidad_aprox, 2, ',', '.');
+
+                                            // Añadir tipo_cantidad si existe
+                                            if (!empty($record->tipo_cantidad)) {
+                                                return $cantidad . ' ' . $record->tipo_cantidad;
+                                            }
+
+                                            return $cantidad;
+                                        }),
                                 ]),
                             ]),
                     ])->collapsed(false),
@@ -489,8 +516,26 @@ class ReferenciaResource extends Resource
                                 }
 
                                 return $query;
-                            }),
+                            })
+                            ->columnSpanFull(),
 
+                        SelectFilter::make('usuario')
+                            ->label('Usuario')
+                            ->options(
+                                User::select('id', \DB::raw("CONCAT(name, ' ', apellidos) as full_name"))
+                                    ->orderBy('name')
+                                    ->pluck('full_name', 'id')
+                                    ->toArray()
+                            )
+                            ->query(function ($query, array $data) {
+                                if (!empty($data['value'])) {
+                                    $query->whereHas('usuarios', function ($q) use ($data) {
+                                        $q->where('users.id', $data['value']);
+                                    });
+                                }
+                            })
+                            ->searchable()
+                            ->placeholder('Seleccionar usuario'),
 
                         SelectFilter::make('tipo_referencia')
                             ->label('Tipo de referencia')
@@ -749,6 +794,24 @@ class ReferenciaResource extends Resource
                         ->label('Interviniente')
                         ->icon('heroicon-m-building-office'),
 
+                    TextColumn::make('cantidad_aprox')
+                        ->label('Cantidad (aprox.)')
+                        ->formatStateUsing(function ($record) {
+                            if ($record->cantidad_aprox === null) {
+                                return null;
+                            }
+
+                            // Formatear número: 2 decimales, ',' como decimal y '.' como miles
+                            $cantidad = number_format($record->cantidad_aprox, 2, ',', '.');
+
+                            // Añadir tipo_cantidad si existe
+                            if (!empty($record->tipo_cantidad)) {
+                                return $cantidad . ' ' . $record->tipo_cantidad;
+                            }
+
+                            return $cantidad;
+                        }),
+
                     TextColumn::make('estado')
                         ->label('Estado')
                         ->badge()
@@ -795,8 +858,26 @@ class ReferenciaResource extends Resource
                                 }
 
                                 return $query;
-                            }),
+                            })
+                            ->columnSpanFull(),
 
+                        SelectFilter::make('usuario')
+                            ->label('Usuario')
+                            ->options(
+                                User::select('id', \DB::raw("CONCAT(name, ' ', apellidos) as full_name"))
+                                    ->orderBy('name')
+                                    ->pluck('full_name', 'id')
+                                    ->toArray()
+                            )
+                            ->query(function ($query, array $data) {
+                                if (!empty($data['value'])) {
+                                    $query->whereHas('usuarios', function ($q) use ($data) {
+                                        $q->where('users.id', $data['value']);
+                                    });
+                                }
+                            })
+                            ->searchable()
+                            ->placeholder('Seleccionar usuario'),
 
                         SelectFilter::make('tipo_referencia')
                             ->label('Tipo de referencia')
@@ -1289,6 +1370,15 @@ class ReferenciaResource extends Resource
                         ])
                         ->required(),
 
+                    Select::make('tipo_cantidad')
+                        ->label('Tipo de cantidad')
+                        ->options([
+                            'toneladas' => 'Toneladas',
+                            'camiones' => 'Camiones',
+                        ])
+                        ->searchable()
+                        ->required(),
+
                     Forms\Components\TextInput::make('cantidad_aprox')
                         ->label('Cantidad (aprox.)')
                         ->numeric()
@@ -1314,7 +1404,7 @@ class ReferenciaResource extends Resource
                         ->label('¿Guía de sanidad?')
                         ->reactive(),
 
-                ])->columns(3)
+                ])->columns(2)
                 ->visible(function ($get) {
                     return !empty($get('referencia'));
                 }),

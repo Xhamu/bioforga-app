@@ -460,6 +460,7 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                                             ->options([
                                                 'camiones' => 'Camiones',
                                                 'toneladas' => 'Toneladas',
+                                                'metros_cubicos' => 'Metros cúbicos (m³)'
                                             ])
                                             ->searchable()
                                             ->reactive()
