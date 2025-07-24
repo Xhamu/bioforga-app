@@ -52,7 +52,10 @@ class CreateParteTrabajoSuministroOperacionMaquina extends CreateRecord
                                 return;
                             }
 
-                            $maquinas = Maquina::where('operario_id', $state)->pluck('id');
+                            // Obtener las máquinas donde el usuario esté vinculado en la tabla pivote
+                            $maquinas = Maquina::whereHas('operarios', fn($q) => $q->where('users.id', $state))
+                                ->pluck('id');
+
                             $set('maquina_id', $maquinas->count() === 1 ? $maquinas->first() : null);
                         }),
 
@@ -65,7 +68,9 @@ class CreateParteTrabajoSuministroOperacionMaquina extends CreateRecord
                                 return [];
                             }
 
-                            $maquinas = Maquina::where('operario_id', $usuarioId)->get();
+                            // Filtrar máquinas por relación many-to-many con el usuario seleccionado
+                            $maquinas = Maquina::whereHas('operarios', fn($q) => $q->where('users.id', $usuarioId))
+                                ->get();
 
                             if ($maquinas->isEmpty()) {
                                 return [];
@@ -78,7 +83,10 @@ class CreateParteTrabajoSuministroOperacionMaquina extends CreateRecord
                         ->placeholder('- Selecciona una máquina -')
                         ->default(function (callable $get) {
                             $usuarioId = $get('usuario_id') ?? Filament::auth()->user()->id;
-                            $maquinas = Maquina::where('operario_id', $usuarioId)->pluck('id');
+
+                            $maquinas = Maquina::whereHas('operarios', fn($q) => $q->where('users.id', $usuarioId))
+                                ->pluck('id');
+
                             return $maquinas->count() === 1 ? $maquinas->first() : null;
                         })
                         ->reactive()
@@ -141,6 +149,20 @@ class CreateParteTrabajoSuministroOperacionMaquina extends CreateRecord
                                         ($r->proveedor?->razon_social ?? $r->cliente?->razon_social ?? 'Sin interviniente') .
                                         " ({$r->monte_parcela}, {$r->ayuntamiento})"
                                 ]);
+                        })
+                        ->default(function (callable $get) {
+                            $usuarioId = $get('usuario_id');
+                            if (!$usuarioId)
+                                return null;
+
+                            // Obtener las referencias reales que se van a mostrar en el select
+                            $referenciasIds = DB::table('referencias_users')
+                                ->where('user_id', $usuarioId)
+                                ->pluck('referencia_id');
+
+                            $referencias = Referencia::whereIn('id', $referenciasIds)->pluck('id');
+
+                            return $referencias->count() === 1 ? $referencias->first() : null;
                         })
                         ->searchable()
                         ->preload()

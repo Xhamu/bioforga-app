@@ -103,7 +103,8 @@ class CreateParteTrabajoSuministroDesplazamiento extends CreateRecord
                             titleAttribute: 'marca',
                             modifyQueryUsing: fn($query, callable $get) => $query->when(
                                 $get('usuario_id'),
-                                fn($q, $usuarioId) => $q->where('operario_id', (string) $usuarioId)
+                                fn($q, $usuarioId) =>
+                                $q->whereHas('operarios', fn($q2) => $q2->where('users.id', (string) $usuarioId))
                             )
                         )
                         ->getOptionLabelFromRecordUsing(
@@ -119,8 +120,11 @@ class CreateParteTrabajoSuministroDesplazamiento extends CreateRecord
                             if (!$usuarioId)
                                 return null;
 
-                            $vehiculos = Maquina::where('operario_id', (string) $usuarioId)->get();
-                            return $vehiculos->count() === 1 ? $vehiculos->first()->id : null;
+                            // Obtener las máquinas que realmente se muestran en el select
+                            $maquinas = Maquina::whereHas('operarios', fn($q) => $q->where('users.id', (string) $usuarioId))
+                                ->pluck('id');
+
+                            return $maquinas->count() === 1 ? $maquinas->first() : null;
                         }),
 
                     Select::make('destino')

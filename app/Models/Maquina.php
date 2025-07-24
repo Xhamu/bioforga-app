@@ -60,6 +60,11 @@ class Maquina extends Model
         return $this->hasMany(ITV_Maquinas::class);
     }
 
+    public function operarios()
+    {
+        return $this->belongsToMany(User::class, 'maquina_user');
+    }
+
     public function getMarcaModeloAttribute()
     {
         return $this->marca . ' ' . $this->modelo;
