@@ -604,6 +604,15 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                         $cantidad = $record->cantidad_total ? number_format($record->cantidad_total, 2, ',', '.') . ' m³' : '-';
                         $peso = $record->peso_neto ? number_format($record->peso_neto, 2, ',', '.') . ' Tn' : '-';
 
+                        $hora_descarga = $record->fecha_hora_descarga
+                            ? $record->fecha_hora_descarga->timezone('Europe/Madrid')->format('H:i')
+                            : null;
+
+                        $hora_html = $hora_descarga
+                            ? "<span class='text-gray-700'>Hora:</span> $hora_descarga <br>"
+                            : '';
+
+
                         if ($record->cliente && $record->cliente->razon_social) {
                             $provincia = Provincia::find($record->cliente->provincia);
 
@@ -615,7 +624,8 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                     <strong>{$record->cliente->razon_social}</strong><br>
                                     <span class="text-gray-700">Ubicación:</span> $ubicacion<br>
                                     <span class="text-gray-700">Cantidad:</span> $cantidad<br>
-                                    <span class="text-gray-700">Peso neto:</span> $peso
+                                    <span class="text-gray-700">Peso neto:</span> $peso <br>
+                                    $hora_html
                                 </div>
                             HTML;
                         }
@@ -627,7 +637,8 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                     <strong>{$record->almacen->referencia}</strong><br>
                                     <span class="text-gray-700">Ubicación:</span> $ubicacion<br>
                                     <span class="text-gray-700">Cantidad:</span> $cantidad<br>
-                                    <span class="text-gray-700">Peso neto:</span> $peso
+                                    <span class="text-gray-700">Peso neto:</span> $peso <br>
+                                    $hora_html                                
                                 </div>
                             HTML;
                         }
