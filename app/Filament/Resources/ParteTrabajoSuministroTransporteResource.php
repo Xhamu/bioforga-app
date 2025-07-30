@@ -445,6 +445,7 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                         ])
                                         ->action(function (array $data, $record) {
                                             $record->update([
+                                                'fecha_hora_descarga' => now(),
                                                 'cliente_id' => $data['eleccion'] === 'cliente' ? $data['cliente_id'] : null,
                                                 'almacen_id' => $data['eleccion'] === 'almacen_intermedio' ? $data['almacen_id'] : null,
                                                 'tipo_biomasa' => $data['tipo_biomasa'],
@@ -474,6 +475,13 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                 Section::make('Datos de la descarga')
                     ->visible(fn($record) => $record && ($record->cliente_id !== null || $record->almacen_id !== null))
                     ->schema([
+                        DateTimePicker::make('fecha_hora_descarga')
+                            ->timezone('Europe/Madrid')
+                            ->label('Fecha descarga')
+                            ->columnSpanFull()
+                            ->required()
+                            ->visible(fn($record) => !is_null($record?->fecha_hora_descarga)),
+
                         Select::make('cliente_id')
                             ->label('Cliente')
                             ->options(fn() => \App\Models\Cliente::where('tipo_cliente', 'suministro')->pluck('razon_social', 'id'))
