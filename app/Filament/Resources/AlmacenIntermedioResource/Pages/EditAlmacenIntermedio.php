@@ -19,4 +19,14 @@ class EditAlmacenIntermedio extends EditRecord
             Actions\RestoreAction::make(),
         ];
     }
+
+    /** 
+     * Sobrescribimos para enviar el registro a las vistas personalizadas
+     */
+    protected function getFormViewData(): array
+    {
+        return array_merge(parent::getFormViewData(), [
+            'record' => $this->record, // Pasamos el registro completo
+        ]);
+    }
 }
