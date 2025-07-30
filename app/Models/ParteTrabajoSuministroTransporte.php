@@ -29,12 +29,14 @@ class ParteTrabajoSuministroTransporte extends Model
         'cantidad_total',
         'albaran',
         'carta_porte',
-        'observaciones'
+        'observaciones',
+        'fecha_hora_descarga'
     ];
 
     protected $casts = [
         'fecha_hora_inicio_carga' => 'datetime',
         'fecha_hora_fin_carga' => 'datetime',
+        'fecha_hora_descarga' => 'datetime',
         'tipo_biomasa' => 'array',
     ];
 

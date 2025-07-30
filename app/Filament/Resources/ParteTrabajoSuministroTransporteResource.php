@@ -445,6 +445,7 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                         ])
                                         ->action(function (array $data, $record) {
                                             $record->update([
+                                                'fecha_hora_descarga' => now(),
                                                 'cliente_id' => $data['eleccion'] === 'cliente' ? $data['cliente_id'] : null,
                                                 'almacen_id' => $data['eleccion'] === 'almacen_intermedio' ? $data['almacen_id'] : null,
                                                 'tipo_biomasa' => $data['tipo_biomasa'],
@@ -474,6 +475,13 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                 Section::make('Datos de la descarga')
                     ->visible(fn($record) => $record && ($record->cliente_id !== null || $record->almacen_id !== null))
                     ->schema([
+                        DateTimePicker::make('fecha_hora_descarga')
+                            ->timezone('Europe/Madrid')
+                            ->label('Fecha descarga')
+                            ->columnSpanFull()
+                            ->required()
+                            ->visible(fn($record) => !is_null($record?->fecha_hora_descarga)),
+
                         Select::make('cliente_id')
                             ->label('Cliente')
                             ->options(fn() => \App\Models\Cliente::where('tipo_cliente', 'suministro')->pluck('razon_social', 'id'))
@@ -596,6 +604,15 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                         $cantidad = $record->cantidad_total ? number_format($record->cantidad_total, 2, ',', '.') . ' m³' : '-';
                         $peso = $record->peso_neto ? number_format($record->peso_neto, 2, ',', '.') . ' Tn' : '-';
 
+                        $hora_descarga = $record->fecha_hora_descarga
+                            ? $record->fecha_hora_descarga->timezone('Europe/Madrid')->format('H:i')
+                            : null;
+
+                        $hora_html = $hora_descarga
+                            ? "<span class='text-gray-700'>Hora:</span> $hora_descarga <br>"
+                            : '';
+
+
                         if ($record->cliente && $record->cliente->razon_social) {
                             $provincia = Provincia::find($record->cliente->provincia);
 
@@ -607,7 +624,8 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                     <strong>{$record->cliente->razon_social}</strong><br>
                                     <span class="text-gray-700">Ubicación:</span> $ubicacion<br>
                                     <span class="text-gray-700">Cantidad:</span> $cantidad<br>
-                                    <span class="text-gray-700">Peso neto:</span> $peso
+                                    <span class="text-gray-700">Peso neto:</span> $peso <br>
+                                    $hora_html
                                 </div>
                             HTML;
                         }
@@ -619,7 +637,8 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                     <strong>{$record->almacen->referencia}</strong><br>
                                     <span class="text-gray-700">Ubicación:</span> $ubicacion<br>
                                     <span class="text-gray-700">Cantidad:</span> $cantidad<br>
-                                    <span class="text-gray-700">Peso neto:</span> $peso
+                                    <span class="text-gray-700">Peso neto:</span> $peso <br>
+                                    $hora_html                                
                                 </div>
                             HTML;
                         }
