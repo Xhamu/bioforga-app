@@ -374,13 +374,18 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                                 ->options(function () {
                                                     $usuario = Auth::user();
 
-                                                    $almacenesIds = \DB::table('almacenes_users')
-                                                        ->where('user_id', $usuario->id)
-                                                        ->pluck('almacen_id');
+                                                    // Si el usuario tiene el rol 'administración', mostrar todos los no eliminados
+                                                    if ($usuario->hasRole('administración')) {
+                                                        $almacenes = AlmacenIntermedio::whereNull('deleted_at')->get();
+                                                    } else {
+                                                        $almacenesIds = \DB::table('almacenes_users')
+                                                            ->where('user_id', $usuario->id)
+                                                            ->pluck('almacen_id');
 
-                                                    $almacenes = $almacenesIds->isNotEmpty()
-                                                        ? AlmacenIntermedio::whereIn('id', $almacenesIds)->get()
-                                                        : AlmacenIntermedio::all();
+                                                        $almacenes = $almacenesIds->isNotEmpty()
+                                                            ? AlmacenIntermedio::whereIn('id', $almacenesIds)->whereNull('deleted_at')->get()
+                                                            : collect();
+                                                    }
 
                                                     return $almacenes->mapWithKeys(function ($almacen) {
                                                         $label = "{$almacen->referencia} ({$almacen->monte_parcela}, {$almacen->ayuntamiento})";

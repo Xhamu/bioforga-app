@@ -29,98 +29,112 @@ class AlmacenIntermedioResource extends Resource
     {
         return $form
             ->schema([
-                Forms\Components\TextInput::make('referencia')
-                    ->label('Referencia')
-                    ->required()
-                    ->reactive()
-                    ->default('ALM')
-                    ->afterStateHydrated(function ($component, $state) {
-                        if (empty($state)) {
-                            $component->state(self::generarReferencia('', '', now()));
-                        }
-                    })
-                    ->columnSpanFull(),
+                Forms\Components\Tabs::make('AlmacenTabs')
+                    ->columnSpanFull()
+                    ->tabs([
+                        Forms\Components\Tabs\Tab::make('Datos generales')
+                            ->schema([
+                                Forms\Components\TextInput::make('referencia')
+                                    ->label('Referencia')
+                                    ->required()
+                                    ->reactive()
+                                    ->default('ALM')
+                                    ->afterStateHydrated(function ($component, $state) {
+                                        if (empty($state)) {
+                                            $component->state(self::generarReferencia('', '', now()));
+                                        }
+                                    })
+                                    ->columnSpanFull(),
 
-                Forms\Components\Section::make('Ubicación')
-                    ->schema([
-                        Forms\Components\TextInput::make('provincia')
-                            ->required()
-                            ->reactive()
-                            ->afterStateUpdated(function (callable $set, $state, callable $get) {
-                                $set('referencia', self::generarReferencia($state, $get('ayuntamiento'), now()));
-                            }),
-                        Forms\Components\TextInput::make('ayuntamiento')
-                            ->required()
-                            ->reactive()
-                            ->afterStateUpdated(function (callable $set, $state, callable $get) {
-                                $set('referencia', self::generarReferencia($get('provincia'), $state, now()));
-                            }),
-                        Forms\Components\TextInput::make('monte_parcela')
-                            ->label('Monte / Parcela')
-                            ->required(),
-                        Forms\Components\TextInput::make('ubicacion_gps')
-                            ->label('GPS'),
-                        View::make('livewire.get-location-button')
-                            ->visible(function ($state) {
-                                return !isset($state['id']);
-                            })
-                            ->columnSpanFull(),
-                    ])
-                    ->columns(2),
+                                Forms\Components\Section::make('Ubicación')
+                                    ->schema([
+                                        Forms\Components\TextInput::make('provincia')
+                                            ->required()
+                                            ->reactive()
+                                            ->afterStateUpdated(function (callable $set, $state, callable $get) {
+                                                $set('referencia', self::generarReferencia($state, $get('ayuntamiento'), now()));
+                                            }),
+                                        Forms\Components\TextInput::make('ayuntamiento')
+                                            ->required()
+                                            ->reactive()
+                                            ->afterStateUpdated(function (callable $set, $state, callable $get) {
+                                                $set('referencia', self::generarReferencia($get('provincia'), $state, now()));
+                                            }),
+                                        Forms\Components\TextInput::make('monte_parcela')
+                                            ->label('Monte / Parcela')
+                                            ->required(),
+                                        Forms\Components\TextInput::make('ubicacion_gps')
+                                            ->label('GPS'),
+                                        View::make('livewire.get-location-button')
+                                            ->visible(function ($state) {
+                                                return !isset($state['id']);
+                                            })
+                                            ->columnSpanFull(),
+                                    ])
+                                    ->columns(2),
 
-                Forms\Components\Section::make('Producto')
-                    ->schema([
-                        Forms\Components\Select::make('producto_especie')
-                            ->label('Especie')
-                            ->searchable()
-                            ->options([
-                                'pino' => 'Pino',
-                                'eucalipto' => 'Eucalipto',
-                                'acacia' => 'Acacia',
-                                'frondosa' => 'Frondosa',
-                                'otros' => 'Otros',
+                                Forms\Components\Section::make('Producto')
+                                    ->schema([
+                                        Forms\Components\Select::make('producto_especie')
+                                            ->label('Especie')
+                                            ->searchable()
+                                            ->options([
+                                                'pino' => 'Pino',
+                                                'eucalipto' => 'Eucalipto',
+                                                'acacia' => 'Acacia',
+                                                'frondosa' => 'Frondosa',
+                                                'otros' => 'Otros',
+                                            ])
+                                            ->required(),
+                                        Forms\Components\Select::make('producto_tipo')
+                                            ->label('Tipo')
+                                            ->searchable()
+                                            ->options([
+                                                'troza' => 'Troza',
+                                                'tacos' => 'Tacos',
+                                                'puntal' => 'Puntal',
+                                            ])
+                                            ->required(),
+
+                                        Forms\Components\TextInput::make('cantidad_aprox')
+                                            ->label('Cantidad')
+                                            ->numeric()
+                                            ->required(),
+                                    ])->columns(3)
+                                    ->visible(fn($get) => !empty($get('referencia'))),
+
+                                Forms\Components\Section::make('Usuarios')
+                                    ->schema([
+                                        Forms\Components\Select::make('usuarios')
+                                            ->label('Usuarios relacionados')
+                                            ->multiple()
+                                            ->relationship('usuarios', 'name')
+                                            ->options(fn() => \App\Models\User::orderBy('name')
+                                                ->get()
+                                                ->mapWithKeys(fn($user) => [
+                                                    $user->id => "{$user->name} {$user->apellidos}",
+                                                ])
+                                                ->toArray())
+                                            ->getOptionLabelFromRecordUsing(fn($record) => "{$record->name} {$record->apellidos}")
+                                            ->preload()
+                                            ->searchable()
+                                            ->columnSpanFull()
+                                            ->visible(fn($get) => !empty($get('referencia'))),
+                                    ])
+                                    ->columns(1)
+                                    ->visible(fn($get) => !empty($get('referencia'))),
+                            ]),
+
+                        // TAB NUEVO
+                        Forms\Components\Tabs\Tab::make('Partes de trabajo')
+                            ->schema([
+                                Forms\Components\View::make('filament.resources.referencia-resource.partials.partes-trabajo-almacen')
+                                    ->viewData([
+                                        'recordId' => request()->route('record'), // obtenemos el ID desde la URL
+                                    ])
+                                    ->columnSpanFull(),
                             ])
-                            ->required(),
-                        Forms\Components\Select::make('producto_tipo')
-                            ->label('Tipo')
-                            ->searchable()
-                            ->options([
-                                'troza' => 'Troza',
-                                'tacos' => 'Tacos',
-                                'puntal' => 'Puntal',
-                            ])
-                            ->required(),
-
-                        Forms\Components\TextInput::make('cantidad_aprox')
-                            ->label('Cantidad')
-                            ->numeric()
-                            ->required(),
-                    ])->columns(3)
-                    ->visible(function ($get) {
-                        return !empty($get('referencia'));  // Se muestra solo si hay referencia
-                    }),
-
-                Forms\Components\Section::make('Usuarios')
-                    ->schema([
-                        Forms\Components\Select::make('usuarios')
-                            ->label('Usuarios relacionados')
-                            ->multiple()
-                            ->relationship('usuarios', 'name')
-                            ->options(fn() => \App\Models\User::orderBy('name')
-                                ->get()
-                                ->mapWithKeys(fn($user) => [
-                                    $user->id => "{$user->name} {$user->apellidos}",
-                                ])
-                                ->toArray())
-                            ->getOptionLabelFromRecordUsing(fn($record) => "{$record->name} {$record->apellidos}")
-                            ->preload()
-                            ->searchable()
-                            ->columnSpanFull()
-                            ->visible(fn($get) => !empty($get('referencia'))),
-                    ])->columns(1)
-                    ->visible(function ($get) {
-                        return !empty($get('referencia'));
-                    }),
+                    ]),
             ]);
     }
 
