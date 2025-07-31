@@ -10,6 +10,11 @@
             },
 
             {
+                id: 'location-descarga',
+                inputIdSuffix: 'gps_descarga'
+            },
+
+            {
                 id: 'location-inicio-trabajo',
                 inputIdSuffix: 'gps_inicio_trabajo'
             },

@@ -30,7 +30,8 @@ class ParteTrabajoSuministroTransporte extends Model
         'albaran',
         'carta_porte',
         'observaciones',
-        'fecha_hora_descarga'
+        'fecha_hora_descarga',
+        'gps_descarga'
     ];
 
     protected $casts = [
@@ -101,6 +102,23 @@ class ParteTrabajoSuministroTransporte extends Model
             })
             ->filter()
             ->implode('<hr class="my-2 border-gray-200" />') ?: '-';
+    }
+
+    protected function getGpsDescargaMostrarAttribute()
+    {
+        if ($this->gps_descarga) {
+            return '
+            <a href="https://www.google.com/maps/search/?api=1&query=' . urlencode($this->gps_descarga) . '" 
+               target="_blank" 
+               rel="noopener noreferrer"
+               aria-label="Ver ubicación en Google Maps"
+               class="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-md shadow hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-400 focus:ring-offset-1 transition">
+                Ver ubicación
+            </a>
+        ';
+        }
+
+        return '-';
     }
 
     public function usuario()
