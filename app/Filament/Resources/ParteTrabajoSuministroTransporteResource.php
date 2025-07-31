@@ -442,10 +442,18 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                             Textarea::make('observaciones')
                                                 ->rows(4)
                                                 ->maxLength(1000),
+
+                                            TextInput::make('gps_descarga')
+                                                ->label('GPS')
+                                                ->required()
+                                                ->readOnly(fn() => !Auth::user()?->hasAnyRole(['administración', 'superadmin'])),
+
+                                            View::make('livewire.location-descarga')->columnSpanFull(),
                                         ])
                                         ->action(function (array $data, $record) {
                                             $record->update([
                                                 'fecha_hora_descarga' => now(),
+                                                'gps_descarga' => $data['gps_descarga'],
                                                 'cliente_id' => $data['eleccion'] === 'cliente' ? $data['cliente_id'] : null,
                                                 'almacen_id' => $data['eleccion'] === 'almacen_intermedio' ? $data['almacen_id'] : null,
                                                 'tipo_biomasa' => $data['tipo_biomasa'],
@@ -478,9 +486,12 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                         DateTimePicker::make('fecha_hora_descarga')
                             ->timezone('Europe/Madrid')
                             ->label('Fecha descarga')
-                            ->columnSpanFull()
                             ->required()
                             ->visible(fn($record) => !is_null($record?->fecha_hora_descarga)),
+
+                        Placeholder::make('gps_descarga_mostrar')
+                            ->label('GPS descarga')
+                            ->content(fn($record) => new \Illuminate\Support\HtmlString($record->gps_descarga_mostrar)),
 
                         Select::make('cliente_id')
                             ->label('Cliente')
