@@ -64,6 +64,15 @@ class EditReferencia extends EditRecord
 
                 Tabs\Tab::make('Facturación')
                     ->schema([
+                        Forms\Components\Select::make('estado_facturacion')
+                            ->label('Estado')
+                            ->searchable()
+                            ->options([
+                                'completa' => 'Completa',
+                                'parcial' => 'Parcial',
+                                'no_facturada' => 'No facturada',
+                            ]),
+
                         Repeater::make('facturas')
                             ->relationship()
                             ->label('Facturas')

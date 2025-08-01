@@ -357,29 +357,21 @@ class ParteTrabajoSuministroAveriaResource extends Resource
                 TextColumn::make('fecha_hora_inicio_averia')
                     ->label('Fecha y hora')
                     ->weight(FontWeight::Bold)
-                    ->dateTime()
-                    ->timezone('Europe/Madrid'),
+                    ->formatStateUsing(
+                        fn($state) => $state
+                        ? Carbon::parse($state)->timezone('Europe/Madrid')->format('d/m/Y H:i')
+                        : '-'
+                    ),
 
-                TextColumn::make('usuario')
-                    ->label('Usuario')
-                    ->formatStateUsing(function ($state, $record) {
-                        $nombre = $record->usuario?->name ?? '';
-                        $apellido = $record->usuario?->apellidos ?? '';
-                        $inicialApellido = $apellido ? strtoupper(substr($apellido, 0, 1)) . '.' : '';
-                        return trim("$nombre $inicialApellido");
-                    })
-                    ->weight(FontWeight::Bold)
+                TextColumn::make('usuario_y_maquina')
+                    ->label('Usuario / Máquina')
+                    ->html()
+                    ->sortable()
                     ->searchable(),
 
-                TextColumn::make('tipo')
-                    ->label('Tipo')
-                    ->formatStateUsing(function ($state) {
-                        return match ($state) {
-                            'averia' => 'Avería',
-                            'mantenimiento' => 'Mantenimiento',
-                            default => ucfirst($state),
-                        };
-                    })
+                TextColumn::make('detalles_trabajo')
+                    ->label('Detalles')
+                    ->html()
                     ->searchable(),
             ])
             ->filters([

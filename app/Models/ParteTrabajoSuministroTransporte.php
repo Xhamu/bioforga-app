@@ -121,6 +121,28 @@ class ParteTrabajoSuministroTransporte extends Model
         return '-';
     }
 
+    public function getUsuarioProveedorCamionAttribute()
+    {
+        // Usuario + Proveedor
+        $nombre = $this->usuario?->name ?? '';
+        $apellido = $this->usuario?->apellidos ?? '';
+        $inicialApellido = $apellido ? strtoupper(substr($apellido, 0, 1)) . '.' : '';
+        $proveedor = $this->usuario?->proveedor?->razon_social ?? '';
+
+        $usuarioProveedor = "<span style='font-weight: bold;'>{$nombre} {$inicialApellido}</span>";
+        if ($proveedor) {
+            $usuarioProveedor .= "<br><span style='color: #666;'>{$proveedor}</span>";
+        }
+
+        // Camión
+        $marca = $this->camion?->marca ?? '';
+        $modelo = $this->camion?->modelo ?? '';
+        $matricula_cabeza = $this->camion?->matricula_cabeza ?? '';
+        $camion = trim("[$matricula_cabeza] - $marca $modelo");
+
+        return "{$usuarioProveedor}<br><span>{$camion}</span>";
+    }
+
     public function usuario()
     {
         return $this->belongsTo(User::class, 'usuario_id');

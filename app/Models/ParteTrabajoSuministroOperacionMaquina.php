@@ -138,6 +138,58 @@ class ParteTrabajoSuministroOperacionMaquina extends Model
         return null;
     }
 
+    public function getReferenciaIntervinienteAttribute()
+    {
+        $referencia = $this->referencia?->referencia ?? '';
+        $ayuntamiento = $this->referencia?->ayuntamiento ?? '';
+        $monte_parcela = $this->referencia?->monte_parcela ?? '';
+        $interviniente = $this->interviniente ?? '';
+
+        $referenciaCompleta = trim("$referencia ($ayuntamiento, $monte_parcela)");
+
+        $url = $this->referencia
+            ? url("/referencias/{$this->referencia->id}/edit")
+            : '#';
+
+        return trim("<strong>$referenciaCompleta</strong><br/>$interviniente");
+    }
+
+    public function getReferenciaaIntervinienteAttribute()
+    {
+        $referencia = $this->referencia?->referencia ?? '';
+        $ayuntamiento = $this->referencia?->ayuntamiento ?? '';
+        $monte_parcela = $this->referencia?->monte_parcela ?? '';
+        $interviniente = $this->interviniente ?? '';
+
+        $referenciaCompleta = trim("$referencia ($ayuntamiento, $monte_parcela)");
+
+        $url = $this->referencia
+            ? url("/referencias/{$this->referencia->id}/edit")
+            : '#';
+
+        return "<a href='{$url}'>{$referenciaCompleta}</a><br/>" . e($interviniente);
+    }
+
+    public function getUsuarioMaquinaHorasProduccionAttribute()
+    {
+        // Usuario
+        $nombre = $this->usuario?->name ?? '';
+        $apellido = $this->usuario?->apellidos ?? '';
+        $inicialApellido = $apellido ? strtoupper(substr($apellido, 0, 1)) . '.' : '';
+        $usuario = trim("$nombre $inicialApellido");
+
+        // Máquina
+        $marca = $this->maquina?->marca ?? '';
+        $modelo = $this->maquina?->modelo ?? '';
+        $maquina = trim("$marca $modelo");
+
+        // Horas y producción
+        $horas = $this->horas_rotor_encendido ?? '-';
+        $produccion = $this->produccion ?? '-';
+
+        return trim("<strong>$usuario</strong><br/>$maquina<br/>$horas h<br/>$produccion");
+    }
+
     public function usuario()
     {
         return $this->belongsTo(User::class, 'usuario_id');

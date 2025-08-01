@@ -212,6 +212,7 @@ class ReferenciaResource extends Resource
                             ->visible(function ($get) {
                                 return !empty($get('referencia'));
                             }),
+
                         View::make('livewire.get-location-button')
                             ->visible(function ($state) {
                                 return !isset($state['id']);
@@ -428,21 +429,6 @@ class ReferenciaResource extends Resource
                     ->visible(function ($get) {
                         return !empty($get('referencia'));
                     }),
-
-                Forms\Components\Section::make('Facturación')
-                    ->schema([
-                        Forms\Components\Select::make('estado_facturacion')
-                            ->label('Estado Facturación')
-                            ->searchable()
-                            ->options([
-                                'completa' => 'Completa',
-                                'parcial' => 'Parcial',
-                                'no_facturada' => 'No facturada',
-                            ]),
-                    ])->columns(1)
-                    ->visible(function ($get) {
-                        return !empty($get('referencia'));
-                    }),
             ]);
     }
 
@@ -469,7 +455,15 @@ class ReferenciaResource extends Resource
                                         ->formatStateUsing(function ($state, $record) {
                                             $monte = $record->monte_parcela;
                                             return $state . ($monte ? " ($monte)" : '');
-                                        }),
+                                        })
+                                        ->searchable(
+                                            query: function ($query, string $search) {
+                                                $query->where(function ($q) use ($search) {
+                                                    $q->where('monte_parcela', 'like', "%{$search}%")
+                                                        ->orWhere('provincia', 'like', "%{$search}%");
+                                                });
+                                            }
+                                        ),
 
                                     TextColumn::make('interviniente')
                                         ->label('Interviniente')
@@ -527,10 +521,11 @@ class ReferenciaResource extends Resource
                                     ->pluck('full_name', 'id')
                                     ->toArray()
                             )
+                            ->multiple() // Permite seleccionar varios
                             ->query(function ($query, array $data) {
-                                if (!empty($data['value'])) {
+                                if (!empty($data['value']) && is_array($data['value'])) {
                                     $query->whereHas('usuarios', function ($q) use ($data) {
-                                        $q->where('users.id', $data['value']);
+                                        $q->whereIn('users.id', $data['value']); // Usamos whereIn
                                     });
                                 }
                             })
@@ -788,7 +783,15 @@ class ReferenciaResource extends Resource
                         ->formatStateUsing(function ($state, $record) {
                             $monte = $record->monte_parcela;
                             return $state . ($monte ? " ($monte)" : '');
-                        }),
+                        })
+                        ->searchable(
+                            query: function ($query, string $search) {
+                                $query->where(function ($q) use ($search) {
+                                    $q->where('monte_parcela', 'like', "%{$search}%")
+                                        ->orWhere('provincia', 'like', "%{$search}%");
+                                });
+                            }
+                        ),
 
                     TextColumn::make('interviniente')
                         ->label('Interviniente')
@@ -874,10 +877,11 @@ class ReferenciaResource extends Resource
                                     ->pluck('full_name', 'id')
                                     ->toArray()
                             )
+                            ->multiple() // Permite seleccionar varios
                             ->query(function ($query, array $data) {
-                                if (!empty($data['value'])) {
+                                if (!empty($data['value']) && is_array($data['value'])) {
                                     $query->whereHas('usuarios', function ($q) use ($data) {
-                                        $q->where('users.id', $data['value']);
+                                        $q->whereIn('users.id', $data['value']); // Usamos whereIn
                                     });
                                 }
                             })
@@ -1292,6 +1296,7 @@ class ReferenciaResource extends Resource
                     Forms\Components\Select::make('sector')
                         ->label('Sector')
                         ->searchable()
+                        ->columnSpanFull()
                         ->options([
                             '01' => 'Zona Norte Galicia',
                             '02' => 'Zona Sur Galicia',
@@ -1523,21 +1528,6 @@ class ReferenciaResource extends Resource
 
                     Forms\Components\Textarea::make('observaciones')
                         ->nullable(),
-                ])->columns(1)
-                ->visible(function ($get) {
-                    return !empty($get('referencia'));
-                }),
-
-            Forms\Components\Section::make('Facturación')
-                ->schema([
-                    Forms\Components\Select::make('estado_facturacion')
-                        ->label('Estado Facturación')
-                        ->searchable()
-                        ->options([
-                            'completa' => 'Completa',
-                            'parcial' => 'Parcial',
-                            'no_facturada' => 'No facturada',
-                        ]),
                 ])->columns(1)
                 ->visible(function ($get) {
                     return !empty($get('referencia'));
