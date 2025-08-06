@@ -951,12 +951,11 @@ class ReferenciaResource extends Resource
                         SelectFilter::make('interviniente')
                             ->label('Interviniente')
                             ->options(function () {
-                                // Leer el valor actual del filtro tipo_referencia desde la request de Filament
                                 $tipoReferencia = request()->input('tableFilters.tipo_referencia.value');
 
                                 if ($tipoReferencia === 'suministro') {
                                     // Solo proveedores
-                                    return \App\Models\Proveedor::query()
+                                    return Proveedor::query()
                                         ->orderBy('razon_social')
                                         ->get()
                                         ->mapWithKeys(fn($proveedor) => [
@@ -967,7 +966,7 @@ class ReferenciaResource extends Resource
 
                                 if ($tipoReferencia === 'servicio') {
                                     // Solo clientes
-                                    return \App\Models\Cliente::query()
+                                    return Cliente::query()
                                         ->orderBy('razon_social')
                                         ->get()
                                         ->mapWithKeys(fn($cliente) => [
@@ -977,14 +976,14 @@ class ReferenciaResource extends Resource
                                 }
 
                                 // Si no hay tipo_referencia → mostrar ambos
-                                $proveedores = \App\Models\Proveedor::query()
+                                $proveedores = Proveedor::query()
                                     ->orderBy('razon_social')
                                     ->get()
                                     ->mapWithKeys(fn($proveedor) => [
                                         'proveedor_' . $proveedor->id => $proveedor->razon_social,
                                     ]);
 
-                                $clientes = \App\Models\Cliente::query()
+                                $clientes = Cliente::query()
                                     ->orderBy('razon_social')
                                     ->get()
                                     ->mapWithKeys(fn($cliente) => [

@@ -676,6 +676,7 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
             ->filters(
                 [
                     Filter::make('fecha_hora_inicio_trabajo')
+                        ->columnSpanFull()
                         ->columns(2)
                         ->form([
                             DatePicker::make('created_from')
@@ -807,10 +808,25 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                         ->searchable()
                         ->preload()
                         ->placeholder('Todas'),
+
+                    SelectFilter::make('tipo_trabajo')
+                        ->label('Tipo de trabajo')
+                        ->options(function () {
+                            return ParteTrabajoSuministroOperacionMaquina::query()
+                                ->distinct()
+                                ->pluck('tipo_trabajo')
+                                ->filter()
+                                ->unique()
+                                ->mapWithKeys(fn($tipo) => [$tipo => ucfirst($tipo)])
+                                ->toArray();
+                        })
+                        ->searchable()
+                        ->preload()
+                        ->placeholder('Todos'),
                 ],
                 layout: FiltersLayout::AboveContent
             )
-            ->filtersFormColumns(3)
+            ->filtersFormColumns(2)
             ->headerActions([
                 Tables\Actions\Action::make('toggle_trashed')
                     ->label(fn() => request('trashed') === 'true' ? 'Ver activos' : 'Ver eliminados')
@@ -849,7 +865,7 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
             ])
             ->paginated(true)
             ->paginationPageOptions([50, 100, 200])
-            ->defaultSort('created_at', 'desc');
+            ->defaultSort('fecha_hora_inicio_trabajo', 'desc');
     }
 
     public static function getRelations(): array

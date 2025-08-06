@@ -44,11 +44,9 @@ class CreateParteTrabajoTallerMaquinaria extends CreateRecord
                         ->searchable()
                         ->required(),
 
-                    TextInput::make('horas_servicio')
-                        ->label('Kilómetros')
-                        ->numeric()
-                        ->rules(['regex:/^\d{1,6}(\.\d{1,3})?$/']) // permite hasta 999.999
-                        ->maxLength(7)
+                    TimePicker::make('horas_servicio')
+                        ->label('Horas de servicio')
+                        ->withoutSeconds()
                         ->required()
                 ])
                 ->action(function (array $data) {
