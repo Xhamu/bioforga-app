@@ -23,6 +23,7 @@ use Filament\Resources\Resource;
 use Filament\Support\Enums\FontWeight;
 use Filament\Tables;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Enums\FiltersLayout;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
@@ -323,31 +324,111 @@ class ParteTrabajoAyudanteResource extends Resource
     {
         return $table
             ->columns([
-                TextColumn::make('created_at')
+                TextColumn::make('fecha_hora_inicio_ayudante')
                     ->label('Fecha y hora')
                     ->weight(FontWeight::Bold)
-                    ->dateTime()
-                    ->timezone('Europe/Madrid'),
+                    ->formatStateUsing(fn($state) => Carbon::parse($state)->timezone('Europe/Madrid')->format('d/m/Y H:i')),
 
-                TextColumn::make('usuario')
-                    ->label('Usuario')
-                    ->formatStateUsing(function ($state, $record) {
-                        $nombre = $record->usuario?->name ?? '';
-                        $apellido = $record->usuario?->apellidos ?? '';
-                        $inicialApellido = $apellido ? strtoupper(substr($apellido, 0, 1)) . '.' : '';
-                        return trim("$nombre $inicialApellido");
+                TextColumn::make('usuario_con_medio')
+                    ->label('Usuario / Medio utilizado')
+                    ->html()
+                    ->searchable(query: function (Builder $query, string $search) {
+                        $query->whereHas('usuario', function ($q) use ($search) {
+                            $q->where('name', 'like', "%{$search}%")
+                                ->orWhere('apellidos', 'like', "%{$search}%");
+                        });
+                    }),
+
+                TextColumn::make('tipologia')
+                    ->label('Tipología'),
+
+                TextColumn::make('tiempo_total')
+                    ->label('Tiempo total')
+                    ->getStateUsing(function ($record) {
+                        if (!$record->fecha_hora_inicio_ayudante) {
+                            return '-';
+                        }
+
+                        $inicio = Carbon::parse($record->getRawOriginal('fecha_hora_inicio_ayudante'))->timezone('Europe/Madrid');
+                        $parada = $record->fecha_hora_parada_ayudante
+                            ? Carbon::parse($record->getRawOriginal('fecha_hora_parada_ayudante'))->timezone('Europe/Madrid')
+                            : null;
+                        $reanudacion = $record->fecha_hora_reanudacion_ayudante
+                            ? Carbon::parse($record->getRawOriginal('fecha_hora_reanudacion_ayudante'))->timezone('Europe/Madrid')
+                            : null;
+                        $fin = $record->fecha_hora_fin_ayudante
+                            ? Carbon::parse($record->getRawOriginal('fecha_hora_fin_ayudante'))->timezone('Europe/Madrid')
+                            : null;
+
+                        $totalMinutos = 0;
+
+                        if ($fin) {
+                            if ($parada && $reanudacion) {
+                                $totalMinutos = $inicio->diffInMinutes($parada) + $reanudacion->diffInMinutes($fin);
+                            } else {
+                                $totalMinutos = $inicio->diffInMinutes($fin);
+                            }
+                        } elseif ($reanudacion) {
+                            $totalMinutos = $inicio->diffInMinutes($parada) + $reanudacion->diffInMinutes(Carbon::now('Europe/Madrid'));
+                        } elseif ($parada) {
+                            $totalMinutos = $inicio->diffInMinutes($parada);
+                        } else {
+                            $totalMinutos = $inicio->diffInMinutes(Carbon::now('Europe/Madrid'));
+                        }
+
+                        $horas = floor($totalMinutos / 60);
+                        $minutos = $totalMinutos % 60;
+
+                        return "{$horas}h {$minutos}min";
                     })
-                    ->weight(FontWeight::Bold)
-                    ->searchable(),
-
-                TextColumn::make('nombre_maquina_vehiculo')
-                    ->label('Medio utilizado')
-                    ->searchable(),
-
+                    ->sortable(),
             ])
-            ->filters([
-                Tables\Filters\TrashedFilter::make(),
-            ])
+            ->filters(
+                [
+                    // Filtro por rango de fechas
+                    Tables\Filters\Filter::make('fecha_rango')
+                        ->form([
+                            Forms\Components\DatePicker::make('desde')
+                                ->label('Desde'),
+                            Forms\Components\DatePicker::make('hasta')
+                                ->label('Hasta'),
+                        ])
+                        ->query(function (Builder $query, array $data) {
+                            return $query
+                                ->when($data['desde'], fn($q) => $q->whereDate('fecha_hora_inicio_ayudante', '>=', $data['desde']))
+                                ->when($data['hasta'], fn($q) => $q->whereDate('fecha_hora_inicio_ayudante', '<=', $data['hasta']));
+                        })
+                        ->columns(2),
+
+                    // Filtro por usuario
+                    Tables\Filters\SelectFilter::make('usuario_id')
+                        ->label('Usuario')
+                        ->options(
+                            \App\Models\User::selectRaw("id, CONCAT(name, ' ', apellidos) as nombre_completo")
+                                ->whereDoesntHave('roles', fn($q) => $q->where('name', 'superadmin'))
+                                ->orderBy('name')
+                                ->pluck('nombre_completo', 'id')
+                        )
+                        ->preload()
+                        ->searchable(),
+
+                    // Filtro por tipología
+                    Tables\Filters\SelectFilter::make('tipologia')
+                        ->label('Tipología')
+                        ->options(
+                            \App\Models\Tipologia::orderBy('nombre')
+                                ->pluck('nombre', 'id')
+                        )
+                        ->preload()
+                        ->searchable(),
+
+                    Tables\Filters\TrashedFilter::make()
+                        ->columnSpanFull()
+                        ->visible(fn() => auth()->user()?->hasRole('superadmin')),
+                ],
+                layout: FiltersLayout::AboveContent
+            )
+            ->filtersFormColumns(3)
             ->actions([
                 Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),
@@ -361,7 +442,7 @@ class ParteTrabajoAyudanteResource extends Resource
             ])
             ->paginated(true)
             ->paginationPageOptions([50, 100, 200])
-            ->defaultSort('created_at', 'desc');
+            ->defaultSort('fecha_hora_inicio_ayudante', 'desc');
     }
 
     public static function getRelations(): array

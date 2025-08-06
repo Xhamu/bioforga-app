@@ -112,8 +112,8 @@ class ParteTrabajoTallerMaquinariaResource extends Resource
                                                         <td class="px-4 py-3">' . e($maquinaLabel) . '</td>
                                                     </tr>
                                                     <tr>
-                                                        <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Kilómetros</th>
-                                                        <td class="px-4 py-3">' . e(number_format($horas, 0, ',', '.')) . 'km</td>
+                                                        <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Horas de servicio</th>
+                                                        <td class="px-4 py-3">' . e($horas, 0) . ' h</td>
                                                     </tr>';
 
                                 if ($record->fecha_hora_fin_taller_maquinaria) {

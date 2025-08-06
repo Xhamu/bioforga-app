@@ -104,4 +104,19 @@ class ParteTrabajoAyudante extends Model
 
         return '—';
     }
+
+    public function getUsuarioConMedioAttribute(): string
+    {
+        $nombre = $this->usuario?->name ?? '';
+        $apellido = $this->usuario?->apellidos ?? '';
+        $inicialApellido = $apellido ? strtoupper(substr($apellido, 0, 1)) . '.' : '';
+        $usuario = trim("$nombre $inicialApellido");
+
+        $medio = $this->nombre_maquina_vehiculo ?? '-';
+
+        return "<div>
+                <div style='font-weight: bold;'>{$usuario}</div>
+                <div style='font-size: 0.85rem; color: #666;'>{$medio}</div>
+            </div>";
+    }
 }

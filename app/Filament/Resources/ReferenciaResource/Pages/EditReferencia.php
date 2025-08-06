@@ -48,12 +48,14 @@ class EditReferencia extends EditRecord
                                         $parte = $cargas->first()->parteTrabajoSuministroTransporte;
 
                                         return (object) [
+                                            'id' => $parte?->id,
                                             'referencias' => $cargas->pluck('referencia.referencia')->filter()->unique()->values(),
                                             'cliente' => $parte?->cliente?->razon_social ?? '-',
                                             'inicio' => $cargas->min('fecha_hora_inicio_carga'),
                                             'fin' => $cargas->max('fecha_hora_fin_carga'),
                                             'cantidad_total' => $cargas->sum('cantidad'),
                                             'cargas' => $cargas,
+                                            'peso_neto' => $parte->peso_neto ?? '-',
                                         ];
                                     })
                                     ->values(),
@@ -64,6 +66,15 @@ class EditReferencia extends EditRecord
 
                 Tabs\Tab::make('Facturación')
                     ->schema([
+                        Forms\Components\Select::make('estado_facturacion')
+                            ->label('Estado')
+                            ->searchable()
+                            ->options([
+                                'completa' => 'Completa',
+                                'parcial' => 'Parcial',
+                                'no_facturada' => 'No facturada',
+                            ]),
+
                         Repeater::make('facturas')
                             ->relationship()
                             ->label('Facturas')

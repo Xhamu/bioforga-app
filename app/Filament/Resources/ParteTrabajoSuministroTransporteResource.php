@@ -583,25 +583,16 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                     ->sortable()
                     ->weight(FontWeight::Bold),
 
-                TextColumn::make('usuario')
-                    ->label('Usuario')
-                    ->formatStateUsing(function ($state, $record) {
-                        $nombre = $record->usuario?->name ?? '';
-                        $apellido = $record->usuario?->apellidos ?? '';
-                        $inicialApellido = $apellido ? strtoupper(substr($apellido, 0, 1)) . '.' : '';
+                TextColumn::make('usuario_proveedor_camion')
+                    ->label('Usuario / Proveedor / Camión')
+                    ->html()
+                    ->tooltip(function ($record) {
+                        $usuario = ($record->usuario?->name ?? '') . ' ' . ($record->usuario?->apellidos ?? '');
                         $proveedor = $record->usuario?->proveedor?->razon_social ?? '';
-
-                        return "<span class='font-bold'>$nombre $inicialApellido</span><br><span class='text-sm text-gray-600'>$proveedor</span>";
-                    })
-                    ->html(),
-
-                TextColumn::make('camion')
-                    ->label('Camión')
-                    ->formatStateUsing(function ($state, $record) {
                         $marca = $record->camion?->marca ?? '';
                         $modelo = $record->camion?->modelo ?? '';
-                        $matricula_cabeza = $record->camion?->matricula_cabeza ?? '';
-                        return trim("[$matricula_cabeza] - $marca $modelo");
+                        $matricula = $record->camion?->matricula_cabeza ?? '';
+                        return "$usuario\n$proveedor\n[$matricula] - $marca $modelo";
                     }),
 
                 TextColumn::make('cargas_totales')

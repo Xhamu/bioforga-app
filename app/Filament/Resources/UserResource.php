@@ -161,7 +161,11 @@ class UserResource extends Resource
                     // REFERENCIAS
                     Select::make('referencias')
                         ->label('Referencias vinculadas')
-                        ->relationship('referencias', 'referencia')
+                        ->relationship(
+                            name: 'referencias',
+                            titleAttribute: 'referencia',
+                            modifyQueryUsing: fn($query) => $query->whereNull('referencias.deleted_at')
+                        )
                         ->multiple()
                         ->preload()
                         ->searchable()
@@ -178,7 +182,11 @@ class UserResource extends Resource
                     // CAMIONES
                     Select::make('camiones')
                         ->label('Camiones vinculados')
-                        ->relationship('camiones', 'marca')
+                        ->relationship(
+                            name: 'camiones',
+                            titleAttribute: 'marca',
+                            modifyQueryUsing: fn($query) => $query->whereNull('camiones.deleted_at') // Especificamos la tabla
+                        )
                         ->multiple()
                         ->preload()
                         ->searchable()

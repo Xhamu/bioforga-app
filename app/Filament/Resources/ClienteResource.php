@@ -68,6 +68,7 @@ class ClienteResource extends Resource
                             ->options([
                                 'Suministro' => 'Suministro',
                                 'Servicio' => 'Servicio',
+                                'suministro_servicio' => 'Suministro / Servicio'
                             ])
                             ->columnSpanFull(),
                     ])

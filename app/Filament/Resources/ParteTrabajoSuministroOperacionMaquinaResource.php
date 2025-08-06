@@ -664,63 +664,19 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                         return "Inicio: $inicio\nFin: $fin";
                     }),
 
-                TextColumn::make('referencia.referencia')
-                    ->label('Referencia')
-                    ->formatStateUsing(function ($state, $record) {
-                        $referencia = $record->referencia?->referencia ?? '';
-                        $ayuntamiento = $record->referencia?->ayuntamiento ?? '';
-                        $monte_parcela = $record->referencia?->monte_parcela ?? '';
-                        return trim("$referencia ($ayuntamiento, $monte_parcela)");
-                    })
-                    ->limit(25)
-                    ->tooltip(fn($record) => trim(($record->referencia?->referencia ?? '') . ' (' . ($record->referencia?->ayuntamiento ?? '') . ', ' . ($record->referencia?->monte_parcela ?? '') . ')'))
-                    ->weight(FontWeight::Bold)
-                    ->sortable(),
+                TextColumn::make('usuario_maquina_horas_produccion')
+                    ->label('Usuario / Máquina / Horas / Producción')
+                    ->html(),
 
-                TextColumn::make('interviniente')
-                    ->label('Interviniente')
-                    ->limit(25)
-                    ->tooltip(fn($state) => $state)
-                    ->weight(FontWeight::Bold)
-                    ->sortable(),
-
-                TextColumn::make('usuario')
-                    ->label('Usuario')
-                    ->formatStateUsing(function ($state, $record) {
-                        $nombre = $record->usuario?->name ?? '';
-                        $apellido = $record->usuario?->apellidos ?? '';
-                        $inicialApellido = $apellido ? strtoupper(substr($apellido, 0, 1)) . '.' : '';
-                        return trim("$nombre $inicialApellido");
-                    })
-                    ->limit(15)
-                    ->tooltip(fn($record) => ($record->usuario?->name ?? '') . ' ' . ($record->usuario?->apellidos ?? ''))
-                    ->weight(FontWeight::Bold)
-                    ->sortable(),
-
-                TextColumn::make('maquina')
-                    ->label('Máquina')
-                    ->formatStateUsing(function ($state, $record) {
-                        $marca = $record->maquina?->marca ?? '';
-                        $modelo = $record->maquina?->modelo ?? '';
-                        return trim("$marca $modelo");
-                    })
-                    ->limit(15)
-                    ->tooltip(fn($record) => ($record->maquina?->marca ?? '') . ' ' . ($record->maquina?->modelo ?? ''))
-                    ->toggleable()
-                    ->sortable(),
-
-                TextColumn::make('horas_rotor_encendido')
-                    ->label('Horas rotor / servicio')
-                    ->alignCenter(),
-
-                TextColumn::make('produccion')
-                    ->label('Producción')
-                    ->alignCenter(),
+                TextColumn::make('referencia_interviniente')
+                    ->label('Referencia / Interviniente')
+                    ->html(),
             ])
             ->persistFiltersInSession()
             ->filters(
                 [
                     Filter::make('fecha_hora_inicio_trabajo')
+                        ->columnSpanFull()
                         ->columns(2)
                         ->form([
                             DatePicker::make('created_from')
@@ -852,10 +808,25 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                         ->searchable()
                         ->preload()
                         ->placeholder('Todas'),
+
+                    SelectFilter::make('tipo_trabajo')
+                        ->label('Tipo de trabajo')
+                        ->options(function () {
+                            return ParteTrabajoSuministroOperacionMaquina::query()
+                                ->distinct()
+                                ->pluck('tipo_trabajo')
+                                ->filter()
+                                ->unique()
+                                ->mapWithKeys(fn($tipo) => [$tipo => ucfirst($tipo)])
+                                ->toArray();
+                        })
+                        ->searchable()
+                        ->preload()
+                        ->placeholder('Todos'),
                 ],
                 layout: FiltersLayout::AboveContent
             )
-            ->filtersFormColumns(3)
+            ->filtersFormColumns(2)
             ->headerActions([
                 Tables\Actions\Action::make('toggle_trashed')
                     ->label(fn() => request('trashed') === 'true' ? 'Ver activos' : 'Ver eliminados')
@@ -894,7 +865,7 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
             ])
             ->paginated(true)
             ->paginationPageOptions([50, 100, 200])
-            ->defaultSort('created_at', 'desc');
+            ->defaultSort('fecha_hora_inicio_trabajo', 'desc');
     }
 
     public static function getRelations(): array
