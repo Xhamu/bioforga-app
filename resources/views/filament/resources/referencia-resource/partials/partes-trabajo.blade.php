@@ -134,7 +134,9 @@
                             {{-- Referencia + Cliente --}}
                             <td class="px-4 py-3 font-semibold text-gray-900">
                                 <div>{{ $parte->referencias->implode(', ') ?: 'N/D' }}</div>
-                                <div class="text-sm text-gray-600">{{ $parte->cliente }}</div>
+                                <div class="text-sm text-gray-600">
+                                    {{ $parte->cliente ?? ($parte->almacen ?? 'Sin destino') }}
+                                </div>
                             </td>
 
                             {{-- Periodo --}}
