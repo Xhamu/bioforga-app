@@ -515,22 +515,23 @@ class ReferenciaResource extends Resource
 
                         SelectFilter::make('usuario')
                             ->label('Usuario')
+                            ->multiple()
+                            ->searchable()
+                            ->placeholder('Seleccionar usuario')
                             ->options(
-                                User::select('id', \DB::raw("CONCAT(name, ' ', apellidos) as full_name"))
+                                User::whereDoesntHave('roles', fn($q) => $q->where('name', 'superadmin'))
+                                    ->select('id', \DB::raw("CONCAT(name, ' ', apellidos) as full_name"))
                                     ->orderBy('name')
                                     ->pluck('full_name', 'id')
                                     ->toArray()
                             )
-                            ->multiple() // Permite seleccionar varios
                             ->query(function ($query, array $data) {
-                                if (!empty($data['value']) && is_array($data['value'])) {
+                                if (!empty($data['values']) && is_array($data['values'])) {
                                     $query->whereHas('usuarios', function ($q) use ($data) {
-                                        $q->whereIn('users.id', $data['value']); // Usamos whereIn
+                                        $q->whereIn('users.id', $data['values']);
                                     });
                                 }
-                            })
-                            ->searchable()
-                            ->placeholder('Seleccionar usuario'),
+                            }),
 
                         SelectFilter::make('tipo_referencia')
                             ->label('Tipo de referencia')
@@ -871,22 +872,23 @@ class ReferenciaResource extends Resource
 
                         SelectFilter::make('usuario')
                             ->label('Usuario')
+                            ->multiple()
+                            ->searchable()
+                            ->placeholder('Seleccionar usuario')
                             ->options(
-                                User::select('id', \DB::raw("CONCAT(name, ' ', apellidos) as full_name"))
+                                User::whereDoesntHave('roles', fn($q) => $q->where('name', 'superadmin'))
+                                    ->select('id', \DB::raw("CONCAT(name, ' ', apellidos) as full_name"))
                                     ->orderBy('name')
                                     ->pluck('full_name', 'id')
                                     ->toArray()
                             )
-                            ->multiple() // Permite seleccionar varios
                             ->query(function ($query, array $data) {
-                                if (!empty($data['value']) && is_array($data['value'])) {
+                                if (!empty($data['values']) && is_array($data['values'])) {
                                     $query->whereHas('usuarios', function ($q) use ($data) {
-                                        $q->whereIn('users.id', $data['value']); // Usamos whereIn
+                                        $q->whereIn('users.id', $data['values']);
                                     });
                                 }
-                            })
-                            ->searchable()
-                            ->placeholder('Seleccionar usuario'),
+                            }),
 
                         SelectFilter::make('tipo_referencia')
                             ->label('Tipo de referencia')
