@@ -7,7 +7,7 @@
         <!-- Tabla para pantallas medianas o mayores -->
         <div class="hidden md:block overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
             @php
-                $totalCantidad = $partesMaquina->sum('cantidad_producida');
+                $totalCantidad = $partesMaquina->sum(fn($parte) => (float) $parte->cantidad_producida);
             @endphp
 
             <style>
@@ -112,8 +112,8 @@
         {{-- VISTA ESCRITORIO --}}
         <div class="hidden md:block overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
             @php
-                $totalCantidad = $partesTransporteAgrupados->sum('cantidad_total');
-                $totalPeso = $partesTransporteAgrupados->sum('peso_neto');
+                $totalCantidad = $partesTransporteAgrupados->sum(fn($parte) => (float) $parte->cantidad_total);
+                $totalPeso = $partesTransporteAgrupados->sum(fn($parte) => (float) $parte->peso_neto);
             @endphp
 
             <table class="w-full text-sm">
