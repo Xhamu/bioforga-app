@@ -39,7 +39,7 @@ class AdminPanelProvider extends PanelProvider
             ->brandLogoHeight('3.5rem')
             ->favicon(asset('favicons/favicon.ico'))
             ->login(Login::class)
-
+            ->sidebarCollapsibleOnDesktop()
             ->colors([
                 'primary' => Color::Green,
             ])
