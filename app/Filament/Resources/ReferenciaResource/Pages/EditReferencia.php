@@ -38,6 +38,7 @@ class EditReferencia extends EditRecord
                             ->viewData([
                                 'partesTransporteAgrupados' => \App\Models\CargaTransporte::with([
                                     'parteTrabajoSuministroTransporte.cliente',
+                                    'parteTrabajoSuministroTransporte.almacen',
                                     'referencia',
                                 ])
                                     ->where('referencia_id', $this->record?->id)
@@ -50,7 +51,8 @@ class EditReferencia extends EditRecord
                                         return (object) [
                                             'id' => $parte?->id,
                                             'referencias' => $cargas->pluck('referencia.referencia')->filter()->unique()->values(),
-                                            'cliente' => $parte?->cliente?->razon_social ?? '-',
+                                            'cliente' => $parte?->cliente?->razon_social ?? null,
+                                            'almacen' => $parte?->almacen?->referencia ?? null,
                                             'inicio' => $cargas->min('fecha_hora_inicio_carga'),
                                             'fin' => $cargas->max('fecha_hora_fin_carga'),
                                             'cantidad_total' => $cargas->sum('cantidad'),
