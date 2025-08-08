@@ -14,13 +14,12 @@
                 icon-alias="panels::topbar.open-sidebar-button" icon-size="lg" :label="__('filament-panels::layout.actions.sidebar.expand.label')" x-cloak
                 x-data="{}"
                 x-on:click="
-        if (window.innerWidth >= 1024) {
-            $store.sidebar.isCollapsed = !$store.sidebar.isCollapsed
-        } else {
-            $store.sidebar.isOpen ? $store.sidebar.close() : $store.sidebar.open()
-        }
-    "
-                @class(['fi-topbar-open-sidebar-btn']) />
+                if (window.innerWidth >= 1024) {
+                    $store.sidebar.isCollapsed = !$store.sidebar.isCollapsed
+                } else {
+                    $store.sidebar.isOpen ? $store.sidebar.close() : $store.sidebar.open()
+                }"
+                class="fi-topbar-open-sidebar-btn lg:hidden" />
 
             <x-filament::icon-button color="gray" icon="heroicon-o-x-mark"
                 icon-alias="panels::topbar.close-sidebar-button" icon-size="lg" :label="__('filament-panels::layout.actions.sidebar.collapse.label')" x-cloak
@@ -63,13 +62,11 @@
                                         if ($childItems = $item->getChildItems()) {
                                             $lists[] = [$item, ...$childItems];
                                             $lists[] = [];
-
                                             continue;
                                         }
 
                                         if (empty($lists)) {
                                             $lists[] = [$item];
-
                                             continue;
                                         }
 
