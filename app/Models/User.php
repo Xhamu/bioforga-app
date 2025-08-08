@@ -35,6 +35,7 @@ class User extends Authenticatable
         'proveedor_id',
         'telefono',
         'sector',
+        'is_blocked',
     ];
 
     /**

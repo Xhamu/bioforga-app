@@ -39,407 +39,248 @@ class MaquinaResource extends Resource
 
     public static function form(Form $form): Form
     {
-
         $agent = new Agent();
 
-        if ($agent->isMobile()) {
-            return $form
-                ->schema([
-                    Section::make('Datos vehículo')
-                        ->schema([
-                            TextInput::make('marca')
-                                ->label(__('Marca'))
-                                ->required()
-                                ->rules('required')
-                                ->autofocus()
-                                ->validationMessages([
-                                    'required' => 'El :attribute es obligatorio.',
-                                ])
-                                ->columnSpan(['default' => 2, 'lg' => 1]),
+        $datosVehiculo = Section::make('Datos vehículo')
+            ->schema([
+                TextInput::make('marca')
+                    ->label(__('Marca'))
+                    ->required()
+                    ->rules('required')
+                    ->autofocus()
+                    ->validationMessages([
+                        'required' => 'El :attribute es obligatorio.',
+                    ])
+                    ->columnSpan(['default' => 2, 'lg' => 1]),
 
-                            TextInput::make('modelo')
-                                ->label(__('Modelo'))
-                                ->required()
-                                ->rules('required')
-                                ->autofocus()
-                                ->validationMessages([
-                                    'required' => 'El :attribute es obligatorio.',
-                                ])
-                                ->columnSpan(['default' => 2, 'lg' => 1]),
+                TextInput::make('modelo')
+                    ->label(__('Modelo'))
+                    ->required()
+                    ->rules('required')
+                    ->autofocus()
+                    ->validationMessages([
+                        'required' => 'El :attribute es obligatorio.',
+                    ])
+                    ->columnSpan(['default' => 2, 'lg' => 1]),
 
-                            Select::make('tipo_trabajo')
-                                ->label(__('Tipo de trabajo'))
-                                ->required()
-                                ->searchable()
-                                ->options([
-                                    'astillado' => 'Astillado',
-                                    'triturado' => 'Triturado',
-                                    'pretiturado' => 'Pretiturado',
-                                    'saca' => 'Saca',
-                                    'tala' => 'Tala',
-                                    'cizallado' => 'Cizallado',
-                                    'carga' => 'Carga',
-                                    'transporte' => 'Transporte',
-                                ])
-                                ->validationMessages([
-                                    'required' => 'El :attribute es obligatorio.',
-                                ])
-                                ->columnSpan(['default' => 2, 'lg' => 1]),
+                Select::make('tipo_trabajo')
+                    ->label(__('Tipo de trabajo'))
+                    ->required()
+                    ->searchable()
+                    ->options([
+                        'astillado' => 'Astillado',
+                        'triturado' => 'Triturado',
+                        'pretiturado' => 'Pretiturado',
+                        'saca' => 'Saca',
+                        'tala' => 'Tala',
+                        'cizallado' => 'Cizallado',
+                        'carga' => 'Carga',
+                        'transporte' => 'Transporte',
+                    ])
+                    ->validationMessages([
+                        'required' => 'El :attribute es obligatorio.',
+                    ])
+                    ->columnSpan(['default' => 2, 'lg' => 1]),
 
-                            Select::make('operarios')
-                                ->label(__('Operarios'))
-                                ->relationship(
-                                    'operarios',
-                                    'name',
-                                    fn($query) =>
-                                    $query->whereDoesntHave('roles', fn($q) => $q->where('name', 'superadmin'))
-                                )
-                                ->getOptionLabelFromRecordUsing(fn($record) => "{$record->name} {$record->apellidos}")
-                                ->multiple()
-                                ->preload()
-                                ->searchable()
-                        ])
-                        ->columns(2)
-                        ->columnSpan(2),
+                Select::make('operarios')
+                    ->label(__('Operarios'))
+                    ->relationship(
+                        'operarios',
+                        'name',
+                        fn($query) =>
+                        $query->whereDoesntHave('roles', fn($q) => $q->where('name', 'superadmin'))
+                    )
+                    ->getOptionLabelFromRecordUsing(fn($record) => "{$record->name} {$record->apellidos}")
+                    ->multiple()
+                    ->preload()
+                    ->searchable()
+            ])
+            ->columns(2)
+            ->columnSpan(2);
 
-                    Section::make('Incidencias')
-                        ->schema([
-                            Select::make('mantenimientos')
-                                ->label(__('Posibles mantenimientos'))
-                                ->searchable()
-                                ->multiple()
-                                ->options(function () {
-                                    return \App\Models\PosibleMantenimiento::all()->pluck('nombre', 'id')->toArray();
-                                })
-                                ->validationMessages([
-                                    'required' => 'El :attribute es obligatorio.',
-                                ])
-                                ->columnSpan(['default' => 2, 'lg' => 1]),
+        $datosEspecificos = Section::make('Datos específicos')
+            ->schema([
+                TextInput::make('numero_bastidor')
+                    ->label('Número de bastidor'),
 
-                            Select::make('averias')
-                                ->label(__('Posibles averías'))
-                                ->searchable()
-                                ->multiple()
-                                ->options(function () {
-                                    return \App\Models\PosibleAveria::all()->pluck('nombre', 'id')->toArray();
-                                })
-                                ->validationMessages([
-                                    'required' => 'El :attribute es obligatorio.',
-                                ])
-                                ->columnSpan(['default' => 2, 'lg' => 1]),
-                        ])
-                        ->columns(2)
-                        ->columnSpan(2),
+                TextInput::make('numero_motor')
+                    ->label('Número de motor'),
 
-                    TableRepeater::make('itvs')
-                        ->relationship('itvs')
-                        ->label('ITVs del vehículo')
-                        ->addActionLabel('Añadir ITV')
-                        ->headers([
-                            Header::make('fecha')
-                                ->label('Fecha')
-                                ->align(Alignment::Center)
-                                ->width('150px'),
+                TextInput::make('matricula')
+                    ->label('Matrícula'),
 
-                            Header::make('lugar')
-                                ->label('Lugar')
-                                ->align(Alignment::Center)
-                                ->width('150px'),
+                TextInput::make('anio_fabricacion')
+                    ->label('Año de fabricación'),
 
-                            Header::make('resultado')
-                                ->label('Resultado')
-                                ->align(Alignment::Center)
-                                ->width('150px'),
+                TextInput::make('color')
+                    ->label('Color'),
+            ])
+            ->columns(2);
 
-                            Header::make('documento')
-                                ->label('Documento')
-                                ->align(Alignment::Center)
-                                ->width('150px'),
+        $incidencias = Section::make('Incidencias')
+            ->schema([
+                Select::make('mantenimientos')
+                    ->label(__('Posibles mantenimientos'))
+                    ->searchable()
+                    ->multiple()
+                    ->options(fn() => \App\Models\PosibleMantenimiento::pluck('nombre', 'id')->toArray()),
 
-                            Header::make('observaciones')
-                                ->label('Observaciones')
-                                ->align(Alignment::Center)
-                                ->width('150px'),
-                        ])
-                        ->schema([
-                            DatePicker::make('fecha')
-                                ->default(now())
-                                ->required(),
+                Select::make('averias')
+                    ->label(__('Posibles averías'))
+                    ->searchable()
+                    ->multiple()
+                    ->options(fn() => \App\Models\PosibleAveria::pluck('nombre', 'id')->toArray()),
+            ])
+            ->columns(2)
+            ->columnSpan(2);
 
-                            TextInput::make('lugar')
-                                ->required(),
+        $itvs = TableRepeater::make('itvs')
+            ->relationship('itvs')
+            ->label('ITVs del vehículo')
+            ->addActionLabel('Añadir ITV')
+            ->headers([
+                Header::make('fecha')->label('Fecha')->align(Alignment::Center)->width('150px'),
+                Header::make('lugar')->label('Lugar')->align(Alignment::Center)->width('150px'),
+                Header::make('resultado')->label('Resultado')->align(Alignment::Center)->width('150px'),
+                Header::make('documento')->label('Documento')->align(Alignment::Center)->width('150px'),
+                Header::make('observaciones')->label('Observaciones')->align(Alignment::Center)->width('150px'),
+            ])
+            ->schema([
+                DatePicker::make('fecha')->default(now())->required(),
+                TextInput::make('lugar')->required(),
+                Select::make('resultado')->searchable()->options([
+                    'Favorable' => 'Favorable',
+                    'Desfavorable' => 'Desfavorable',
+                    'Negativo' => 'Negativo',
+                ])->required(),
+                FileUpload::make('documento')
+                    ->disk('public')
+                    ->directory('itvs')
+                    ->preserveFilenames()
+                    ->openable()
+                    ->imageEditor()
+                    ->nullable()
+                    ->acceptedFileTypes(['application/pdf', 'image/png', 'image/jpeg']),
+                Textarea::make('observaciones')->nullable(),
+            ])
+            ->emptyLabel('Aún no se han registrado ITVs')
+            ->columnSpan('full')
+            ->defaultItems(0);
 
-                            Select::make('resultado')
-                                ->searchable()
-                                ->options([
-                                    'Favorable' => 'Favorable',
-                                    'Desfavorable' => 'Desfavorable',
-                                    'Negativo' => 'Negativo',
-                                ])
-                                ->required(),
-
-                            FileUpload::make('documento')
-                                ->disk('public')
-                                ->directory('itvs')
-                                ->preserveFilenames()
-                                ->openable()
-                                ->imageEditor()
-                                ->nullable()
-                                ->acceptedFileTypes(['application/pdf', 'image/png', 'image/jpeg']),
-
-                            Textarea::make('observaciones')
-                                ->nullable(),
-                        ])
-                        ->emptyLabel('Aún no se han registrado ITVs')
-                        ->columnSpan('full')
-                        ->defaultItems(0),
-                ]);
-        } else {
-            return $form
-                ->schema([
-                    Section::make('Datos vehículo')
-                        ->schema([
-                            TextInput::make('marca')
-                                ->label(__('Marca'))
-                                ->required()
-                                ->rules('required')
-                                ->autofocus()
-                                ->validationMessages([
-                                    'required' => 'El :attribute es obligatorio.',
-                                ])
-                                ->columnSpan(['default' => 2, 'lg' => 1]),
-
-                            TextInput::make('modelo')
-                                ->label(__('Modelo'))
-                                ->required()
-                                ->rules('required')
-                                ->autofocus()
-                                ->validationMessages([
-                                    'required' => 'El :attribute es obligatorio.',
-                                ])
-                                ->columnSpan(['default' => 2, 'lg' => 1]),
-
-                            Select::make('tipo_trabajo')
-                                ->label(__('Tipo de trabajo'))
-                                ->required()
-                                ->searchable()
-                                ->options([
-                                    'astillado' => 'Astillado',
-                                    'triturado' => 'Triturado',
-                                    'pretiturado' => 'Pretiturado',
-                                    'saca' => 'Saca',
-                                    'tala' => 'Tala',
-                                    'cizallado' => 'Cizallado',
-                                    'carga' => 'Carga',
-                                    'transporte' => 'Transporte',
-                                ])
-                                ->validationMessages([
-                                    'required' => 'El :attribute es obligatorio.',
-                                ])
-                                ->columnSpan(['default' => 2, 'lg' => 1]),
-
-                            Select::make('operarios')
-                                ->label(__('Operarios'))
-                                ->relationship(
-                                    'operarios',
-                                    'name',
-                                    fn($query) =>
-                                    $query->whereDoesntHave('roles', fn($q) => $q->where('name', 'superadmin'))
-                                )
-                                ->getOptionLabelFromRecordUsing(fn($record) => "{$record->name} {$record->apellidos}")
-                                ->multiple()
-                                ->preload()
-                                ->searchable()
-                        ])
-                        ->columns(2)
-                        ->columnSpan(2),
-
-                    Section::make('Rendimiento y Consumo')
-                        ->schema([
-
-                            Select::make('tipo_consumo')
-                                ->label(__('Tipo de consumo'))
-                                ->required()
-                                ->rules('required')
-                                ->options([
-                                    'gasoil' => 'Gasoil',
-                                    'muela' => 'Muela',
-                                    'cuchilla' => 'Cuchilla',
-                                ])
-                                ->multiple()
-                                ->validationMessages([
-                                    'required' => 'El :attribute es obligatorio.',
-                                ]),
-
-                            Select::make('tipo_horas')
-                                ->label(__('Tipo de horas'))
-                                ->required()
-                                ->rules('required')
-                                ->multiple()
-                                ->options([
-                                    'horas_encendido' => 'Horas de encendido',
-                                    'horas_rotor' => 'Horas de rotor',
-                                    'horas_trabajo' => 'Horas de trabajo',
-                                ])
-                                ->validationMessages([
-                                    'required' => 'El :attribute es obligatorio.',
-                                ]),
-                        ])
-                        ->columns(2),
-
-                    Section::make('Incidencias')
-                        ->schema([
-                            Select::make('mantenimientos')
-                                ->label(__('Posibles mantenimientos'))
-                                ->searchable()
-                                ->multiple()
-                                ->options(function () {
-                                    return \App\Models\PosibleMantenimiento::all()->pluck('nombre', 'id')->toArray();
-                                })
-                                ->validationMessages([
-                                    'required' => 'El :attribute es obligatorio.',
-                                ])
-                                ->columnSpan(['default' => 2, 'lg' => 1]),
-
-                            Select::make('averias')
-                                ->label(__('Posibles averías'))
-                                ->searchable()
-                                ->multiple()
-                                ->options(function () {
-                                    return \App\Models\PosibleAveria::all()->pluck('nombre', 'id')->toArray();
-                                })
-                                ->validationMessages([
-                                    'required' => 'El :attribute es obligatorio.',
-                                ])
-                                ->columnSpan(['default' => 2, 'lg' => 1]),
-                        ])
-                        ->columns(2)
-                        ->columnSpan(2),
-
-                    TableRepeater::make('itvs')
-                        ->relationship('itvs')
-                        ->label('ITVs del vehículo')
-                        ->addActionLabel('Añadir ITV')
-                        ->headers([
-                            Header::make('fecha')
-                                ->label('Fecha')
-                                ->align(Alignment::Center)
-                                ->width('150px'),
-
-                            Header::make('lugar')
-                                ->label('Lugar')
-                                ->align(Alignment::Center)
-                                ->width('150px'),
-
-                            Header::make('resultado')
-                                ->label('Resultado')
-                                ->align(Alignment::Center)
-                                ->width('150px'),
-
-                            Header::make('documento')
-                                ->label('Documento')
-                                ->align(Alignment::Center)
-                                ->width('150px'),
-
-                            Header::make('observaciones')
-                                ->label('Observaciones')
-                                ->align(Alignment::Center)
-                                ->width('150px'),
-                        ])
-                        ->schema([
-                            DatePicker::make('fecha')
-                                ->default(now())
-                                ->required(),
-
-                            TextInput::make('lugar')
-                                ->required(),
-
-                            Select::make('resultado')
-                                ->searchable()
-                                ->options([
-                                    'Favorable' => 'Favorable',
-                                    'Desfavorable' => 'Desfavorable',
-                                    'Negativo' => 'Negativo',
-                                ])
-                                ->required(),
-
-                            FileUpload::make('documento')
-                                ->disk('public')
-                                ->directory('itvs')
-                                ->preserveFilenames()
-                                ->openable()
-                                ->imageEditor()
-                                ->nullable()
-                                ->acceptedFileTypes(['application/pdf', 'image/png', 'image/jpeg']),
-
-                            Textarea::make('observaciones')
-                                ->nullable(),
-                        ])
-                        ->emptyLabel('Aún no se han registrado ITVs')
-                        ->columnSpan('full')
-                        ->defaultItems(0),
-                ]);
-        }
+        return $form->schema([
+            Forms\Components\Tabs::make('Tabs')
+                ->tabs([
+                    Forms\Components\Tabs\Tab::make('Datos vehículo')->schema([$datosVehiculo]),
+                    Forms\Components\Tabs\Tab::make('Datos específicos')->schema([$datosEspecificos]),
+                    Forms\Components\Tabs\Tab::make('Incidencias')->schema([$incidencias]),
+                    Forms\Components\Tabs\Tab::make('ITVs')->schema([$itvs]),
+                ])
+                ->columnSpanFull()
+                ->persistTabInQueryString(),
+        ]);
     }
 
     public static function table(Table $table): Table
     {
-        $agent = new Agent();
+        return $table
+            ->columns([
+                // Marca + modelo con búsqueda personalizada y copia rápida
+                Tables\Columns\TextColumn::make('marca_modelo')
+                    ->label('Marca - Modelo')
+                    ->weight('semibold')
+                    ->copyable()
+                    ->limit(40)
+                    // Buscamos por 'marca' o 'modelo' reales, no solo por el accessor
+                    ->searchable(query: function ($query, string $search) {
+                        $query->where(function ($q) use ($search) {
+                            $q->where('marca', 'like', "%{$search}%")
+                                ->orWhere('modelo', 'like', "%{$search}%");
+                        });
+                    }),
 
-        if ($agent->isMobile()) {
-            return $table
-                ->columns([
-                    Panel::make([
-                        Grid::make(['default' => 1, 'md' => 2])
-                            ->schema([
-                                Stack::make([
-                                    TextColumn::make('marca_modelo')
-                                        ->label('Marca - Modelo')
-                                        ->searchable(),
-                                ]),
-                            ]),
-                    ])->collapsed(false),
-                ])
-                ->filters([
-                    Tables\Filters\TrashedFilter::make(),
-                ])
-                ->actions([
-                    Tables\Actions\EditAction::make(),
-                ])
-                ->bulkActions([
-                    Tables\Actions\BulkActionGroup::make([
-                        Tables\Actions\DeleteBulkAction::make(),
-                        Tables\Actions\ForceDeleteBulkAction::make(),
-                        Tables\Actions\RestoreBulkAction::make(),
+                // Tipo de trabajo como badge
+                Tables\Columns\BadgeColumn::make('tipo_trabajo')
+                    ->label('Tipo')
+                    ->sortable()
+                    ->colors([
+                        'success' => 'mantenimiento',
+                        'warning' => 'avería',
+                        'info' => 'operación',
+                    ])
+                    ->formatStateUsing(fn($state) => ucfirst((string) $state))
+                    ->extraAttributes(['class' => 'w-fit'])
+                    ->toggleable(),
+
+                // Año y nº de serie
+                Tables\Columns\TextColumn::make('anio_fabricacion')
+                    ->label('Año')
+                    ->placeholder('-')
+                    ->sortable()
+                    ->toggleable(),
+
+                Tables\Columns\TextColumn::make('numero_serie')
+                    ->label('Nº serie')
+                    ->placeholder('-')
+                    ->toggleable(isToggledHiddenByDefault: true),
+            ])
+
+            ->filters([
+                Tables\Filters\SelectFilter::make('tipo_trabajo')
+                    ->label('Tipo de trabajo')
+                    ->options([
+                        'mantenimiento' => 'Mantenimiento',
+                        'avería' => 'Avería',
+                        'operación' => 'Operación',
                     ]),
-                ])
-                ->paginated(true)
-                ->paginationPageOptions([50, 100, 200])
-                ->defaultSort('created_at', 'desc');
-        } else {
-            return $table
-                ->columns([
-                    TextColumn::make('marca_modelo')
-                        ->label('Marca - Modelo')
-                        ->searchable(),
-                ])
-                ->filters([
-                    Tables\Filters\TrashedFilter::make(),
-                ])
-                ->actions([
-                    Tables\Actions\EditAction::make(),
-                ])
-                ->bulkActions([
-                    Tables\Actions\BulkActionGroup::make([
-                        Tables\Actions\DeleteBulkAction::make(),
-                        Tables\Actions\ForceDeleteBulkAction::make(),
-                        Tables\Actions\RestoreBulkAction::make(),
-                    ]),
-                ])
-                ->paginated(true)
-                ->paginationPageOptions([50, 100, 200])
-                ->defaultSort('created_at', 'desc');
-        }
+
+                Tables\Filters\SelectFilter::make('anio_fabricacion')
+                    ->label('Año')
+                    ->options(
+                        fn() => \App\Models\Maquina::query()
+                            ->whereNotNull('anio_fabricacion')
+                            ->distinct()
+                            ->orderByDesc('anio_fabricacion')
+                            ->pluck('anio_fabricacion', 'anio_fabricacion')
+                            ->toArray()
+                    ),
+
+                Tables\Filters\TrashedFilter::make(),
+            ])->persistFiltersInSession()
+
+            ->actions([
+                Tables\Actions\EditAction::make()
+                    ->icon('heroicon-o-pencil-square')
+                    ->tooltip('Editar'),
+
+                Tables\Actions\DeleteAction::make()
+                    ->icon('heroicon-o-trash'),
+
+                Tables\Actions\RestoreAction::make()
+                    ->visible(fn($record) => method_exists($record, 'trashed') && $record->trashed()),
+
+                Tables\Actions\ForceDeleteAction::make()
+                    ->visible(fn($record) => method_exists($record, 'trashed') && $record->trashed()),
+            ])
+            ->bulkActions([
+                Tables\Actions\BulkActionGroup::make([
+                    Tables\Actions\DeleteBulkAction::make(),
+                    Tables\Actions\ForceDeleteBulkAction::make(),
+                    Tables\Actions\RestoreBulkAction::make(),
+                ]),
+            ])
+
+            // Click en fila abre la acción de edición (sin rutas)
+            ->recordAction('edit')
+
+            ->paginated(true)
+            ->paginationPageOptions([25, 50, 100, 200])
+            ->defaultSort('created_at', 'desc')
+            ->striped()
+            ->emptyStateHeading('Aún no hay máquinas')
+            ->emptyStateDescription('Crea tu primera máquina para empezar.')
+            ->emptyStateActions([
+                Tables\Actions\CreateAction::make()->label('Crear máquina'),
+            ]);
     }
 
     public static function getRelations(): array

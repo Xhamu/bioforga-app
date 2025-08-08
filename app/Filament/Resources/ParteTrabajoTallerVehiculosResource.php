@@ -3,25 +3,28 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\ParteTrabajoTallerVehiculosResource\Pages;
-use App\Filament\Resources\ParteTrabajoTallerVehiculosResource\RelationManagers;
 use App\Models\ParteTrabajoTallerVehiculos;
 use Carbon\Carbon;
 use Filament\Facades\Filament;
 use Filament\Forms;
+use Filament\Forms\Form;
 use Filament\Forms\Components\Actions;
 use Filament\Forms\Components\Actions\Action;
 use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
-use Filament\Forms\Form;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Support\Enums\FontWeight;
 use Filament\Tables;
-use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Enums\FiltersLayout;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\HtmlString;
@@ -35,6 +38,7 @@ class ParteTrabajoTallerVehiculosResource extends Resource
     protected static ?string $slug = 'partes-trabajo-taller-vehiculos';
     public static ?string $label = 'taller (vehículo)';
     public static ?string $pluralLabel = 'Taller (Vehículos)';
+
     public static function form(Form $form): Form
     {
         return $form
@@ -87,19 +91,13 @@ class ParteTrabajoTallerVehiculosResource extends Resource
                                 $vehiculoLabel = $vehiculo ? "{$vehiculo->marca} {$vehiculo->modelo}" : '-';
                                 $kilometros = $record->kilometros;
                                 $tipoActuacion = $record->tipo_actuacion ?? '-';
-                                $trabajoRealizado = $record->trabajo_realizado ?? '-';
-                                $recambiosUtilizados = $record->recambios_utilizados ?? '-';
 
-                                // ⚠️ Convertir IDs a nombres
-                                $trabajoRealizadoIds = $record->trabajo_realizado ?? [];
-                                $recambiosUtilizadosIds = $record->recambios_utilizados ?? [];
+                                // Convertir IDs a nombres (por si vienen array/string)
+                                $trabajoRealizadoIds = is_array($record->trabajo_realizado) ? $record->trabajo_realizado : json_decode($record->trabajo_realizado ?? '[]', true);
+                                $recambiosUtilizadosIds = is_array($record->recambios_utilizados) ? $record->recambios_utilizados : json_decode($record->recambios_utilizados ?? '[]', true);
 
-                                // Por si vienen en string JSON
-                                $trabajoRealizadoIds = is_array($trabajoRealizadoIds) ? $trabajoRealizadoIds : json_decode($trabajoRealizadoIds, true);
-                                $recambiosUtilizadosIds = is_array($recambiosUtilizadosIds) ? $recambiosUtilizadosIds : json_decode($recambiosUtilizadosIds, true);
-
-                                $trabajoRealizadoNombres = \App\Models\TrabajoRealizado::whereIn('id', $trabajoRealizadoIds)->pluck('nombre')->toArray();
-                                $recambiosNombres = \App\Models\RecambioUtilizado::whereIn('id', $recambiosUtilizadosIds)->pluck('nombre')->toArray();
+                                $trabajoRealizadoNombres = \App\Models\TrabajoRealizado::whereIn('id', $trabajoRealizadoIds ?: [])->pluck('nombre')->toArray();
+                                $recambiosNombres = \App\Models\RecambioUtilizado::whereIn('id', $recambiosUtilizadosIds ?: [])->pluck('nombre')->toArray();
 
                                 $tabla = '
                                 <div class="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
@@ -266,6 +264,35 @@ class ParteTrabajoTallerVehiculosResource extends Resource
                     ->visible(fn() => !Filament::auth()->user()?->hasAnyRole(['superadmin', 'administración']))
                     ->columns(1),
 
+                // 🔼 NUEVA sección con los campos solicitados (sin tocar lo demás)
+                Section::make('Observaciones y estado')
+                    ->schema([
+                        Select::make('estado')
+                            ->label('Estado')
+                            ->options([
+                                'reparado' => 'Reparado',
+                                'sin_reparar' => 'Sin reparar',
+                                'en_proceso' => 'En proceso',
+                            ])
+                            ->columnSpanFull()
+                            ->required(),
+
+                        Textarea::make('observaciones')
+                            ->label('Observaciones')
+                            ->columnSpanFull()
+                            ->rows(4),
+
+                        FileUpload::make('fotos')
+                            ->label('Fotos')
+                            ->image()
+                            ->columnSpanFull()
+                            ->multiple()
+                            ->maxFiles(4)
+                            ->directory('taller_vehiculos/fotos'),
+                    ])
+                    ->visible(fn($record) => $record && $record->fecha_hora_fin_taller_vehiculos)
+                    ->columns(2),
+
                 Section::make()
                     ->visible(function ($record) {
                         if (!$record)
@@ -308,12 +335,38 @@ class ParteTrabajoTallerVehiculosResource extends Resource
                                         ->options(\App\Models\TrabajoRealizado::pluck('nombre', 'id'))
                                         ->required(),
 
+                                    // 👇 Añadimos 'ninguno' a recambios sin tocar el resto
                                     Select::make('recambios_utilizados')
                                         ->label('Recambios utilizados')
                                         ->multiple()
                                         ->searchable()
-                                        ->options(\App\Models\RecambioUtilizado::pluck('nombre', 'id'))
+                                        ->options(['ninguno' => 'Ninguno'] + \App\Models\RecambioUtilizado::pluck('nombre', 'id')->toArray())
                                         ->required(),
+
+                                    Select::make('estado')
+                                        ->label('Estado')
+                                        ->options([
+                                            'reparado' => 'Reparado',
+                                            'sin_reparar' => 'Sin reparar',
+                                            'en_proceso' => 'En proceso',
+                                        ])
+                                        ->default('en_proceso')
+                                        ->required(),
+
+                                    Textarea::make('observaciones')
+                                        ->label('Observaciones')
+                                        ->rows(3),
+
+                                    FileUpload::make('fotos')
+                                        ->label('Fotos')
+                                        ->image()
+                                        ->multiple()
+                                        ->maxFiles(4)
+                                        ->directory('taller-maquinaria')
+                                        ->imagePreviewHeight('200')
+                                        ->reorderable()
+                                        ->panelLayout('grid')
+                                        ->columnSpanFull(),
                                 ])
                                 ->action(function (array $data, $record) {
                                     $record->update([
@@ -321,6 +374,9 @@ class ParteTrabajoTallerVehiculosResource extends Resource
                                         'tipo_actuacion' => $data['tipo_actuacion'],
                                         'trabajo_realizado' => $data['trabajo_realizado'],
                                         'recambios_utilizados' => $data['recambios_utilizados'],
+                                        'estado' => $data['estado'] ?? 'en_proceso',
+                                        'observaciones' => $data['observaciones'] ?? null,
+                                        'fotos' => $data['fotos'] ?? [],
                                     ]);
 
                                     Notification::make()
@@ -343,8 +399,9 @@ class ParteTrabajoTallerVehiculosResource extends Resource
                 TextColumn::make('fecha_hora_inicio_taller_vehiculos')
                     ->label('Fecha y hora')
                     ->weight(FontWeight::Bold)
-                    ->dateTime()
-                    ->timezone('Europe/Madrid'),
+                    ->dateTime('d/m/Y H:i')
+                    ->timezone('Europe/Madrid')
+                    ->sortable(),
 
                 TextColumn::make('usuario')
                     ->label('Usuario')
@@ -355,23 +412,68 @@ class ParteTrabajoTallerVehiculosResource extends Resource
                         return trim("$nombre $inicialApellido");
                     })
                     ->weight(FontWeight::Bold)
-                    ->searchable(),
+                    ->tooltip(fn($record) => $record->usuario?->name . ' ' . $record->usuario?->apellidos)
+                    ->searchable(['name', 'apellidos'])
+                    ->sortable(),
 
                 TextColumn::make('vehiculo.marca')
                     ->label('Vehículo')
-                    ->searchable()
                     ->formatStateUsing(function ($state, $record) {
                         $marca = $record->vehiculo?->marca ?? '';
                         $modelo = $record->vehiculo?->modelo ?? '';
-                        $matricula = ucfirst($record->vehiculo?->matricula ?? '');
-
+                        $matricula = strtoupper($record->vehiculo?->matricula ?? '');
                         return "{$marca} {$modelo} ({$matricula})";
-                    }),
+                    })
+                    ->tooltip(fn($record) => "Marca: {$record->vehiculo?->marca} | Modelo: {$record->vehiculo?->modelo} | Matrícula: {$record->vehiculo?->matricula}")
+                    ->searchable(['marca', 'modelo', 'matricula'])
+                    ->sortable(),
 
+                TextColumn::make('taller.nombre')
+                    ->label('Taller')
+                    ->searchable()
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                Tables\Filters\TrashedFilter::make(),
-            ])
+                Tables\Filters\Filter::make('fecha')
+                    ->label('Rango de fechas')
+                    ->columns(2)
+                    ->form([
+                        DatePicker::make('desde')->label('Desde'),
+                        DatePicker::make('hasta')->label('Hasta'),
+                    ])
+                    ->query(function (Builder $query, array $data) {
+                        return $query
+                            ->when($data['desde'] ?? null, fn($q, $date) => $q->whereDate('fecha_hora_inicio_taller_vehiculos', '>=', $date))
+                            ->when($data['hasta'] ?? null, fn($q, $date) => $q->whereDate('fecha_hora_inicio_taller_vehiculos', '<=', $date));
+                    })
+                    ->columnSpanFull(),
+
+                Tables\Filters\SelectFilter::make('vehiculo_id')
+                    ->label('Vehículo')
+                    ->relationship('vehiculo', 'marca')
+                    ->getOptionLabelFromRecordUsing(fn($record) => "{$record->marca} {$record->modelo} ({$record->matricula})")
+                    ->searchable()
+                    ->preload(),
+
+                Tables\Filters\SelectFilter::make('usuario_id')
+                    ->label('Usuario')
+                    ->relationship('usuario', 'name')
+                    ->getOptionLabelFromRecordUsing(fn($record) => "{$record->name} {$record->apellidos}")
+                    ->searchable()
+                    ->preload(),
+
+                Tables\Filters\SelectFilter::make('taller_id')
+                    ->label('Taller')
+                    ->relationship('taller', 'nombre')
+                    ->searchable()
+                    ->preload(),
+
+                Tables\Filters\TrashedFilter::make()
+                    ->visible(fn() => Filament::auth()->user()?->hasRole('superadmin'))
+                    ->columnSpanFull(),
+            ], layout: FiltersLayout::AboveContent)
+            ->filtersFormColumns(3)
             ->actions([
                 Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),
@@ -385,7 +487,7 @@ class ParteTrabajoTallerVehiculosResource extends Resource
             ])
             ->paginated(true)
             ->paginationPageOptions([50, 100, 200])
-            ->defaultSort('created_at', 'desc');
+            ->defaultSort('fecha_hora_inicio_taller_vehiculos', 'desc');
     }
 
     public static function getRelations(): array

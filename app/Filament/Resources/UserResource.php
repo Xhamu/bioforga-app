@@ -12,6 +12,7 @@ use Filament\Forms;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Forms\Form;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
@@ -154,6 +155,15 @@ class UserResource extends Resource
                                     ->options(
                                         \Spatie\Permission\Models\Role::where('name', '!=', 'superadmin')->pluck('name', 'id')
                                     ),
+
+                                Toggle::make('is_blocked')
+                                    ->label('🔒 Usuario bloqueado')
+                                    ->onColor('danger')
+                                    ->offColor('gray') // o puedes quitar este si no quieres color
+                                    ->onIcon('heroicon-o-no-symbol')
+                                    ->offIcon(null)
+                                    ->helperText('Si está activado, el usuario no podrá iniciar sesión.')
+                                    ->default(false),
                             ])
                     ]),
 

@@ -3,24 +3,26 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\ParteTrabajoTallerMaquinariaResource\Pages;
-use App\Filament\Resources\ParteTrabajoTallerMaquinariaResource\RelationManagers;
 use App\Models\ParteTrabajoTallerMaquinaria;
 use Carbon\Carbon;
 use Filament\Facades\Filament;
 use Filament\Forms;
 use Filament\Forms\Components\Actions;
 use Filament\Forms\Components\Actions\Action;
+use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Form;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Support\Enums\FontWeight;
 use Filament\Tables;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Enums\FiltersLayout;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
@@ -35,27 +37,23 @@ class ParteTrabajoTallerMaquinariaResource extends Resource
     protected static ?string $slug = 'partes-trabajo-taller-maquinaria';
     public static ?string $label = 'taller (maquinaria)';
     public static ?string $pluralLabel = 'Taller (Maquinaria)';
+
     public static function form(Form $form): Form
     {
         return $form
             ->schema([
+                // ====== DATOS GENERALES ======
                 Section::make('Datos generales')
                     ->schema([
-                        // Usuario actual (solo lectura)
                         Select::make('usuario_id')
                             ->relationship(
                                 'usuario',
                                 'name',
                                 modifyQueryUsing: function ($query) {
                                     $user = Filament::auth()->user();
-
                                     if ($user->hasAnyRole(['superadmin', 'administrador', 'administración'])) {
-                                        // Ver todos menos los superadmin
-                                        $query->whereDoesntHave('roles', function ($q) {
-                                            $q->where('name', 'superadmin');
-                                        });
+                                        $query->whereDoesntHave('roles', fn($q) => $q->where('name', 'superadmin'));
                                     } else {
-                                        // Ver solo a sí mismo
                                         $query->where('id', $user->id);
                                     }
                                 }
@@ -63,22 +61,18 @@ class ParteTrabajoTallerMaquinariaResource extends Resource
                             ->getOptionLabelFromRecordUsing(fn($record) => $record->name . ' ' . $record->apellidos)
                             ->searchable()
                             ->preload()
-                            ->default(Filament::auth()->user()->id)
+                            ->default(fn() => Filament::auth()->user()->id)
                             ->required(),
                     ])
                     ->columns(1),
 
+                // ====== RESUMEN “DATOS DEL TRABAJO” ======
                 Section::make('Datos del trabajo')
                     ->visible(fn($record) => $record && $record->fecha_hora_inicio_taller_maquinaria)
                     ->schema([
                         Placeholder::make('')
                             ->content(function ($record) {
-                                if (
-                                    !$record ||
-                                    !$record->taller ||
-                                    !$record->maquina_id ||
-                                    !$record->horas_servicio
-                                ) {
+                                if (!$record || !$record->taller || !$record->maquina_id || !$record->horas_servicio) {
                                     return null;
                                 }
 
@@ -88,61 +82,66 @@ class ParteTrabajoTallerMaquinariaResource extends Resource
                                 $horas = $record->horas_servicio;
                                 $tipoActuacion = $record->tipo_actuacion ?? '-';
 
-                                // ⚠️ Convertir IDs a nombres
-                                $trabajoRealizadoIds = $record->trabajo_realizado ?? [];
-                                $recambiosUtilizadosIds = $record->recambios_utilizados ?? [];
+                                // IDs → nombres, filtrando no numéricos (por "ninguno")
+                                $trabajoIds = is_array($record->trabajo_realizado) ? $record->trabajo_realizado : json_decode($record->trabajo_realizado ?? '[]', true);
+                                $recambioIds = is_array($record->recambios_utilizados) ? $record->recambios_utilizados : json_decode($record->recambios_utilizados ?? '[]', true);
 
-                                // Por si vienen en string JSON
-                                $trabajoRealizadoIds = is_array($trabajoRealizadoIds) ? $trabajoRealizadoIds : json_decode($trabajoRealizadoIds, true);
-                                $recambiosUtilizadosIds = is_array($recambiosUtilizadosIds) ? $recambiosUtilizadosIds : json_decode($recambiosUtilizadosIds, true);
+                                $trabajoNombres = \App\Models\TrabajoRealizado::whereIn('id', array_filter($trabajoIds, 'is_numeric'))->pluck('nombre')->toArray();
 
-                                $trabajoRealizadoNombres = \App\Models\TrabajoRealizado::whereIn('id', $trabajoRealizadoIds)->pluck('nombre')->toArray();
-                                $recambiosNombres = \App\Models\RecambioUtilizado::whereIn('id', $recambiosUtilizadosIds)->pluck('nombre')->toArray();
+                                $recambiosTexto = 'Ninguno';
+                                $idsNumericos = array_filter($recambioIds, 'is_numeric');
+                                if (!empty($idsNumericos)) {
+                                    $recambiosNombres = \App\Models\RecambioUtilizado::whereIn('id', $idsNumericos)->pluck('nombre')->toArray();
+                                    $recambiosTexto = implode(', ', $recambiosNombres) ?: 'Ninguno';
+                                } elseif (empty($recambioIds)) {
+                                    $recambiosTexto = 'Ninguno';
+                                }
 
                                 $tabla = '
-                                        <div class="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
-                                            <table class="w-full text-sm text-left text-gray-700 dark:text-gray-200">
-                                                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-                                                    <tr class="bg-gray-50 dark:bg-gray-800">
-                                                        <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Taller</th>
-                                                        <td class="px-4 py-3 font-semibold text-gray-900 dark:text-white">' . e($tallerNombre) . '</td>
-                                                    </tr>
-                                                    <tr>
-                                                        <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Máquina</th>
-                                                        <td class="px-4 py-3">' . e($maquinaLabel) . '</td>
-                                                    </tr>
-                                                    <tr>
-                                                        <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Horas de servicio</th>
-                                                        <td class="px-4 py-3">' . e($horas, 0) . ' h</td>
-                                                    </tr>';
+                                    <div class="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
+                                        <table class="w-full text-sm text-left text-gray-700 dark:text-gray-200">
+                                            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                                                <tr class="bg-gray-50 dark:bg-gray-800">
+                                                    <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Taller</th>
+                                                    <td class="px-4 py-3 font-semibold text-gray-900 dark:text-white">' . e($tallerNombre) . '</td>
+                                                </tr>
+                                                <tr>
+                                                    <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Máquina</th>
+                                                    <td class="px-4 py-3">' . e($maquinaLabel) . '</td>
+                                                </tr>
+                                                <tr>
+                                                    <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Horas de servicio</th>
+                                                    <td class="px-4 py-3">' . e($horas) . ' h</td>
+                                                </tr>';
 
                                 if ($record->fecha_hora_fin_taller_maquinaria) {
                                     $tabla .= '
-                                            <tr>
-                                                <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Tipo de actuación</th>
-                                                <td class="px-4 py-3">' . e(ucfirst($tipoActuacion)) . '</td>
-                                            </tr>
-                                            <tr>
-                                                <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Trabajo realizado</th>
-                                                <td class="px-4 py-3">' . e(implode(', ', $trabajoRealizadoNombres)) . '</td>
-                                            </tr>
-                                            <tr>
-                                                <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Recambios utilizados</th>
-                                                <td class="px-4 py-3">' . e(implode(', ', $recambiosNombres)) . '</td>
-                                            </tr>';
+                                                <tr>
+                                                    <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Tipo de actuación</th>
+                                                    <td class="px-4 py-3">' . e(ucfirst($tipoActuacion)) . '</td>
+                                                </tr>
+                                                <tr>
+                                                    <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Trabajo realizado</th>
+                                                    <td class="px-4 py-3">' . e(implode(', ', $trabajoNombres)) . '</td>
+                                                </tr>
+                                                <tr>
+                                                    <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Recambios utilizados</th>
+                                                    <td class="px-4 py-3">' . e($recambiosTexto) . '</td>
+                                                </tr>';
                                 }
 
                                 $tabla .= '
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    ';
+                                            </tbody>
+                                        </table>
+                                    </div>';
+
                                 return new HtmlString($tabla);
                             })
                             ->columnSpanFull(),
                     ])
                     ->columns(1),
 
+                // ====== ESTADO ACTUAL ======
                 Section::make('')
                     ->schema([
                         Placeholder::make('')
@@ -157,9 +156,7 @@ class ParteTrabajoTallerMaquinariaResource extends Resource
                                     : null;
 
                                 $estado = $fin ? 'Finalizado' : 'Trabajando';
-
                                 $totalMinutos = $inicio->diffInMinutes($fin ?? Carbon::now('Europe/Madrid'));
-
                                 $horas = floor($totalMinutos / 60);
                                 $minutos = $totalMinutos % 60;
 
@@ -178,29 +175,28 @@ class ParteTrabajoTallerMaquinariaResource extends Resource
                                     : '';
 
                                 $tabla = '
-                    <div class="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
-                        <table class="w-full text-sm text-left text-gray-700 dark:text-gray-200">
-                            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-                                <tr class="bg-gray-50 dark:bg-gray-800">
-                                    <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Estado actual</th>
-                                    <td class="px-4 py-3 font-semibold text-gray-900 dark:text-white">' . $emoji . ' ' . $estado . '</td>
-                                </tr>
-                                <tr>
-                                    <th class="px-4 py-3">Hora de inicio</th>
-                                    <td class="px-4 py-3">' . $inicio->format('H:i') . $gpsInicio . '</td>
-                                </tr>
-                                <tr>
-                                    <th class="px-4 py-3">Hora de finalización</th>
-                                    <td class="px-4 py-3">' . ($fin ? $fin->format('H:i') . $gpsFin : '-') . '</td>
-                                </tr>
-                                <tr class="bg-gray-50 dark:bg-gray-800 border-t">
-                                    <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Tiempo total</th>
-                                    <td class="px-4 py-3 font-semibold">' . $horas . 'h ' . $minutos . 'min</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                ';
+                                    <div class="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
+                                        <table class="w-full text-sm text-left text-gray-700 dark:text-gray-200">
+                                            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                                                <tr class="bg-gray-50 dark:bg-gray-800">
+                                                    <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Estado actual</th>
+                                                    <td class="px-4 py-3 font-semibold text-gray-900 dark:text-white">' . $emoji . ' ' . $estado . '</td>
+                                                </tr>
+                                                <tr>
+                                                    <th class="px-4 py-3">Hora de inicio</th>
+                                                    <td class="px-4 py-3">' . $inicio->format('H:i') . $gpsInicio . '</td>
+                                                </tr>
+                                                <tr>
+                                                    <th class="px-4 py-3">Hora de finalización</th>
+                                                    <td class="px-4 py-3">' . ($fin ? $fin->format('H:i') . $gpsFin : '-') . '</td>
+                                                </tr>
+                                                <tr class="bg-gray-50 dark:bg-gray-800 border-t">
+                                                    <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Tiempo total</th>
+                                                    <td class="px-4 py-3 font-semibold">' . $horas . 'h ' . $minutos . 'min</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>';
 
                                 return new HtmlString($tabla);
                             })
@@ -209,6 +205,7 @@ class ParteTrabajoTallerMaquinariaResource extends Resource
                     ])
                     ->columns(1),
 
+                // ====== FECHAS / HORAS ======
                 Section::make('Fechas y horas')
                     ->schema([
                         DateTimePicker::make('fecha_hora_inicio_taller_maquinaria')
@@ -263,27 +260,15 @@ class ParteTrabajoTallerMaquinariaResource extends Resource
                         filled($record?->fecha_hora_inicio_taller_maquinaria)
                     ),
 
+                // ====== FINALIZAR TRABAJO (Action) ======
                 Section::make()
-                    ->visible(function ($record) {
-                        if (!$record)
-                            return false;
-
-                        return (
-                            $record->fecha_hora_inicio_taller_maquinaria && !$record->fecha_hora_fin_taller_maquinaria
-                        );
-                    })
+                    ->visible(fn($record) => $record && $record->fecha_hora_inicio_taller_maquinaria && !$record->fecha_hora_fin_taller_maquinaria)
                     ->schema([
                         Actions::make([
                             Action::make('Finalizar')
                                 ->label('Finalizar trabajo')
                                 ->color('danger')
                                 ->extraAttributes(['class' => 'w-full'])
-                                ->visible(
-                                    fn($record) =>
-                                    $record &&
-                                    $record->fecha_hora_inicio_taller_maquinaria &&
-                                    !$record->fecha_hora_fin_taller_maquinaria
-                                )
                                 ->button()
                                 ->modalHeading('Finalizar trabajo')
                                 ->modalSubmitActionLabel('Finalizar')
@@ -309,8 +294,35 @@ class ParteTrabajoTallerMaquinariaResource extends Resource
                                         ->label('Recambios utilizados')
                                         ->multiple()
                                         ->searchable()
-                                        ->options(\App\Models\RecambioUtilizado::pluck('nombre', 'id'))
+                                        ->options(
+                                            ['ninguno' => 'Ninguno'] + \App\Models\RecambioUtilizado::pluck('nombre', 'id')->toArray()
+                                        )
                                         ->required(),
+
+                                    Select::make('estado')
+                                        ->label('Estado')
+                                        ->options([
+                                            'reparado' => 'Reparado',
+                                            'sin_reparar' => 'Sin reparar',
+                                            'en_proceso' => 'En proceso',
+                                        ])
+                                        ->default('en_proceso')
+                                        ->required(),
+
+                                    Textarea::make('observaciones')
+                                        ->label('Observaciones')
+                                        ->rows(3),
+
+                                    FileUpload::make('fotos')
+                                        ->label('Fotos')
+                                        ->image()
+                                        ->multiple()
+                                        ->maxFiles(4)
+                                        ->directory('taller-maquinaria')
+                                        ->imagePreviewHeight('200')
+                                        ->reorderable()
+                                        ->panelLayout('grid')
+                                        ->columnSpanFull(),
                                 ])
                                 ->action(function (array $data, $record) {
                                     $record->update([
@@ -318,6 +330,9 @@ class ParteTrabajoTallerMaquinariaResource extends Resource
                                         'tipo_actuacion' => $data['tipo_actuacion'],
                                         'trabajo_realizado' => $data['trabajo_realizado'],
                                         'recambios_utilizados' => $data['recambios_utilizados'],
+                                        'estado' => $data['estado'] ?? 'en_proceso',
+                                        'observaciones' => $data['observaciones'] ?? null,
+                                        'fotos' => $data['fotos'] ?? [],
                                     ]);
 
                                     Notification::make()
@@ -327,9 +342,40 @@ class ParteTrabajoTallerMaquinariaResource extends Resource
 
                                     return redirect(ParteTrabajoTallerMaquinariaResource::getUrl());
                                 }),
-                        ])
-                            ->columns(4)
+                        ])->columns(4)
                     ]),
+
+                // ====== DETALLES ADICIONALES (edición/creación sin finalizar) ======
+                Section::make('Detalles adicionales')
+                    ->schema([
+                        Select::make('estado')
+                            ->label('Estado')
+                            ->options([
+                                'reparado' => 'Reparado',
+                                'sin_reparar' => 'Sin reparar',
+                                'en_proceso' => 'En proceso',
+                            ])
+                            ->default('en_proceso')
+                            ->columnSpanFull()
+                            ->native(false),
+
+                        Textarea::make('observaciones')
+                            ->label('Observaciones')
+                            ->rows(4)
+                            ->columnSpanFull(),
+
+                        FileUpload::make('fotos')
+                            ->label('Fotos')
+                            ->image()
+                            ->multiple()
+                            ->maxFiles(4)
+                            ->directory('taller-maquinaria')
+                            ->imagePreviewHeight('200')
+                            ->reorderable()
+                            ->panelLayout('grid')
+                            ->columnSpanFull(),
+                    ])
+                    ->columns(2),
             ]);
     }
 
@@ -340,37 +386,100 @@ class ParteTrabajoTallerMaquinariaResource extends Resource
                 TextColumn::make('fecha_hora_inicio_taller_maquinaria')
                     ->label('Fecha y hora')
                     ->weight(FontWeight::Bold)
-                    ->dateTime()
-                    ->timezone('Europe/Madrid'),
+                    ->dateTime('d/m/Y H:i')
+                    ->timezone('Europe/Madrid')
+                    ->sortable()
+                    ->tooltip(
+                        fn($record) =>
+                        $record->fecha_hora_inicio_taller_maquinaria
+                        ? $record->fecha_hora_inicio_taller_maquinaria->format('d/m/Y H:i')
+                        : null
+                    ),
 
                 TextColumn::make('usuario')
                     ->label('Usuario')
                     ->formatStateUsing(function ($state, $record) {
                         $nombre = $record->usuario?->name ?? '';
                         $apellido = $record->usuario?->apellidos ?? '';
-                        $inicialApellido = $apellido ? strtoupper(substr($apellido, 0, 1)) . '.' : '';
-                        return trim("$nombre $inicialApellido");
+                        return trim("$nombre $apellido");
                     })
                     ->weight(FontWeight::Bold)
-                    ->searchable(),
+                    ->searchable()
+                    ->sortable()
+                    ->tooltip(fn($record) => $record->usuario?->email ?? ''),
 
                 TextColumn::make('maquina.marca')
                     ->label('Máquina')
                     ->searchable()
+                    ->sortable()
                     ->formatStateUsing(function ($state, $record) {
                         $marca = $record->maquina?->marca ?? '';
                         $modelo = $record->maquina?->modelo ?? '';
                         $tipo = ucfirst($record->maquina?->tipo_trabajo ?? '');
-
                         return "{$marca} {$modelo} - {$tipo}";
-                    }),
+                    })
+                    ->tooltip(fn($record) => $record->maquina?->numero_serie ?? ''),
+
+                TextColumn::make('estado')
+                    ->label('Estado')
+                    ->badge()
+                    ->color(fn($state) => match ($state) {
+                        'reparado' => 'success',
+                        'sin_reparar' => 'danger',
+                        'en_proceso' => 'warning',
+                        default => 'gray',
+                    })
+                    ->formatStateUsing(fn($state) => match ($state) {
+                        'reparado' => '✅ Reparado',
+                        'sin_reparar' => '❌ Sin reparar',
+                        'en_proceso' => '⏳ En proceso',
+                        default => ucfirst((string) $state),
+                    })
+                    ->sortable(),
             ])
             ->filters([
-                Tables\Filters\TrashedFilter::make(),
-            ])
+                Tables\Filters\Filter::make('fecha')
+                    ->columns(2)
+                    ->form([
+                        DatePicker::make('desde')->label('Desde'),
+                        DatePicker::make('hasta')->label('Hasta'),
+                    ])
+                    ->query(function (Builder $query, array $data) {
+                        return $query
+                            ->when($data['desde'] ?? null, fn($q, $date) => $q->whereDate('fecha_hora_inicio_taller_maquinaria', '>=', $date))
+                            ->when($data['hasta'] ?? null, fn($q, $date) => $q->whereDate('fecha_hora_inicio_taller_maquinaria', '<=', $date));
+                    }),
+
+                Tables\Filters\SelectFilter::make('maquina_id')
+                    ->label('Máquina')
+                    ->relationship('maquina', 'marca')
+                    ->getOptionLabelFromRecordUsing(fn($record) => "{$record->marca} {$record->modelo}")
+                    ->searchable()
+                    ->preload(),
+
+                Tables\Filters\SelectFilter::make('usuario_id')
+                    ->label('Usuario')
+                    ->relationship('usuario', 'name')
+                    ->getOptionLabelFromRecordUsing(fn($record) => "{$record->name} {$record->apellidos}")
+                    ->searchable()
+                    ->preload(),
+
+                Tables\Filters\SelectFilter::make('taller_id')
+                    ->label('Taller')
+                    ->relationship('taller', 'nombre')
+                    ->searchable()
+                    ->preload(),
+
+                Tables\Filters\TrashedFilter::make()
+                    ->visible(fn() => Filament::auth()->user()?->hasRole('superadmin'))
+                    ->columnSpanFull(),
+            ], layout: FiltersLayout::AboveContent)
+            ->filtersFormColumns(2)
             ->actions([
-                Tables\Actions\ViewAction::make(),
-                Tables\Actions\EditAction::make(),
+                Tables\Actions\ViewAction::make()
+                    ->tooltip('Ver detalles'),
+                Tables\Actions\EditAction::make()
+                    ->tooltip('Editar registro'),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
@@ -386,9 +495,7 @@ class ParteTrabajoTallerMaquinariaResource extends Resource
 
     public static function getRelations(): array
     {
-        return [
-            //
-        ];
+        return [];
     }
 
     public static function getPages(): array
@@ -404,9 +511,7 @@ class ParteTrabajoTallerMaquinariaResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         $query = parent::getEloquentQuery()
-            ->withoutGlobalScopes([
-                SoftDeletingScope::class,
-            ]);
+            ->withoutGlobalScopes([SoftDeletingScope::class]);
 
         $user = Filament::auth()->user();
         $rolesPermitidos = ['superadmin', 'administración', 'administrador'];

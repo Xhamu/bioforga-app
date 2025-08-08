@@ -3,7 +3,6 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\TallerResource\Pages;
-use App\Filament\Resources\TallerResource\RelationManagers;
 use App\Models\Pais;
 use App\Models\Poblacion;
 use App\Models\Provincia;
@@ -14,17 +13,15 @@ use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\ToggleButtons;
+use Filament\Forms\Components\Repeater;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Support\Enums\FontWeight;
 use Filament\Tables;
-use Filament\Tables\Columns\Layout\Split;
-use Filament\Tables\Columns\Layout\Stack;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\File;
 
 class TallerResource extends Resource
@@ -45,19 +42,31 @@ class TallerResource extends Resource
 
     public static function form(Form $form): Form
     {
-        $ubicaciones = json_decode(File::get(resource_path('data/ubicaciones.json')), true);
-
         return $form
             ->schema([
                 TextInput::make('nombre')
-                    ->label(__('Nombre'))
+                    ->label('Nombre')
                     ->required()
-                    ->rules('required')
                     ->autofocus()
-                    ->validationMessages([
-                        'required' => 'El :attribute es obligatorio.',
-                    ])
                     ->columnSpanFull(),
+
+                ToggleButtons::make('propio')
+                    ->label('Propiedad')
+                    ->inline()
+                    ->options([
+                        1 => 'Propio',
+                        0 => 'Ajeno',
+                    ])
+                    ->icons([
+                        1 => 'heroicon-o-check-badge',
+                        0 => 'heroicon-o-user-group',
+                    ])
+                    ->colors([
+                        1 => 'success',
+                        0 => 'gray',
+                    ])
+                    ->required()
+                    ->default(0),
 
                 Section::make('Ubicación')
                     ->schema([
@@ -66,11 +75,7 @@ class TallerResource extends Resource
                             ->options(fn() => Pais::orderBy('nombre')->pluck('nombre', 'id'))
                             ->searchable()
                             ->required()
-                            ->reactive()
-                            ->validationMessages([
-                                'required' => 'El :attribute es obligatorio.',
-                            ])
-                            ->columnSpan(['default' => 2, 'md' => 1]),
+                            ->reactive(),
 
                         Select::make('provincia')
                             ->label('Provincia')
@@ -88,25 +93,34 @@ class TallerResource extends Resource
                             ->disabled(fn(callable $get) => !$get('provincia')),
 
                         TextInput::make('codigo_postal')
-                            ->label(__('Código postal'))
+                            ->label('Código postal')
                             ->rules('required|numeric')
-                            ->required()
-                            ->validationMessages([
-                                'required' => 'El :attribute es obligatorio.',
-                                'numeric' => 'El :attribute no es válido.'
-                            ])
-                            ->columnSpan(['default' => 2, 'md' => 1]),
+                            ->required(),
 
                         TextInput::make('direccion')
-                            ->label(__('Dirección'))
+                            ->label('Dirección')
                             ->required()
-                            ->rules('required')
-                            ->validationMessages([
-                                'required' => 'La :attribute es obligatorio.',
-                            ])
-                            ->columnSpan(['default' => 2, 'md' => 2]),
+                            ->columnSpanFull(),
                     ])
-                    ->columns(['default' => 1, 'md' => 2])
+                    ->columns(2)
+                    ->columnSpanFull(),
+
+                Section::make('Personas de contacto')
+                    ->schema([
+                        Repeater::make('contactos')
+                            ->relationship() // Usa la relación hasMany en el modelo Taller
+                            ->schema([
+                                TextInput::make('nombre')->label('Nombre')->required(),
+                                TextInput::make('cargo')->label('Cargo')->maxLength(255),
+                                TextInput::make('telefono')->label('Teléfono')->tel(),
+                                TextInput::make('email')->label('Email')->email(),
+                                Forms\Components\Toggle::make('principal')->label('Principal'),
+                                Textarea::make('notas')->label('Notas')->rows(2)->columnSpanFull(),
+                            ])
+                            ->columns(2)
+                            ->createItemButtonLabel('Añadir contacto'),
+                    ])
+                    ->collapsed(false)
                     ->columnSpanFull(),
 
                 Section::make('Observaciones')
@@ -125,16 +139,57 @@ class TallerResource extends Resource
                     ->weight(FontWeight::Bold)
                     ->searchable()
                     ->sortable(),
+
+                TextColumn::make('propio')
+                    ->label('Propiedad')
+                    ->formatStateUsing(fn($state) => $state ? 'Propio' : 'Ajeno')
+                    ->badge()
+                    ->color(fn($state) => $state ? 'success' : 'gray'),
+
                 TextColumn::make('direccion')
                     ->icon('heroicon-m-map-pin'),
+
+                TextColumn::make('contactos_count')
+                    ->counts('contactos')
+                    ->label('Contactos')
+                    ->badge()
+                    ->color('info'),
             ])
             ->filters([
+                Tables\Filters\SelectFilter::make('propio')
+                    ->label('Propiedad')
+                    ->options([
+                        1 => 'Propio',
+                        0 => 'Ajeno',
+                    ])
+                    ->searchable()
+                    ->attribute('propio')
+                    ->placeholder('Todas'),
+
+                Tables\Filters\SelectFilter::make('provincia')
+                    ->label('Provincia')
+                    ->options(fn() => Provincia::orderBy('nombre')->pluck('nombre', 'id'))
+                    ->searchable()
+                    ->placeholder('Todas'),
+
+                Tables\Filters\TernaryFilter::make('contactos')
+                    ->label('Contactos')
+                    ->placeholder('Todos')
+                    ->trueLabel('Con contactos')
+                    ->falseLabel('Sin contactos')
+                    ->searchable()
+                    ->queries(
+                        true: fn($query) => $query->has('contactos'),
+                        false: fn($query) => $query->doesntHave('contactos'),
+                    ),
+
                 TrashedFilter::make()
-                    ->columnSpanFull()
-                    ->visible(fn() => Filament::auth()->user()?->hasRole('superadmin')),
-            ])
+                    ->visible(fn() => Filament::auth()->user()?->hasRole('superadmin'))
+                    ->columnSpanFull(),
+
+            ], layout: Tables\Enums\FiltersLayout::AboveContent)
+            ->filtersFormColumns(3)
             ->actions([
-                //Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),
             ])
             ->bulkActions([
@@ -151,7 +206,7 @@ class TallerResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            // Si prefieres usar RelationManager en vez de Repeater, añádelo aquí
         ];
     }
 

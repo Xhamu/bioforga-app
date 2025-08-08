@@ -27,6 +27,7 @@ class Taller extends Authenticatable
         'codigo_postal',
         'direccion',
         'observaciones',
+        'propio',
     ];
 
     /**
@@ -43,7 +44,9 @@ class Taller extends Authenticatable
      */
     protected function casts(): array
     {
-        return [];
+        return [
+            'propio' => 'bool',
+        ];
     }
 
     protected $table = 'talleres';
@@ -51,5 +54,10 @@ class Taller extends Authenticatable
     public function getPaisNombreAttribute()
     {
         return $this->pais;
+    }
+
+    public function contactos()
+    {
+        return $this->hasMany(TallerContacto::class);
     }
 }
