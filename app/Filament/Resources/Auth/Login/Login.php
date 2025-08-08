@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Auth\Login;
 
+use App\Models\User;
 use Filament\Forms\Form;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Component;
@@ -31,13 +32,30 @@ class Login extends BaseAuth
             ->extraInputAttributes(['tabindex' => 1]);
     }
 
+    /**
+     * Aquí controlamos:
+     *  - Detectar si el login es NIF o email
+     *  - Bloquear si el usuario existe y está marcado como is_blocked
+     *  - Añadir is_blocked = 0 a las credenciales para que Auth::attempt falle si está bloqueado
+     */
     protected function getCredentialsFromFormData(array $data): array
     {
-        $login_type = filter_var($data['login'], FILTER_VALIDATE_EMAIL) ? 'email' : 'nif';
+        $loginType = filter_var($data['login'], FILTER_VALIDATE_EMAIL) ? 'email' : 'nif';
 
+        // Si el usuario existe y está bloqueado, mostramos un error específico
+        $user = User::query()->where($loginType, $data['login'])->first();
+        if ($user?->is_blocked) {
+            throw ValidationException::withMessages([
+                'data.login' => 'Tu cuenta está bloqueada. Contacta con administración.',
+            ]);
+        }
+
+        // Credenciales para Auth::attempt: además de login+password,
+        // exigimos is_blocked = 0 para que no pueda autenticarse un bloqueado.
         return [
-            $login_type => $data['login'],
-            'password'  => $data['password'],
+            $loginType => $data['login'],
+            'password' => $data['password'],
+            'is_blocked' => 0,
         ];
     }
 

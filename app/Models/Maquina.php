@@ -26,7 +26,13 @@ class Maquina extends Model
         'averias',
         'mantenimientos',
         'tipo_consumo',
-        'tipo_horas'
+        'tipo_horas',
+        'numero_bastidor',
+        'numero_motor',
+        'fabricante',
+        'anio_fabricacion',
+        'color',
+        'numero_serie'
     ];
 
     protected $casts = [
@@ -42,16 +48,6 @@ class Maquina extends Model
      * @var list<string>
      */
     protected $hidden = [];
-
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
-    protected function casts(): array
-    {
-        return [];
-    }
 
     protected $table = 'maquinas';
 

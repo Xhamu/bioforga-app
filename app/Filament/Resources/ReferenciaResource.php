@@ -53,12 +53,74 @@ class ReferenciaResource extends Resource
 
     public static function form(Form $form): Form
     {
+        // --- Helpers para construir referencia de forma consistente ---
+        $certMap = [
+            'sure_induestrial' => 'SI',
+            'sure_foresal' => 'SF',
+            'pefc' => 'PF',
+            'sbp' => 'SB',
+        ];
+
+        // Construye el prefijo (todo menos el contador) según sea SU o Servicio
+        $buildRefPrefix = function (callable $get) use ($certMap): string {
+            $refActual = (string) ($get('referencia') ?? '');
+            $sector = (string) ($get('sector') ?? '01');
+            $fecha = now()->format('dmy');
+
+            $esSU = str_contains($refActual, 'SU'); // si tu "tipo" está en otro estado, cámbialo aquí
+
+            if ($esSU) {
+                $formato = (string) ($get('formato') ?? 'CA');
+
+                $mid = 'NO';
+                if ($get('certificable')) {
+                    $tc = $get('tipo_certificacion');
+                    if ($tc && isset($certMap[$tc])) {
+                        $mid = $certMap[$tc];
+                    }
+                }
+
+                // SECTOR + SU + FORMATO + MID + FECHA
+                return "{$sector}SU{$formato}{$mid}{$fecha}";
+            }
+
+            // Servicio: SECTOR + PROV(2) + AYTO(2) + INIC(2) + FECHA
+            $prov = strtoupper(substr((string) ($get('provincia') ?? ''), 0, 2));
+            $ayto = strtoupper(substr((string) ($get('ayuntamiento') ?? ''), 0, 2));
+
+            // Iniciales cliente (o NO si no hay)
+            $inic = 'NO';
+            if ($clienteId = $get('cliente_id')) {
+                $razon = optional(\App\Models\Cliente::find($clienteId))->razon_social;
+                if ($razon) {
+                    $slug = strtoupper(preg_replace('/[^A-Z]/i', '', $razon));
+                    $inic = substr($slug, 0, 2) ?: 'NO';
+                }
+            }
+
+            return "{$sector}{$prov}{$ayto}{$inic}{$fecha}";
+        };
+
+        // Setea referencia única añadiendo contador de 2 dígitos, evitando colisiones
+        $setUniqueRef = function (callable $set, callable $get) use ($buildRefPrefix) {
+            $prefix = $buildRefPrefix($get);
+
+            $i = 1;
+            do {
+                $contador = str_pad((string) $i, 2, '0', STR_PAD_LEFT);
+                $ref = $prefix . $contador;
+                $exists = \App\Models\Referencia::where('referencia', $ref)->exists();
+                $i++;
+            } while ($exists);
+
+            $set('referencia', $ref);
+        };
+        // ----------------------------------------------------------------
+
         return $form
             ->schema([
                 View::make('livewire.tipo-select')
-                    ->visible(function ($state) {
-                        return !isset($state['id']);
-                    })
+                    ->visible(fn($state) => !isset($state['id']))
                     ->columnSpanFull(),
 
                 Forms\Components\TextInput::make('referencia')
@@ -77,10 +139,9 @@ class ReferenciaResource extends Resource
                         'Saca autocargador' => 'Saca autocargador',
                     ])
                     ->columnSpanFull()
-                    ->visible(function ($get) {
-                        return !empty($get('referencia')) && strpos($get('referencia'), 'SU') === false;
-                    }),
+                    ->visible(fn($get) => !empty($get('referencia')) && strpos((string) $get('referencia'), 'SU') === false),
 
+                // FORMATO (solo SU): inserta el código de certificación entre formato y fecha
                 Forms\Components\Select::make('formato')
                     ->nullable()
                     ->options([
@@ -94,101 +155,34 @@ class ReferenciaResource extends Resource
                     ->required()
                     ->columnSpanFull()
                     ->live()
-                    ->afterStateUpdated(function ($state, callable $set, callable $get) {
-                        if ($state) {
-                            $referencia = $get('referencia') ?? '';
-
-                            preg_match('/^(?<sector>\d{2})SU(?:CA|SA|EX|OT)?(?<fecha>\d{6})(?<contador>\d{3})$/', $referencia, $matches);
-
-                            $sector = $matches['sector'] ?? '01';
-                            $fecha = $matches['fecha'] ?? now()->format('dmy');
-                            $contador = $matches['contador'] ?? '01';
-
-                            $contadorInt = (int) $contador;
-
-                            do {
-                                $contadorFormateado = str_pad($contadorInt, 2, '0', STR_PAD_LEFT);
-                                $nuevaReferencia = $sector . 'SU' . $state . $fecha . $contadorFormateado;
-
-                                $existe = Referencia::where('referencia', $nuevaReferencia)->exists();
-
-                                $contadorInt++;
-                            } while ($existe);
-
-                            $set('referencia', $nuevaReferencia);
-                        } else {
-                            $set('referencia', '');
-                        }
-                    })
-                    ->visible(function ($get) {
-                        return str_contains($get('referencia'), 'SU');
-                    }),
+                    ->afterStateUpdated(fn($state, $set, $get) => $setUniqueRef($set, $get))
+                    ->visible(fn($get) => str_contains((string) $get('referencia'), 'SU')),
 
                 Forms\Components\Section::make('Ubicación')
                     ->schema([
                         Forms\Components\TextInput::make('provincia')
                             ->required()
                             ->live()
-                            ->afterStateUpdated(function ($state, callable $set, callable $get) {
-                                $referenciaActual = $get('referencia') ?? '';
-
-                                // Solo generamos si NO es tipo suministro
-                                if (str_contains($referenciaActual, 'SU')) {
-                                    return;
-                                }
-
-                                $provincia = strtoupper(substr($get('provincia') ?? '', 0, 2));
-                                $ayuntamiento = strtoupper(substr($get('ayuntamiento') ?? '', 0, 2));
-                                $fecha = now()->format('dmy');
-
-                                $contador = 1;
-                                do {
-                                    $contadorStr = str_pad($contador, 2, '0', STR_PAD_LEFT);
-                                    $nuevaReferencia = "{$provincia}{$ayuntamiento}{$fecha}{$contadorStr}";
-
-                                    $existe = Referencia::where('referencia', $nuevaReferencia)->exists();
-                                    $contador++;
-                                } while ($existe);
-
-                                $set('referencia', $nuevaReferencia);
-                            }),
+                            ->afterStateUpdated(fn($state, $set, $get) => $setUniqueRef($set, $get)),
 
                         Forms\Components\TextInput::make('ayuntamiento')
                             ->required()
                             ->live()
-                            ->afterStateUpdated(function ($state, callable $set, callable $get) {
-                                $referenciaActual = $get('referencia') ?? '';
+                            ->afterStateUpdated(fn($state, $set, $get) => $setUniqueRef($set, $get)),
 
-                                if (str_contains($referenciaActual, 'SU')) {
-                                    return;
-                                }
-
-                                $provincia = strtoupper(substr($get('provincia') ?? '', 0, 2));
-                                $ayuntamiento = strtoupper(substr($get('ayuntamiento') ?? '', 0, 2));
-                                $fecha = now()->format('dmy');
-
-                                $contador = 1;
-                                do {
-                                    $contadorStr = str_pad($contador, 2, '0', STR_PAD_LEFT);
-                                    $nuevaReferencia = "{$provincia}{$ayuntamiento}{$fecha}{$contadorStr}";
-
-                                    $existe = Referencia::where('referencia', $nuevaReferencia)->exists();
-                                    $contador++;
-                                } while ($existe);
-
-                                $set('referencia', $nuevaReferencia);
-                            }),
                         Forms\Components\TextInput::make('monte_parcela')
                             ->label('Monte / Parcela')
                             ->required(),
+
                         Forms\Components\TextInput::make('ubicacion_gps')
                             ->label('GPS'),
+
                         Forms\Components\TextInput::make('finca')
                             ->label('Finca')
-                            ->visible(function ($get) {
-                                return !empty($get('referencia')) && strpos($get('referencia'), 'SU') === false;
-                            })
+                            ->visible(fn($get) => !empty($get('referencia')) && strpos((string) $get('referencia'), 'SU') === false)
                             ->columnSpanFull(),
+
+                        // SECTOR: siempre prefijo delante (SU y servicio)
                         Forms\Components\Select::make('sector')
                             ->label('Sector')
                             ->searchable()
@@ -202,21 +196,11 @@ class ReferenciaResource extends Resource
                             ->columnSpanFull()
                             ->required()
                             ->live()
-                            ->afterStateUpdated(function ($state, callable $set, callable $get) {
-                                $referencia = $get('referencia') ?? '';
-
-                                $referencia = preg_replace('/^(01|02|03|04|05)/', '', $referencia);
-
-                                $set('referencia', $state . $referencia);
-                            })
-                            ->visible(function ($get) {
-                                return !empty($get('referencia'));
-                            }),
+                            ->afterStateUpdated(fn($state, $set, $get) => $setUniqueRef($set, $get))
+                            ->visible(fn($get) => !empty($get('referencia'))),
 
                         View::make('livewire.get-location-button')
-                            ->visible(function ($state) {
-                                return !isset($state['id']);
-                            })
+                            ->visible(fn($state) => !isset($state['id']))
                             ->columnSpanFull(),
                     ])
                     ->columns(2),
@@ -232,22 +216,17 @@ class ReferenciaResource extends Resource
                                 'razon_social',
                                 fn(Builder $query) => $query->whereIn('tipo_servicio', ['suministro', 'servicios'])
                             )
-                            ->visible(function ($get) {
-                                return strpos($get('referencia'), 'SU') !== false;
-                            }),
+                            ->visible(fn($get) => strpos((string) $get('referencia'), 'SU') !== false),
 
                         Forms\Components\Select::make('cliente_id')
                             ->nullable()
                             ->searchable()
                             ->preload()
                             ->relationship('cliente', 'razon_social')
-                            ->visible(function ($get) {
-                                return strpos($get('referencia'), 'SU') === false;
-                            }),
+                            ->afterStateUpdated(fn($state, $set, $get) => $setUniqueRef($set, $get))
+                            ->visible(fn($get) => strpos((string) $get('referencia'), 'SU') === false),
                     ])
-                    ->visible(function ($get) {
-                        return !empty($get('referencia'));
-                    })
+                    ->visible(fn($get) => !empty($get('referencia')))
                     ->columns(1),
 
                 Forms\Components\Section::make('Producto')
@@ -263,6 +242,7 @@ class ReferenciaResource extends Resource
                                 'otros' => 'Otros',
                             ])
                             ->required(),
+
                         Forms\Components\Select::make('producto_tipo')
                             ->label('Tipo')
                             ->searchable()
@@ -293,7 +273,8 @@ class ReferenciaResource extends Resource
 
                         Forms\Components\Checkbox::make('certificable')
                             ->label('¿Certificable?')
-                            ->reactive(),
+                            ->reactive()
+                            ->afterStateUpdated(fn($state, $set, $get) => $setUniqueRef($set, $get)),
 
                         Forms\Components\Select::make('tipo_certificacion')
                             ->label('Tipo de certificación')
@@ -305,16 +286,15 @@ class ReferenciaResource extends Resource
                                 'pefc' => 'PEFC',
                             ])
                             ->visible(fn($get) => $get('certificable') === true)
-                            ->reactive(),
+                            ->reactive()
+                            ->afterStateUpdated(fn($state, $set, $get) => $setUniqueRef($set, $get)),
 
                         Forms\Components\Checkbox::make('guia_sanidad')
                             ->label('¿Guía de sanidad?')
                             ->reactive(),
-
-                    ])->columns(2)
-                    ->visible(function ($get) {
-                        return !empty($get('referencia'));
-                    }),
+                    ])
+                    ->columns(2)
+                    ->visible(fn($get) => !empty($get('referencia'))),
 
                 Forms\Components\Section::make('Tarifa')
                     ->schema([
@@ -347,12 +327,10 @@ class ReferenciaResource extends Resource
                                         'hora' => '€/hora',
                                         default => '€',
                                     }),
-                            ])
+                            ]),
                     ])
                     ->columns(3)
-                    ->visible(function ($get) {
-                        return !empty($get('referencia'));
-                    }),
+                    ->visible(fn($get) => !empty($get('referencia'))),
 
                 Forms\Components\Section::make('Contacto')
                     ->schema([
@@ -366,9 +344,7 @@ class ReferenciaResource extends Resource
                             ->label('Correo electrónico')
                             ->nullable(),
                     ])->columns(3)
-                    ->visible(function ($get) {
-                        return !empty($get('referencia'));
-                    }),
+                    ->visible(fn($get) => !empty($get('referencia'))),
 
                 Section::make('Usuarios')
                     ->schema([
@@ -383,8 +359,7 @@ class ReferenciaResource extends Resource
                                         ->whereNull('users.deleted_at')
                                         ->whereDoesntHave(
                                             'roles',
-                                            fn($q) =>
-                                            $q->where('name', 'superadmin')
+                                            fn($q) => $q->where('name', 'superadmin')
                                         );
                                 }
                             )
@@ -398,9 +373,7 @@ class ReferenciaResource extends Resource
                             ->columnSpanFull()
                             ->visible(fn($get) => !empty($get('referencia'))),
                     ])
-                    ->visible(function ($get) {
-                        return !empty($get('referencia'));
-                    }),
+                    ->visible(fn($get) => !empty($get('referencia'))),
 
                 Forms\Components\Section::make('Estado')
                     ->schema([
@@ -426,9 +399,7 @@ class ReferenciaResource extends Resource
                         Forms\Components\Textarea::make('observaciones')
                             ->nullable(),
                     ])->columns(1)
-                    ->visible(function ($get) {
-                        return !empty($get('referencia'));
-                    }),
+                    ->visible(fn($get) => !empty($get('referencia'))),
             ]);
     }
 
@@ -1345,6 +1316,37 @@ class ReferenciaResource extends Resource
                         ->searchable()
                         ->preload()
                         ->relationship('cliente', 'razon_social')
+                        ->afterStateUpdated(function ($state, callable $set, callable $get) {
+                            $ref = $get('referencia') ?? '';
+
+                            // Sólo aplica a NO-SU
+                            if (str_contains($ref, 'SU'))
+                                return;
+
+                            $provincia = strtoupper(substr($get('provincia') ?? '', 0, 2));
+                            $ayunta = strtoupper(substr($get('ayuntamiento') ?? '', 0, 2));
+                            $fecha = now()->format('dmy');
+
+                            // Iniciales de cliente
+                            $iniciales = 'NO';
+                            if ($state) {
+                                $razon = optional(\App\Models\Cliente::find($state))->razon_social;
+                                if ($razon) {
+                                    $slug = strtoupper(preg_replace('/[^A-Z]/i', '', $razon));
+                                    $iniciales = substr($slug, 0, 2) ?: 'NO';
+                                }
+                            }
+
+                            $contador = 1;
+                            do {
+                                $contadorStr = str_pad($contador, 2, '0', STR_PAD_LEFT);
+                                $nueva = "{$provincia}{$ayunta}{$iniciales}{$fecha}{$contadorStr}";
+                                $existe = \App\Models\Referencia::where('referencia', $nueva)->exists();
+                                $contador++;
+                            } while ($existe);
+
+                            $set('referencia', $nueva);
+                        })
                         ->visible(function ($get) {
                             return strpos($get('referencia'), 'SU') === false;
                         }),
