@@ -31,6 +31,8 @@ class AlmacenIntermedioResource extends Resource
             ->schema([
                 Forms\Components\Tabs::make('AlmacenTabs')
                     ->columnSpanFull()
+                    ->id('almacen-tabs')           // id único para esta Tabs
+                    ->persistTab()
                     ->tabs([
                         Forms\Components\Tabs\Tab::make('Datos generales')
                             ->schema([

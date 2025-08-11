@@ -91,7 +91,7 @@ class ReferenciaResource extends Resource
             // Iniciales cliente (o NO si no hay)
             $inic = 'NO';
             if ($clienteId = $get('cliente_id')) {
-                $razon = optional(\App\Models\Cliente::find($clienteId))->razon_social;
+                $razon = optional(Cliente::find($clienteId))->razon_social;
                 if ($razon) {
                     $slug = strtoupper(preg_replace('/[^A-Z]/i', '', $razon));
                     $inic = substr($slug, 0, 2) ?: 'NO';
@@ -109,7 +109,7 @@ class ReferenciaResource extends Resource
             do {
                 $contador = str_pad((string) $i, 2, '0', STR_PAD_LEFT);
                 $ref = $prefix . $contador;
-                $exists = \App\Models\Referencia::where('referencia', $ref)->exists();
+                $exists = Referencia::where('referencia', $ref)->exists();
                 $i++;
             } while ($exists);
 
