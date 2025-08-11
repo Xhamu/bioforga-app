@@ -65,7 +65,7 @@ class ReferenciaResource extends Resource
         $buildRefPrefix = function (callable $get) use ($certMap): string {
             $refActual = (string) ($get('referencia') ?? '');
             $sector = (string) ($get('sector') ?? '01');
-            $fecha = now()->format('dmy');
+            $fecha = (string) ($get('ref_fecha_fija') ?? now()->format('dmy')); // <- fecha congelada
 
             $esSU = str_contains($refActual, 'SU'); // si tu "tipo" está en otro estado, cámbialo aquí
 
@@ -119,6 +119,11 @@ class ReferenciaResource extends Resource
 
         return $form
             ->schema([
+                // Fecha fija (no se guarda en BD)
+                Forms\Components\Hidden::make('ref_fecha_fija')
+                    ->dehydrated(false)
+                    ->default(now()->format('dmy')),
+
                 View::make('livewire.tipo-select')
                     ->visible(fn($state) => !isset($state['id']))
                     ->columnSpanFull(),
@@ -126,7 +131,15 @@ class ReferenciaResource extends Resource
                 Forms\Components\TextInput::make('referencia')
                     ->required()
                     ->reactive()
-                    ->columnSpanFull(),
+                    ->columnSpanFull()
+                    ->afterStateHydrated(function (callable $set, $state, ?\App\Models\Referencia $record) {
+                        $ref = (string)($state ?: ($record->referencia ?? ''));
+                        if (preg_match('/(\d{6})/', $ref, $m)) {
+                            $set('ref_fecha_fija', $m[1]); // ej: 110725
+                        } else {
+                            $set('ref_fecha_fija', now()->format('dmy'));
+                        }
+                    }),
 
                 Forms\Components\Select::make('tipo_servicio')
                     ->required()
@@ -1131,6 +1144,11 @@ class ReferenciaResource extends Resource
     public static function generalFormSchema(): array
     {
         return [
+            // Fecha fija también aquí para cuando uses este schema suelto
+            Forms\Components\Hidden::make('ref_fecha_fija')
+                ->dehydrated(false)
+                ->default(now()->format('dmy')),
+
             View::make('livewire.tipo-select')
                 ->visible(function ($state) {
                     return !isset($state['id']);
@@ -1140,7 +1158,15 @@ class ReferenciaResource extends Resource
             Forms\Components\TextInput::make('referencia')
                 ->required()
                 ->reactive()
-                ->columnSpanFull(),
+                ->columnSpanFull()
+                ->afterStateHydrated(function (callable $set, $state, ?\App\Models\Referencia $record) {
+                    $ref = (string)($state ?: ($record->referencia ?? ''));
+                    if (preg_match('/(\d{6})/', $ref, $m)) {
+                        $set('ref_fecha_fija', $m[1]);
+                    } else {
+                        $set('ref_fecha_fija', now()->format('dmy'));
+                    }
+                }),
 
             Forms\Components\Select::make('tipo_servicio')
                 ->required()
@@ -1174,10 +1200,11 @@ class ReferenciaResource extends Resource
                     if ($state) {
                         $referencia = $get('referencia') ?? '';
 
-                        preg_match('/^(?<sector>\d{2})SU(?:CA|SA|EX|OT)?(?<fecha>\d{6})(?<contador>\d{3})$/', $referencia, $matches);
+                        // Contador de 2 dígitos
+                        preg_match('/^(?<sector>\d{2})SU(?:CA|SA|EX|OT)?(?<fecha>\d{6})(?<contador>\d{2})$/', $referencia, $matches);
 
                         $sector = $matches['sector'] ?? '01';
-                        $fecha = $matches['fecha'] ?? now()->format('dmy');
+                        $fecha = (string) ($get('ref_fecha_fija') ?? now()->format('dmy'));
                         $contador = $matches['contador'] ?? '01';
 
                         $contadorInt = (int) $contador;
@@ -1215,7 +1242,7 @@ class ReferenciaResource extends Resource
 
                             $provincia = strtoupper(substr($get('provincia') ?? '', 0, 2));
                             $ayuntamiento = strtoupper(substr($get('ayuntamiento') ?? '', 0, 2));
-                            $fecha = now()->format('dmy');
+                            $fecha = (string) ($get('ref_fecha_fija') ?? now()->format('dmy'));
 
                             $contador = 1;
                             do {
@@ -1241,7 +1268,7 @@ class ReferenciaResource extends Resource
 
                             $provincia = strtoupper(substr($get('provincia') ?? '', 0, 2));
                             $ayuntamiento = strtoupper(substr($get('ayuntamiento') ?? '', 0, 2));
-                            $fecha = now()->format('dmy');
+                            $fecha = (string) ($get('ref_fecha_fija') ?? now()->format('dmy'));
 
                             $contador = 1;
                             do {
@@ -1325,7 +1352,7 @@ class ReferenciaResource extends Resource
 
                             $provincia = strtoupper(substr($get('provincia') ?? '', 0, 2));
                             $ayunta = strtoupper(substr($get('ayuntamiento') ?? '', 0, 2));
-                            $fecha = now()->format('dmy');
+                            $fecha = (string) ($get('ref_fecha_fija') ?? now()->format('dmy'));
 
                             // Iniciales de cliente
                             $iniciales = 'NO';
