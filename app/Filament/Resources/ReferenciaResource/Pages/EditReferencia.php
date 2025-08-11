@@ -28,130 +28,133 @@ class EditReferencia extends EditRecord
     public function form(Forms\Form $form): Forms\Form
     {
         return $form->schema([
-            Tabs::make('Formulario')->tabs([
-                Tabs\Tab::make('General')
-                    ->schema(ReferenciaResource::generalFormSchema()),
+            Tabs::make('Formulario')
+                ->id('referencia-tabs')           // id único para esta Tabs
+                ->persistTab()
+                ->tabs([
+                    Tabs\Tab::make('General')
+                        ->schema(ReferenciaResource::generalFormSchema()),
 
-                Tabs\Tab::make('Partes de trabajo')
-                    ->schema([
-                        Forms\Components\View::make('filament.resources.referencia-resource.partials.partes-trabajo')
-                            ->viewData([
-                                'partesTransporteAgrupados' => \App\Models\CargaTransporte::with([
-                                    'parteTrabajoSuministroTransporte.cliente',
-                                    'parteTrabajoSuministroTransporte.almacen',
-                                    'referencia',
-                                ])
-                                    ->where('referencia_id', $this->record?->id)
-                                    ->whereNull('deleted_at')
-                                    ->get()
-                                    ->groupBy('parte_trabajo_suministro_transporte_id')
-                                    ->map(function ($cargas) {
-                                        $parte = $cargas->first()->parteTrabajoSuministroTransporte;
-
-                                        return (object) [
-                                            'id' => $parte?->id,
-                                            'referencias' => $cargas->pluck('referencia.referencia')->filter()->unique()->values(),
-                                            'cliente' => $parte?->cliente?->razon_social ?? null,
-                                            'almacen' => $parte?->almacen?->referencia ?? null,
-                                            'inicio' => $cargas->min('fecha_hora_inicio_carga'),
-                                            'fin' => $cargas->max('fecha_hora_fin_carga'),
-                                            'cantidad_total' => $cargas->sum('cantidad'),
-                                            'cargas' => $cargas,
-                                            'peso_neto' => $parte->peso_neto ?? '-',
-                                        ];
-                                    })
-                                    ->values(),
-                                'partesMaquina' => $this->record?->partesMaquina ?? collect(),
-                            ])
-                            ->columnSpanFull(),
-                    ]),
-
-                Tabs\Tab::make('Facturación')
-                    ->schema([
-                        Forms\Components\Select::make('estado_facturacion')
-                            ->label('Estado')
-                            ->searchable()
-                            ->options([
-                                'completa' => 'Completa',
-                                'parcial' => 'Parcial',
-                                'no_facturada' => 'No facturada',
-                            ]),
-
-                        Repeater::make('facturas')
-                            ->relationship()
-                            ->label('Facturas')
-                            ->schema([
-                                Forms\Components\TextInput::make('numero')
-                                    ->label('Número de factura')
-                                    ->nullable(),
-
-                                Forms\Components\DatePicker::make('fecha')
-                                    ->label('Fecha')
-                                    ->default(now())
-                                    ->nullable(),
-
-                                Forms\Components\Select::make('tipo')
-                                    ->options([
-                                        'horas' => 'Horas',
-                                        'toneladas' => 'Tn',
+                    Tabs\Tab::make('Partes de trabajo')
+                        ->schema([
+                            Forms\Components\View::make('filament.resources.referencia-resource.partials.partes-trabajo')
+                                ->viewData([
+                                    'partesTransporteAgrupados' => \App\Models\CargaTransporte::with([
+                                        'parteTrabajoSuministroTransporte.cliente',
+                                        'parteTrabajoSuministroTransporte.almacen',
+                                        'referencia',
                                     ])
-                                    ->label('Tipo')
-                                    ->searchable()
-                                    ->nullable()
-                                    ->reactive(),
+                                        ->where('referencia_id', $this->record?->id)
+                                        ->whereNull('deleted_at')
+                                        ->get()
+                                        ->groupBy('parte_trabajo_suministro_transporte_id')
+                                        ->map(function ($cargas) {
+                                            $parte = $cargas->first()->parteTrabajoSuministroTransporte;
 
-                                Forms\Components\TextInput::make('importe')
-                                    ->label(fn(callable $get) => match ($get('tipo')) {
-                                        'horas' => 'Importe / hora',
-                                        'toneladas' => 'Importe / tonelada',
-                                        default => 'Importe',
-                                    })
-                                    ->numeric()
-                                    ->nullable()
-                                    ->suffix(function (callable $get) {
-                                        return match ($get('tipo')) {
-                                            'horas' => '€/hora',
-                                            'toneladas' => '€/tn',
-                                            default => '€',
-                                        };
-                                    }),
+                                            return (object) [
+                                                'id' => $parte?->id,
+                                                'referencias' => $cargas->pluck('referencia.referencia')->filter()->unique()->values(),
+                                                'cliente' => $parte?->cliente?->razon_social ?? null,
+                                                'almacen' => $parte?->almacen?->referencia ?? null,
+                                                'inicio' => $cargas->min('fecha_hora_inicio_carga'),
+                                                'fin' => $cargas->max('fecha_hora_fin_carga'),
+                                                'cantidad_total' => $cargas->sum('cantidad'),
+                                                'cargas' => $cargas,
+                                                'peso_neto' => $parte->peso_neto ?? '-',
+                                            ];
+                                        })
+                                        ->values(),
+                                    'partesMaquina' => $this->record?->partesMaquina ?? collect(),
+                                ])
+                                ->columnSpanFull(),
+                        ]),
 
-                                Forms\Components\TextInput::make('importe_sin_iva')
-                                    ->label('Importe sin IVA')
-                                    ->numeric()
-                                    ->suffix('€')
-                                    ->nullable(),
+                    Tabs\Tab::make('Facturación')
+                        ->schema([
+                            Forms\Components\Select::make('estado_facturacion')
+                                ->label('Estado')
+                                ->searchable()
+                                ->options([
+                                    'completa' => 'Completa',
+                                    'parcial' => 'Parcial',
+                                    'no_facturada' => 'No facturada',
+                                ]),
 
-                                Forms\Components\TextInput::make('cantidad')
-                                    ->label('Cantidad')
-                                    ->numeric()
-                                    ->step(0.01)
-                                    ->nullable(),
+                            Repeater::make('facturas')
+                                ->relationship()
+                                ->label('Facturas')
+                                ->schema([
+                                    Forms\Components\TextInput::make('numero')
+                                        ->label('Número de factura')
+                                        ->nullable(),
 
-                                Forms\Components\Textarea::make('notas')
-                                    ->label('Notas')
-                                    ->nullable()
-                                    ->columnSpanFull(),
-                            ])
-                            ->columns(2) // Opcional: puedes poner en columnas si quieres ahorrar espacio
-                            ->defaultItems(1) // Opcional: cuántas facturas se muestran por defecto
-                            ->createItemButtonLabel('Añadir factura'),
-                    ]),
+                                    Forms\Components\DatePicker::make('fecha')
+                                        ->label('Fecha')
+                                        ->default(now())
+                                        ->nullable(),
 
-                Tabs\Tab::make('Historial de cambios')
-                    ->schema([
-                        Forms\Components\View::make('filament.resources.referencia-resource.partials.historial-cambios')
-                            ->viewData([
-                                'logs' => \Spatie\Activitylog\Models\Activity::where('subject_type', \App\Models\Referencia::class)
-                                    ->where('subject_id', $this->record?->id)
-                                    ->latest()
-                                    ->take(20)
-                                    ->get(),
-                            ])
-                            ->columnSpanFull(),
-                    ]),
+                                    Forms\Components\Select::make('tipo')
+                                        ->options([
+                                            'horas' => 'Horas',
+                                            'toneladas' => 'Tn',
+                                        ])
+                                        ->label('Tipo')
+                                        ->searchable()
+                                        ->nullable()
+                                        ->reactive(),
 
-            ])
+                                    Forms\Components\TextInput::make('importe')
+                                        ->label(fn(callable $get) => match ($get('tipo')) {
+                                            'horas' => 'Importe / hora',
+                                            'toneladas' => 'Importe / tonelada',
+                                            default => 'Importe',
+                                        })
+                                        ->numeric()
+                                        ->nullable()
+                                        ->suffix(function (callable $get) {
+                                            return match ($get('tipo')) {
+                                                'horas' => '€/hora',
+                                                'toneladas' => '€/tn',
+                                                default => '€',
+                                            };
+                                        }),
+
+                                    Forms\Components\TextInput::make('importe_sin_iva')
+                                        ->label('Importe sin IVA')
+                                        ->numeric()
+                                        ->suffix('€')
+                                        ->nullable(),
+
+                                    Forms\Components\TextInput::make('cantidad')
+                                        ->label('Cantidad')
+                                        ->numeric()
+                                        ->step(0.01)
+                                        ->nullable(),
+
+                                    Forms\Components\Textarea::make('notas')
+                                        ->label('Notas')
+                                        ->nullable()
+                                        ->columnSpanFull(),
+                                ])
+                                ->columns(2) // Opcional: puedes poner en columnas si quieres ahorrar espacio
+                                ->defaultItems(1) // Opcional: cuántas facturas se muestran por defecto
+                                ->createItemButtonLabel('Añadir factura'),
+                        ]),
+
+                    Tabs\Tab::make('Historial de cambios')
+                        ->schema([
+                            Forms\Components\View::make('filament.resources.referencia-resource.partials.historial-cambios')
+                                ->viewData([
+                                    'logs' => \Spatie\Activitylog\Models\Activity::where('subject_type', \App\Models\Referencia::class)
+                                        ->where('subject_id', $this->record?->id)
+                                        ->latest()
+                                        ->take(20)
+                                        ->get(),
+                                ])
+                                ->columnSpanFull(),
+                        ]),
+
+                ])
                 ->columnSpanFull(),
         ]);
     }

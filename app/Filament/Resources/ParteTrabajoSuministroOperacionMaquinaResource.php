@@ -439,20 +439,20 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                             Action::make('Finalizar')
                                 ->label('Finalizar trabajo')
                                 ->color('danger')
-                                ->extraAttributes(['class' => 'w-full']) // Hace que el botón ocupe todo el ancho disponible
+                                ->extraAttributes(['class' => 'w-full'])
                                 ->visible(
                                     fn($record) =>
-                                    $record &&
-                                    $record->fecha_hora_inicio_trabajo &&
-                                    !$record->fecha_hora_fin_trabajo
+                                    $record
+                                    && $record->fecha_hora_inicio_trabajo
+                                    && !$record->fecha_hora_fin_trabajo
                                 )
                                 ->button()
                                 ->modalHeading('Finalizar trabajo')
                                 ->modalSubmitActionLabel('Finalizar')
                                 ->modalWidth('xl')
                                 ->form(function (Get $get) {
-                                    $tipoHoras = \App\Models\Maquina::find($get('maquina_id'))?->tipo_horas ?? [];
-                                    $tipoConsumos = \App\Models\Maquina::find($get('maquina_id'))?->tipo_consumo ?? [];
+                                    $tipoHoras = Maquina::find($get('maquina_id'))?->tipo_horas ?? [];
+                                    $tipoConsumos = Maquina::find($get('maquina_id'))?->tipo_consumo ?? [];
 
                                     return [
                                         Select::make('tipo_cantidad_producida')

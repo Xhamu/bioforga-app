@@ -177,6 +177,7 @@ class ActivityLogResource extends Resource
                     ->color('gray'),
             ])
             ->paginationPageOptions([50, 100, 200])
+            ->defaultPaginationPageOption(100) 
             ->defaultSort('created_at', 'desc')
             ->headerActions([
                 Action::make('exportar')
