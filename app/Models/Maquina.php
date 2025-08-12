@@ -32,7 +32,8 @@ class Maquina extends Model
         'fabricante',
         'anio_fabricacion',
         'color',
-        'numero_serie'
+        'numero_serie',
+        'matricula'
     ];
 
     protected $casts = [
