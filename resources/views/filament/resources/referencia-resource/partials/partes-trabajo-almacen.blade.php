@@ -11,48 +11,51 @@
             ];
 
             $mapParte = function ($cargas) {
-                $parte   = $cargas->first()->parteTrabajoSuministroTransporte;
+                $parte = $cargas->first()->parteTrabajoSuministroTransporte;
 
-                // Transportista + proveedor_id (si tiene)
+                // Transportista + nombre del proveedor (si tiene)
                 $u = $parte?->usuario;
                 $transportista = trim(($u?->name ?? '') . ' ' . ($u?->apellidos ?? '')) ?: '—';
+
                 if ($u?->proveedor_id) {
-                    $transportista .= ' (Prov. ' . $u->proveedor_id . ')';
+                    $nombreProveedor = $u->proveedor?->razon_social ?? null;
+                    if ($nombreProveedor) {
+                        $transportista .= ' (Prov. ' . $nombreProveedor . ')';
+                    }
                 }
 
                 // Especie (tipo_biomasa puede ser string o array)
                 $especie = $parte?->tipo_biomasa;
                 if (is_array($especie)) {
-                    // Si viene como array asociativo, nos quedamos con valores
                     $especie = collect($especie)->values()->implode(', ');
                 }
                 $especie = $especie ?: '—';
 
                 return (object) [
-                    'inicio'         => $cargas->min('fecha_hora_inicio_carga'),
-                    'fin'            => $cargas->max('fecha_hora_fin_carga'),
+                    'inicio' => $cargas->min('fecha_hora_inicio_carga'),
+                    'fin' => $cargas->max('fecha_hora_fin_carga'),
                     'cantidad_total' => (float) $cargas->sum('cantidad'),
-                    'cliente'        => $parte?->cliente?->razon_social ?? '—',
-                    'referencias'    => $cargas->pluck('referencia.referencia')->filter()->unique()->values(),
-                    'transportista'  => $transportista,
-                    'especie'        => $especie,
+                    'cliente' => $parte?->cliente?->razon_social ?? '—',
+                    'referencias' => $cargas->pluck('referencia.referencia')->filter()->unique()->values(),
+                    'transportista' => $transportista,
+                    'especie' => $especie,
                 ];
             };
-
+            
             // ===== ENTRADAS: desde referencia -> a ESTE almacén (sin cliente) =====
             $entradas = \App\Models\CargaTransporte::with($with)
                 ->whereNull('deleted_at')
-                ->whereHas('parteTrabajoSuministroTransporte', fn ($q) => $q
-                    ->where('almacen_id', $recordId)
-                    ->whereNull('cliente_id') // termina en almacén
+                ->whereHas(
+                    'parteTrabajoSuministroTransporte',
+                    fn($q) => $q->where('almacen_id', $recordId)->whereNull('cliente_id'), // termina en almacén
                 )
                 ->get()
                 ->groupBy('parte_trabajo_suministro_transporte_id')
                 ->filter(function ($cargas) {
                     // Empieza en referencia (al menos una con referencia_id) y NO desde almacén
-                    $tieneRef = $cargas->contains(fn ($c) => filled($c->referencia_id));
-                    $tieneOrigenAlmacen = $cargas->contains(fn ($c) => filled($c->almacen_id));
-                    return $tieneRef && ! $tieneOrigenAlmacen;
+                    $tieneRef = $cargas->contains(fn($c) => filled($c->referencia_id));
+                    $tieneOrigenAlmacen = $cargas->contains(fn($c) => filled($c->almacen_id));
+                    return $tieneRef && !$tieneOrigenAlmacen;
                 })
                 ->map($mapParte)
                 ->values();
@@ -61,8 +64,9 @@
             $salidas = \App\Models\CargaTransporte::with($with)
                 ->whereNull('deleted_at')
                 ->where('almacen_id', $recordId) // origen: este almacén
-                ->whereHas('parteTrabajoSuministroTransporte', fn ($q) => $q
-                    ->whereNotNull('cliente_id') // termina en cliente
+                ->whereHas(
+                    'parteTrabajoSuministroTransporte',
+                    fn($q) => $q->whereNotNull('cliente_id'), // termina en cliente
                 )
                 ->get()
                 ->groupBy('parte_trabajo_suministro_transporte_id')
@@ -70,7 +74,7 @@
                 ->values();
         }
 
-        $fmt = fn ($dt) => optional($dt)?->timezone('Europe/Madrid')->format('d/m/Y H:i');
+        $fmt = fn($dt) => optional($dt)?->timezone('Europe/Madrid')->format('d/m/Y H:i');
     @endphp
 
     <x-slot name="heading">Suministros Transporte</x-slot>
@@ -124,7 +128,8 @@
                     <p><span class="font-semibold">Referencia:</span> {{ $p->referencias->implode(', ') ?: 'N/D' }}</p>
                     <p><span class="font-semibold">Transportista:</span> {{ $p->transportista }}</p>
                     <p><span class="font-semibold">Especie:</span> {{ $p->especie }}</p>
-                    <p><span class="font-semibold">Cantidad:</span> {{ number_format($p->cantidad_total, 2, ',', '.') }} m³</p>
+                    <p><span class="font-semibold">Cantidad:</span>
+                        {{ number_format($p->cantidad_total, 2, ',', '.') }} m³</p>
                 </div>
             @endforeach
         </div>
@@ -178,7 +183,8 @@
                     <p><span class="font-semibold">Fecha:</span> {{ $fmt($p->inicio) }} - {{ $fmt($p->fin) }}</p>
                     <p><span class="font-semibold">Transportista:</span> {{ $p->transportista }}</p>
                     <p><span class="font-semibold">Especie:</span> {{ $p->especie }}</p>
-                    <p><span class="font-semibold">Cantidad:</span> {{ number_format($p->cantidad_total, 2, ',', '.') }} m³</p>
+                    <p><span class="font-semibold">Cantidad:</span>
+                        {{ number_format($p->cantidad_total, 2, ',', '.') }} m³</p>
                     <p><span class="font-semibold">Destino:</span> {{ $p->cliente }}</p>
                 </div>
             @endforeach

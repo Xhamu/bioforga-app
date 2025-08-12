@@ -132,7 +132,7 @@ class AlmacenIntermedioResource extends Resource
                             ->schema([
                                 Forms\Components\View::make('filament.resources.referencia-resource.partials.partes-trabajo-almacen')
                                     ->viewData([
-                                        'recordId' => request()->route('record'), // obtenemos el ID desde la URL
+                                        'recordId' => request()->route('record'),
                                     ])
                                     ->columnSpanFull(),
                             ])
