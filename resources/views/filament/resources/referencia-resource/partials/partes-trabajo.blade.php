@@ -32,7 +32,7 @@
                 <tbody class="divide-y divide-gray-100">
                     @foreach ($partesMaquina as $parte)
                         <tr class="hover:bg-gray-50 cursor-pointer"
-                            onclick="window.location='/partes-trabajo-suministro-operacion-maquina/{{ $parte->id }}/edit'">
+                            onclick="window.location='/partes-trabajo-suministro-operacion-maquina/{{ $parte->id }}'">
 
                             <td class="px-4 py-3 text-gray-800">
                                 <div>
@@ -88,9 +88,15 @@
                 <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
                     <p><span class="font-semibold">Referencia:</span> {{ $parte->referencia->referencia }}</p>
                     <p><span class="font-semibold">Inicio:</span>
-                        {{ $parte->fecha_hora_inicio_trabajo?->format('d/m/Y H:i') }}</p>
+                        {{ $parte->fecha_hora_inicio_trabajo
+                            ? \Carbon\Carbon::parse($parte->fecha_hora_inicio_trabajo)->timezone('Europe/Madrid')->format('d/m/Y H:i')
+                            : '-' }}
+                    </p>
                     <p><span class="font-semibold">Fin:</span>
-                        {{ $parte->fecha_hora_fin_trabajo?->format('d/m/Y H:i') }}</p>
+                        {{ $parte->fecha_hora_fin_trabajo
+                            ? \Carbon\Carbon::parse($parte->fecha_hora_fin_trabajo)->timezone('Europe/Madrid')->format('d/m/Y H:i')
+                            : '-' }}
+                    </p>
                     <p><span class="font-semibold">Máquina:</span>
                         {{ $parte->maquina?->marca . ' ' . $parte->maquina?->modelo ?? 'Sin asignar' }}</p>
                     <p><span class="font-semibold">Tipo de trabajo:</span> {{ ucfirst($parte->tipo_trabajo) ?? 'N/D' }}
@@ -129,7 +135,7 @@
                     @foreach ($partesTransporteAgrupados as $parte)
                         {{-- FILA PRINCIPAL CLICABLE --}}
                         <tr class="bg-gray-100 hover:bg-gray-200 cursor-pointer transition"
-                            onclick="window.location='/partes-trabajo-suministro-transporte/{{ $parte->id }}/edit'">
+                            onclick="window.location='/partes-trabajo-suministro-transporte/{{ $parte->id }}'">
 
                             {{-- Referencia + Cliente --}}
                             <td class="px-4 py-3 font-semibold text-gray-900">
