@@ -212,8 +212,8 @@ class MaquinaResource extends Resource
                     ->toggleable(),
 
                 // Año y nº de serie
-                Tables\Columns\TextColumn::make('anio_fabricacion')
-                    ->label('Año')
+                Tables\Columns\TextColumn::make('matricula')
+                    ->label('Matrícula')
                     ->placeholder('-')
                     ->sortable()
                     ->toggleable(),
