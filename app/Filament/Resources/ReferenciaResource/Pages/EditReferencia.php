@@ -164,6 +164,7 @@ class EditReferencia extends EditRecord
                             Forms\Components\View::make('filament.resources.referencia-resource.partials.mapa-referencias')
                                 ->viewData([
                                     'markers' => Referencia::query()
+                                        ->whereNull('deleted_at')
                                         ->whereNotNull('ubicacion_gps')
                                         ->where('ubicacion_gps', '!=', '')
                                         ->get(['id', 'referencia', 'provincia', 'ayuntamiento', 'ubicacion_gps'])
