@@ -14,7 +14,7 @@
 @push('styles')
     {{-- Leaflet base --}}
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin>
-    {{-- MarkerCluster (para rendimiento con muchos puntos) --}}
+    {{-- MarkerCluster --}}
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
 @endpush
@@ -31,14 +31,12 @@
             const el = document.getElementById('referencias-map');
             if (!el || !Array.isArray(puntos) || puntos.length === 0) return;
 
-            // Evita doble inicialización en rehidratados
             if (el.dataset.inited === '1') return;
             el.dataset.inited = '1';
 
             const map = L.map(el, {
                 zoomControl: true,
                 scrollWheelZoom: true,
-                preferCanvas: true, // mejora el rendimiento al mover/zoom
             });
 
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -49,22 +47,32 @@
                 keepBuffer: 1,
             }).addTo(map);
 
-            // Clustering con carga troceada para UI fluida
+            // MarkerCluster con chunked loading para rendimiento
             const cluster = L.markerClusterGroup({
                 chunkedLoading: true,
+                chunkDelay: 16,
+                chunkInterval: 200,
                 disableClusteringAtZoom: 16,
                 spiderfyOnEveryZoom: false,
+                showCoverageOnHover: false,
             });
 
-            // Crea marcadores (DOM). Si quieres aún más rendimiento, cambia a circleMarker.
+            // Añadimos markers normales con popup ya enlazado
             puntos.forEach(p => {
-                const m = L.marker([p.lat, p.lng])
-                    .bindPopup(
-                        `<div style="min-width:220px">
-                            <div style="font-weight:600; margin-bottom:6px;">${p.titulo}</div>
-                            <a href="${p.url}" class="text-primary-600 underline" target="_self">Abrir referencia</a>
-                        </div>`
-                    );
+                const popupHtml = `
+                    <div style="min-width:220px">
+                        <div style="font-weight:600; margin-bottom:6px;">${p.titulo}</div>
+                        <a href="${p.url}" class="text-primary-600 underline" target="_self" rel="noopener">Abrir referencia</a>
+                    </div>
+                `;
+                const m = L.marker([p.lat, p.lng]).bindPopup(popupHtml, {
+                    autoPanPaddingTopLeft: [12, 12]
+                });
+                // Evita que el click en el enlace burbujee al cluster
+                m.on('popupopen', (e) => {
+                    const a = e.popup.getElement()?.querySelector('a');
+                    if (a) a.addEventListener('click', ev => ev.stopPropagation());
+                });
                 cluster.addLayer(m);
             });
 
@@ -78,11 +86,9 @@
                 });
             }
 
-            // Si el mapa se monta dentro de un tab oculto, re-calc dimensiones
             setTimeout(() => map.invalidateSize(), 80);
         };
 
-        // Inicializa en cargas y navegaciones Livewire v3
         document.addEventListener('DOMContentLoaded', window.initRefMap);
         document.addEventListener('livewire:navigated', window.initRefMap);
     </script>

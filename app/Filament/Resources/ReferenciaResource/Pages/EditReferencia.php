@@ -10,6 +10,7 @@ use Filament\Resources\Pages\EditRecord;
 use Filament\Forms;
 use Filament\Forms\Components\Tabs;
 use App\Filament\Resources\ReferenciaResource as RefRes;
+use Illuminate\Support\Facades\Auth;
 
 
 class EditReferencia extends EditRecord
@@ -159,12 +160,12 @@ class EditReferencia extends EditRecord
 
 
                     Tabs\Tab::make('Mapa')
-                        ->visible(fn() => auth()->user()?->hasRole('superadmin'))
+                        ->visible(fn() => Auth::user()?->hasRole('superadmin')) // solo superadmin
                         ->schema([
                             Forms\Components\View::make('filament.resources.referencia-resource.partials.mapa-referencias')
                                 ->viewData([
                                     'markers' => Referencia::query()
-                                        ->whereNull('deleted_at')
+                                        ->withoutTrashed()                       // excluir soft-deleted
                                         ->whereNotNull('ubicacion_gps')
                                         ->where('ubicacion_gps', '!=', '')
                                         ->get(['id', 'referencia', 'provincia', 'ayuntamiento', 'ubicacion_gps'])
@@ -190,7 +191,7 @@ class EditReferencia extends EditRecord
                                                 'url' => RefRes::getUrl('edit', ['record' => $ref->id]),
                                             ];
                                         })
-                                        ->filter()
+                                        ->filter()  // elimina nulls del map()
                                         ->values(),
                                 ])
                                 ->columnSpanFull(),
