@@ -165,24 +165,56 @@ class EditReferencia extends EditRecord
                             Forms\Components\View::make('filament.resources.referencia-resource.partials.mapa-referencias')
                                 ->viewData([
                                     'markers' => Referencia::query()
-                                        ->withoutTrashed()                       // excluir soft-deleted
+                                        ->withoutTrashed()
                                         ->whereNotNull('ubicacion_gps')
                                         ->where('ubicacion_gps', '!=', '')
-                                        ->get(['id', 'referencia', 'provincia', 'ayuntamiento', 'ubicacion_gps'])
+                                        ->select('id', 'referencia', 'provincia', 'ayuntamiento', 'ubicacion_gps')
+                                        ->get()
                                         ->map(function ($ref) {
                                             $raw = trim((string) $ref->ubicacion_gps);
                                             $raw = str_replace([';', '|'], ',', $raw);
                                             $raw = preg_replace('/\s+/', ' ', $raw);
-                                            $raw = str_replace(' ', ',', $raw);
-                                            $parts = array_values(array_filter(explode(',', $raw), fn($v) => $v !== ''));
 
-                                            if (count($parts) < 2)
-                                                return null;
+                                            // Separar por coma y limpiar
+                                            $parts = array_values(array_filter(explode(',', $raw), fn($v) => trim($v) !== ''));
 
-                                            $lat = (float) str_replace(',', '.', $parts[0]);
-                                            $lng = (float) str_replace(',', '.', $parts[1]);
-                                            if ($lat === 0 || $lng === 0)
+                                            // Si hay más de 2 partes y parecen números partidos por coma decimal
+                                            if (count($parts) > 2 && preg_match('/^-?\d+$/', trim($parts[0])) && preg_match('/^\d+$/', trim($parts[1]))) {
+                                                $parts = [
+                                                    $parts[0] . '.' . $parts[1],
+                                                    $parts[2] . (isset($parts[3]) ? '.' . $parts[3] : '')
+                                                ];
+                                            }
+
+                                            if (count($parts) < 2) {
                                                 return null;
+                                            }
+
+                                            $convert = function ($coord) {
+                                                $coord = trim($coord);
+                                                // DMS → Decimal
+                                                if (preg_match('/(\d+)°(\d+)\'([\d.]+)"?([NSEW])?/i', $coord, $m)) {
+                                                    $deg = (float) $m[1];
+                                                    $min = (float) $m[2];
+                                                    $sec = (float) $m[3];
+                                                    $dir = strtoupper($m[4] ?? 'N');
+                                                    $decimal = $deg + ($min / 60) + ($sec / 3600);
+                                                    if (in_array($dir, ['S', 'W'])) {
+                                                        $decimal *= -1;
+                                                    }
+                                                    return $decimal;
+                                                }
+                                                // Decimal con coma
+                                                $coord = str_replace(',', '.', $coord);
+                                                return (float) $coord;
+                                            };
+
+                                            $lat = $convert($parts[0]);
+                                            $lng = $convert($parts[1]);
+
+                                            if ($lat === 0 || $lng === 0 || abs($lat) > 90 || abs($lng) > 180) {
+                                                return null;
+                                            }
 
                                             return [
                                                 'lat' => $lat,
@@ -191,8 +223,8 @@ class EditReferencia extends EditRecord
                                                 'url' => RefRes::getUrl('edit', ['record' => $ref->id]),
                                             ];
                                         })
-                                        ->filter()  // elimina nulls del map()
-                                        ->values(),
+                                        ->filter()
+                                        ->values()
                                 ])
                                 ->columnSpanFull(),
                         ]),
