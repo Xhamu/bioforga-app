@@ -164,6 +164,7 @@ class EditReferencia extends EditRecord
                         ->schema([
                             Forms\Components\View::make('filament.resources.referencia-resource.partials.mapa-referencias')
                                 ->viewData([
+                                    'referenciaActualId' => $this->record->getKey(),
                                     'markers' => Referencia::query()
                                         ->withoutTrashed()
                                         ->whereNotNull('ubicacion_gps')

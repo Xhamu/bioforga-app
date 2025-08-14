@@ -28,9 +28,10 @@
     <script>
         window.initRefMap = function() {
             const puntos = @json($markers);
+            const refActualId = @json($referenciaActualId ?? null); // El ID de la referencia en la que estás
+
             const el = document.getElementById('referencias-map');
             if (!el || !Array.isArray(puntos) || puntos.length === 0) return;
-
             if (el.dataset.inited === '1') return;
             el.dataset.inited = '1';
 
@@ -42,12 +43,8 @@
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 maxZoom: 19,
                 attribution: '&copy; OpenStreetMap contributors',
-                updateWhenIdle: true,
-                updateWhenZooming: false,
-                keepBuffer: 1,
             }).addTo(map);
 
-            // MarkerCluster con chunked loading para rendimiento
             const cluster = L.markerClusterGroup({
                 chunkedLoading: true,
                 chunkDelay: 16,
@@ -57,33 +54,56 @@
                 showCoverageOnHover: false,
             });
 
-            // Añadimos markers normales con popup ya enlazado
+            // Icono por defecto (azul)
+            const iconDefault = new L.Icon({
+                iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+                shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+                iconSize: [25, 41],
+                iconAnchor: [12, 41],
+                popupAnchor: [1, -34],
+                shadowSize: [41, 41]
+            });
+
+            // Icono resaltado (rojo)
+            const iconResaltado = new L.Icon({
+                iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
+                shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+                iconSize: [25, 41],
+                iconAnchor: [12, 41],
+                popupAnchor: [1, -34],
+                shadowSize: [41, 41]
+            });
+
             puntos.forEach(p => {
                 const popupHtml = `
-                    <div style="min-width:220px">
-                        <div style="font-weight:600; margin-bottom:6px;">${p.titulo}</div>
-                        <a href="${p.url}" class="text-primary-600 underline" target="_self" rel="noopener">Abrir referencia</a>
-                    </div>
-                `;
-                const m = L.marker([p.lat, p.lng]).bindPopup(popupHtml, {
+                <div style="min-width:220px">
+                    <div style="font-weight:600; margin-bottom:6px;">${p.titulo}</div>
+                    <a href="${p.url}" class="text-primary-600 underline" target="_self" rel="noopener">Abrir referencia</a>
+                </div>
+            `;
+                const m = L.marker([p.lat, p.lng], {
+                    icon: (p.id === refActualId) ? iconResaltado : iconDefault
+                }).bindPopup(popupHtml, {
                     autoPanPaddingTopLeft: [12, 12]
                 });
-                // Evita que el click en el enlace burbujee al cluster
-                m.on('popupopen', (e) => {
+
+                m.on('popupopen', e => {
                     const a = e.popup.getElement()?.querySelector('a');
                     if (a) a.addEventListener('click', ev => ev.stopPropagation());
                 });
+
                 cluster.addLayer(m);
             });
 
             cluster.addTo(map);
 
             if (puntos.length === 1) {
-                map.setView([puntos[0].lat, puntos[0].lng], 14);
+                map.setView([puntos[0].lat, puntos[0].lng], 10);
             } else {
                 map.fitBounds(cluster.getBounds(), {
                     padding: [24, 24]
                 });
+                if (map.getZoom() > 6) map.setZoom(6);
             }
 
             setTimeout(() => map.invalidateSize(), 80);
