@@ -3,11 +3,14 @@
 namespace App\Filament\Resources\ReferenciaResource\Pages;
 
 use App\Filament\Resources\ReferenciaResource;
+use App\Models\Referencia;
 use Filament\Actions;
 use Filament\Forms\Components\Repeater;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Forms;
 use Filament\Forms\Components\Tabs;
+use App\Filament\Resources\ReferenciaResource as RefRes;
+
 
 class EditReferencia extends EditRecord
 {
@@ -154,6 +157,43 @@ class EditReferencia extends EditRecord
                                 ->columnSpanFull(),
                         ]),
 
+
+                    Tabs\Tab::make('Mapa')
+                        ->visible(fn() => auth()->user()?->hasRole('superadmin'))
+                        ->schema([
+                            Forms\Components\View::make('filament.resources.referencia-resource.partials.mapa-referencias')
+                                ->viewData([
+                                    'markers' => Referencia::query()
+                                        ->whereNotNull('ubicacion_gps')
+                                        ->where('ubicacion_gps', '!=', '')
+                                        ->get(['id', 'referencia', 'provincia', 'ayuntamiento', 'ubicacion_gps'])
+                                        ->map(function ($ref) {
+                                            $raw = trim((string) $ref->ubicacion_gps);
+                                            $raw = str_replace([';', '|'], ',', $raw);
+                                            $raw = preg_replace('/\s+/', ' ', $raw);
+                                            $raw = str_replace(' ', ',', $raw);
+                                            $parts = array_values(array_filter(explode(',', $raw), fn($v) => $v !== ''));
+
+                                            if (count($parts) < 2)
+                                                return null;
+
+                                            $lat = (float) str_replace(',', '.', $parts[0]);
+                                            $lng = (float) str_replace(',', '.', $parts[1]);
+                                            if ($lat === 0 || $lng === 0)
+                                                return null;
+
+                                            return [
+                                                'lat' => $lat,
+                                                'lng' => $lng,
+                                                'titulo' => "{$ref->referencia} — {$ref->ayuntamiento}, {$ref->provincia}",
+                                                'url' => RefRes::getUrl('edit', ['record' => $ref->id]),
+                                            ];
+                                        })
+                                        ->filter()
+                                        ->values(),
+                                ])
+                                ->columnSpanFull(),
+                        ]),
                 ])
                 ->columnSpanFull(),
         ]);
