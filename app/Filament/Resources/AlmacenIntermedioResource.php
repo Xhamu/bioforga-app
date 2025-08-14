@@ -135,7 +135,17 @@ class AlmacenIntermedioResource extends Resource
                                         'recordId' => request()->route('record'),
                                     ])
                                     ->columnSpanFull(),
-                            ])
+                            ]),
+
+                        Forms\Components\Tabs\Tab::make('Stock')
+                            ->schema([
+                                Forms\Components\View::make('filament.resources.referencia-resource.partials.stock-almacen')
+                                    ->viewData([
+                                        'recordId' => request()->route('record'),
+                                    ])
+                                    ->columnSpanFull(),
+                            ]),
+
                     ]),
             ]);
     }

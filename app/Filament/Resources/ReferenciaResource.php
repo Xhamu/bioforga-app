@@ -6,7 +6,9 @@ use App\Filament\Resources\ReferenciaResource\Pages;
 use App\Filament\Resources\ReferenciaResource\Pages\ListReferencias;
 use App\Filament\Resources\ReferenciaResource\RelationManagers;
 use App\Models\Cliente;
+use App\Models\Poblacion;
 use App\Models\Proveedor;
+use App\Models\Provincia;
 use App\Models\Referencia;
 use App\Models\User;
 use Filament\Forms;
@@ -133,7 +135,7 @@ class ReferenciaResource extends Resource
                     ->reactive()
                     ->columnSpanFull()
                     ->afterStateHydrated(function (callable $set, $state, ?\App\Models\Referencia $record) {
-                        $ref = (string)($state ?: ($record->referencia ?? ''));
+                        $ref = (string) ($state ?: ($record->referencia ?? ''));
                         if (preg_match('/(\d{6})/', $ref, $m)) {
                             $set('ref_fecha_fija', $m[1]); // ej: 110725
                         } else {
@@ -423,7 +425,22 @@ class ReferenciaResource extends Resource
 
         if ($agent->isMobile()) {
             return $table
+                ->modifyQueryUsing(fn($query) => $query->withCount('usuarios'))
                 ->columns([
+                    Tables\Columns\IconColumn::make('tiene_usuarios')
+                        ->label('')
+                        ->alignCenter()
+                        ->state(fn($record) => ($record->usuarios_count ?? 0) > 0)
+                        ->boolean()
+                        ->trueIcon('heroicon-m-user-group')
+                        ->falseIcon('heroicon-m-user')
+                        ->color(fn(bool $state) => $state ? 'success' : 'gray')
+                        ->tooltip(
+                            fn($record) => ($record->usuarios_count ?? 0) > 0
+                            ? "{$record->usuarios_count} usuario(s) vinculados"
+                            : 'Sin usuarios vinculados'
+                        ),
+
                     TextColumn::make('referencia')
                         ->label('Referencia')
                         ->weight(FontWeight::Bold)
@@ -656,6 +673,68 @@ class ReferenciaResource extends Resource
                                 return $query;
                             })
                             ->placeholder('Todos'),
+
+                        SelectFilter::make('provincia_id')
+                            ->label('Provincia')
+                            ->multiple()
+                            ->searchable()
+                            ->placeholder('Todas')
+                            ->options(
+                                fn() =>
+                                Provincia::query()
+                                    ->whereNull('deleted_at') // por SoftDeletes
+                                    ->orderBy('nombre')
+                                    ->pluck('nombre', 'id')
+                                    ->toArray()
+                            )
+                            ->query(function ($query, array $data) {
+                                if (!empty($data['values'])) {
+                                    $query->whereIn('provincia_id', $data['values']);
+                                }
+                                return $query;
+                            })
+                            ->indicateUsing(function (array $data) {
+                                if (empty($data['values']))
+                                    return null;
+                                $n = count($data['values']);
+                                if ($n === 1) {
+                                    $nombre = Provincia::withTrashed()->find($data['values'][0])?->nombre;
+                                    return $nombre ? "Provincia: {$nombre}" : '1 provincia';
+                                }
+                                return "{$n} provincias";
+                            }),
+
+                        SelectFilter::make('poblacion_id')
+                            ->label('Municipio')
+                            ->multiple()
+                            ->searchable()
+                            ->placeholder('Todos')
+                            ->options(function () {
+                                // lee lo seleccionado en el filtro de provincia
+                                $provinciasSeleccionadas = request()->input('tableFilters.provincia_id.values', []);
+
+                                $q = Poblacion::query()
+                                    ->whereNull('deleted_at') // por SoftDeletes
+                                    ->orderBy('nombre');
+
+                                if (!empty($provinciasSeleccionadas)) {
+                                    $q->whereIn('provincia_id', $provinciasSeleccionadas);
+                                }
+
+                                return $q->pluck('nombre', 'id')->toArray();
+                            })
+                            ->query(function ($query, array $data) {
+                                if (!empty($data['values'])) {
+                                    $query->whereIn('poblacion_id', $data['values']);
+                                }
+                                return $query;
+                            })
+                            ->indicateUsing(function (array $data) {
+                                if (empty($data['values']))
+                                    return null;
+                                $n = count($data['values']);
+                                return $n === 1 ? '1 municipio' : "{$n} municipios";
+                            }),
                     ],
                     layout: FiltersLayout::AboveContent
                 )
@@ -756,7 +835,22 @@ class ReferenciaResource extends Resource
                 ->defaultSort('created_at', 'desc');
         } else {
             return $table
+                ->modifyQueryUsing(fn($query) => $query->withCount('usuarios'))
                 ->columns([
+                    Tables\Columns\IconColumn::make('tiene_usuarios')
+                        ->label('')
+                        ->alignCenter()
+                        ->state(fn($record) => ($record->usuarios_count ?? 0) > 0)
+                        ->boolean()
+                        ->trueIcon('heroicon-m-user-group')
+                        ->falseIcon('heroicon-m-user')
+                        ->color(fn(bool $state) => $state ? 'success' : 'gray')
+                        ->tooltip(
+                            fn($record) => ($record->usuarios_count ?? 0) > 0
+                            ? "{$record->usuarios_count} usuario(s) vinculados"
+                            : 'Sin usuarios vinculados'
+                        ),
+
                     TextColumn::make('referencia')
                         ->label('Referencia')
                         ->weight(FontWeight::Bold)
@@ -1012,6 +1106,67 @@ class ReferenciaResource extends Resource
                                 return $query;
                             })
                             ->placeholder('Todos'),
+
+                        SelectFilter::make('provincia')
+                            ->label('Provincia')
+                            ->multiple()
+                            ->searchable()
+                            ->placeholder('Todas')
+                            ->options(
+                                fn() =>
+                                Referencia::query()
+                                    ->whereNotNull('provincia')
+                                    ->distinct()
+                                    ->orderBy('provincia')
+                                    ->pluck('provincia', 'provincia')
+                                    ->toArray()
+                            )
+                            ->query(function ($query, array $data) {
+                                if (!empty($data['values'])) {
+                                    $query->whereIn('provincia', $data['values']);
+                                }
+                                return $query;
+                            })
+                            ->indicateUsing(function (array $data) {
+                                if (empty($data['values']))
+                                    return null;
+                                $n = count($data['values']);
+                                return $n === 1 ? "Provincia: {$data['values'][0]}" : "{$n} provincias";
+                            }),
+
+                        SelectFilter::make('ayuntamiento')
+                            ->label('Municipio')
+                            ->multiple()
+                            ->searchable()
+                            ->placeholder('Todos')
+                            ->options(function () {
+                                // Provincias seleccionadas en el otro filtro
+                                $provSel = request()->input('tableFilters.provincia.values', []);
+
+                                $q = Referencia::query()
+                                    ->whereNotNull('ayuntamiento');
+
+                                if (!empty($provSel)) {
+                                    $q->whereIn('provincia', $provSel);
+                                }
+
+                                return $q->distinct()
+                                    ->orderBy('ayuntamiento')
+                                    ->pluck('ayuntamiento', 'ayuntamiento')
+                                    ->toArray();
+                            })
+                            ->query(function ($query, array $data) {
+                                if (!empty($data['values'])) {
+                                    $query->whereIn('ayuntamiento', $data['values']);
+                                }
+                                return $query;
+                            })
+                            ->indicateUsing(function (array $data) {
+                                if (empty($data['values']))
+                                    return null;
+                                $n = count($data['values']);
+                                return $n === 1 ? "Municipio: {$data['values'][0]}" : "{$n} municipios";
+                            }),
                     ],
                     layout: FiltersLayout::AboveContent
                 )
@@ -1160,7 +1315,7 @@ class ReferenciaResource extends Resource
                 ->reactive()
                 ->columnSpanFull()
                 ->afterStateHydrated(function (callable $set, $state, ?\App\Models\Referencia $record) {
-                    $ref = (string)($state ?: ($record->referencia ?? ''));
+                    $ref = (string) ($state ?: ($record->referencia ?? ''));
                     if (preg_match('/(\d{6})/', $ref, $m)) {
                         $set('ref_fecha_fija', $m[1]);
                     } else {
