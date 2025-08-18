@@ -182,7 +182,6 @@ class EditReferencia extends EditRecord
 
 
                     Tabs\Tab::make('Mapa')
-                        ->visible(fn() => Auth::user()?->hasRole('superadmin')) // solo superadmin
                         ->schema([
                             Forms\Components\View::make('filament.resources.referencia-resource.partials.mapa-referencias')
                                 ->viewData([
@@ -240,6 +239,7 @@ class EditReferencia extends EditRecord
                                             }
 
                                             return [
+                                                'id' => (int) $ref->id,
                                                 'lat' => $lat,
                                                 'lng' => $lng,
                                                 'titulo' => "{$ref->referencia} — {$ref->ayuntamiento}, {$ref->provincia}",
