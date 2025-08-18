@@ -28,7 +28,7 @@
     <script>
         window.initRefMap = function() {
             const puntos = @json($markers);
-            const refActualId = @json($referenciaActualId ?? null); // El ID de la referencia en la que estás
+            const refActualId = @json($referenciaActualId ?? null);
 
             const el = document.getElementById('referencias-map');
             if (!el || !Array.isArray(puntos) || puntos.length === 0) return;
@@ -37,7 +37,7 @@
 
             const map = L.map(el, {
                 zoomControl: true,
-                scrollWheelZoom: true,
+                scrollWheelZoom: true
             });
 
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -54,42 +54,47 @@
                 showCoverageOnHover: false,
             });
 
-            // Icono por defecto (azul)
             const iconDefault = new L.Icon({
                 iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
                 shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
                 iconSize: [25, 41],
                 iconAnchor: [12, 41],
                 popupAnchor: [1, -34],
-                shadowSize: [41, 41]
+                shadowSize: [41, 41],
             });
 
-            // Icono resaltado (rojo)
             const iconResaltado = new L.Icon({
                 iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
                 shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
                 iconSize: [25, 41],
                 iconAnchor: [12, 41],
                 popupAnchor: [1, -34],
-                shadowSize: [41, 41]
+                shadowSize: [41, 41],
             });
 
-            puntos.forEach(p => {
+            // 👇 Normaliza tipos para evitar fallo número vs string
+            const refActualIdNorm = refActualId == null ? null : String(refActualId);
+
+            puntos.forEach((p) => {
+                const isActual = refActualIdNorm !== null && String(p.id) === refActualIdNorm;
+
                 const popupHtml = `
-                <div style="min-width:220px">
-                    <div style="font-weight:600; margin-bottom:6px;">${p.titulo}</div>
-                    <a href="${p.url}" class="text-primary-600 underline" target="_self" rel="noopener">Abrir referencia</a>
-                </div>
-            `;
+      <div style="min-width:220px">
+        <div style="font-weight:600; margin-bottom:6px;">${p.titulo}</div>
+        <a href="${p.url}" class="text-primary-600 underline" target="_self" rel="noopener">Abrir referencia</a>
+      </div>
+    `;
+
                 const m = L.marker([p.lat, p.lng], {
-                    icon: (p.id === refActualId) ? iconResaltado : iconDefault
+                    icon: isActual ? iconResaltado : iconDefault,
+                    zIndexOffset: isActual ? 1000 : 0, // que quede por encima
                 }).bindPopup(popupHtml, {
                     autoPanPaddingTopLeft: [12, 12]
                 });
 
-                m.on('popupopen', e => {
+                m.on('popupopen', (e) => {
                     const a = e.popup.getElement()?.querySelector('a');
-                    if (a) a.addEventListener('click', ev => ev.stopPropagation());
+                    if (a) a.addEventListener('click', (ev) => ev.stopPropagation());
                 });
 
                 cluster.addLayer(m);
@@ -97,19 +102,32 @@
 
             cluster.addTo(map);
 
-            if (puntos.length === 1) {
-                map.setView([puntos[0].lat, puntos[0].lng], 10);
+            if (refActualIdNorm) {
+                const actual = puntos.find(p => String(p.id) === refActualIdNorm);
+                if (actual) {
+                    map.setView([actual.lat, actual.lng], 12);
+                } else {
+                    if (puntos.length === 1) {
+                        map.setView([puntos[0].lat, puntos[0].lng], 10);
+                    } else {
+                        map.fitBounds(cluster.getBounds(), {
+                            padding: [24, 24]
+                        });
+                        if (map.getZoom() > 6) map.setZoom(6);
+                    }
+                }
             } else {
-                map.fitBounds(cluster.getBounds(), {
-                    padding: [24, 24]
-                });
-                if (map.getZoom() > 6) map.setZoom(6);
+                if (puntos.length === 1) {
+                    map.setView([puntos[0].lat, puntos[0].lng], 10);
+                } else {
+                    map.fitBounds(cluster.getBounds(), {
+                        padding: [24, 24]
+                    });
+                    if (map.getZoom() > 6) map.setZoom(6);
+                }
             }
 
             setTimeout(() => map.invalidateSize(), 80);
         };
-
-        document.addEventListener('DOMContentLoaded', window.initRefMap);
-        document.addEventListener('livewire:navigated', window.initRefMap);
     </script>
 @endpush
