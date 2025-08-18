@@ -117,11 +117,6 @@
     @else
         {{-- VISTA ESCRITORIO --}}
         <div class="hidden md:block overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
-            @php
-                $totalCantidad = $partesTransporteAgrupados->sum(fn($parte) => (float) $parte->cantidad_total);
-                $totalPeso = $partesTransporteAgrupados->sum(fn($parte) => (float) $parte->peso_neto);
-            @endphp
-
             <table class="w-full text-sm">
                 <thead class="bg-gray-50">
                     <tr>
@@ -158,11 +153,10 @@
                             </td>
 
                             {{-- Cantidad total --}}
-                            <td class="px-4 py-3 text-gray-800">{{ $parte->cantidad_total }}</td>
+                            <td class="px-4 py-3 text-gray-800">{{ $parte->cantidad_total }} m³</td>
 
-                            {{-- Peso neto --}}
                             <td class="px-4 py-2 text-sm text-gray-600">
-                                {{ $carga->peso_neto_proporcional }} Tn
+                                {{ $parte->peso_neto_ref !== null ? number_format($parte->peso_neto_ref, 2) . ' Tn' : '—' }}
                             </td>
                         </tr>
 
@@ -184,7 +178,7 @@
                                         </span>
                                     </div>
                                 </td>
-                                <td class="px-4 py-2 text-sm text-gray-600">{{ $carga->cantidad ?? 'N/D' }}</td>
+                                <td class="px-4 py-2 text-sm text-gray-600">{{ $carga->cantidad ?? 'N/D' }} m³</td>
                                 <td></td>
                             </tr>
                         @endforeach
@@ -197,11 +191,15 @@
                         </tr>
                     @endforeach
                 </tbody>
+                @php
+                    $totalCantidad = $partesTransporteAgrupados->sum(fn($parte) => (float) $parte->cantidad_total);
+                    $totalPeso = $partesTransporteAgrupados->sum(fn($parte) => (float) ($parte->peso_neto_ref ?? 0));
+                @endphp
                 <tfoot class="bg-gray-100 font-semibold">
                     <tr>
                         <td colspan="2" class="px-4 py-3 text-right text-gray-700"></td>
                         <td class="px-4 py-3 text-gray-900">{{ $totalCantidad }} m³</td>
-                        <td class="px-4 py-3 text-gray-900">{{ $totalPeso }} Tn</td>
+                        <td class="px-4 py-3 text-gray-900">{{ number_format($totalPeso, 2) }} Tn</td>
                     </tr>
                 </tfoot>
             </table>

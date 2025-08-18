@@ -23,17 +23,6 @@ class CargaTransporte extends Model
         'fecha_hora_fin_carga' => 'datetime',
     ];
 
-    public function getPesoNetoProporcionalAttribute(): ?float
-    {
-        $parte = $this->parteTrabajoSuministroTransporte;
-
-        if (!$parte || !$parte->peso_neto || !$parte->cantidad_total) {
-            return null;
-        }
-
-        return round(($this->cantidad / $parte->cantidad_total) * $parte->peso_neto, 2);
-    }
-
     public function getReferenciaCompletaAttribute(): ?string
     {
         if ($this->referencia) {

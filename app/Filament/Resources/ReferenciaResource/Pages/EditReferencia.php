@@ -46,25 +46,47 @@ class EditReferencia extends EditRecord
                                     'partesTransporteAgrupados' => \App\Models\CargaTransporte::with([
                                         'parteTrabajoSuministroTransporte.cliente',
                                         'parteTrabajoSuministroTransporte.almacen',
+                                        // 👇 importante: trae TODAS las cargas del parte para poder prorratear
+                                        'parteTrabajoSuministroTransporte.cargas',
                                         'referencia',
                                     ])
-                                        ->where('referencia_id', $this->record?->id)
+                                        ->where('referencia_id', $this->record?->id) // solo cargas de ESTA referencia
                                         ->whereNull('deleted_at')
                                         ->get()
                                         ->groupBy('parte_trabajo_suministro_transporte_id')
-                                        ->map(function ($cargas) {
-                                            $parte = $cargas->first()->parteTrabajoSuministroTransporte;
+                                        ->map(function ($cargasDeEstaRef) {
+                                            $parte = $cargasDeEstaRef->first()->parteTrabajoSuministroTransporte;
+
+                                            // m³ de esta referencia dentro del parte (ya filtrado arriba a esta ref)
+                                            $m3DeEstaRef = (float) $cargasDeEstaRef->sum('cantidad');
+
+                                            // m³ totales del parte (todas sus cargas, cualquiera que sea la referencia)
+                                            $totalM3Parte = (float) ($parte?->cargas?->sum('cantidad') ?? 0);
+
+                                            // peso total del parte
+                                            $pesoNetoParte = is_null($parte?->peso_neto) ? null : (float) $parte->peso_neto;
+
+                                            // Regla de 3: peso proporcional de ESTA referencia en este parte
+                                            $pesoNetoRef = null;
+                                            if ($pesoNetoParte !== null) {
+                                                if ($totalM3Parte > 0) {
+                                                    $pesoNetoRef = ($m3DeEstaRef / $totalM3Parte) * $pesoNetoParte;
+                                                } else {
+                                                    // Si por lo que sea no hay total m³, mostramos el total del parte
+                                                    $pesoNetoRef = $pesoNetoParte;
+                                                }
+                                            }
 
                                             return (object) [
                                                 'id' => $parte?->id,
-                                                'referencias' => $cargas->pluck('referencia.referencia')->filter()->unique()->values(),
+                                                'referencias' => $cargasDeEstaRef->pluck('referencia.referencia')->filter()->unique()->values(),
                                                 'cliente' => $parte?->cliente?->razon_social ?? null,
                                                 'almacen' => $parte?->almacen?->referencia ?? null,
-                                                'inicio' => $cargas->min('fecha_hora_inicio_carga'),
-                                                'fin' => $cargas->max('fecha_hora_fin_carga'),
-                                                'cantidad_total' => $cargas->sum('cantidad'),
-                                                'cargas' => $cargas,
-                                                'peso_neto' => $parte->peso_neto ?? '-',
+                                                'inicio' => $cargasDeEstaRef->min('fecha_hora_inicio_carga'),
+                                                'fin' => $cargasDeEstaRef->max('fecha_hora_fin_carga'),
+                                                'cantidad_total' => $m3DeEstaRef,               // m³ de ESTA referencia en el parte
+                                                'cargas' => $cargasDeEstaRef,
+                                                'peso_neto_ref' => $pesoNetoRef,               // 👈 ya prorrateado
                                             ];
                                         })
                                         ->values(),
