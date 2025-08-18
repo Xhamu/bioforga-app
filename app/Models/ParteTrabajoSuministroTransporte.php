@@ -143,6 +143,34 @@ class ParteTrabajoSuministroTransporte extends Model
         return "{$usuarioProveedor}<br><span>{$camion}</span>";
     }
 
+    // App\Models\ParteTrabajoSuministroTransporte.php
+
+    public function pesoNetoParaReferencia(?int $referenciaId): ?float
+    {
+        if (!$referenciaId) {
+            return $this->peso_neto; // por si acaso
+        }
+
+        // Asegúrate de tener las cargas cargadas para evitar N+1
+        $cargas = $this->relationLoaded('cargas') ? $this->cargas : $this->cargas()->get();
+
+        $totalM3Parte = (float) $cargas->sum('cantidad');
+        if ($totalM3Parte <= 0 || !$this->peso_neto) {
+            // Si no hay m3 registrados o no hay peso_neto en el parte, devolvemos el total tal cual o null
+            return $this->peso_neto ?: null;
+        }
+
+        $m3DeEstaRef = (float) $cargas->where('referencia_id', $referenciaId)->sum('cantidad');
+
+        // Si todas las cargas son de esta referencia o sólo hay una carga, devuelve el total
+        if ($m3DeEstaRef <= 0) {
+            return 0.0; // No hay cargas de esta referencia
+        }
+
+        // Regla de tres
+        return ($m3DeEstaRef / $totalM3Parte) * (float) $this->peso_neto;
+    }
+
     public function usuario()
     {
         return $this->belongsTo(User::class, 'usuario_id');
