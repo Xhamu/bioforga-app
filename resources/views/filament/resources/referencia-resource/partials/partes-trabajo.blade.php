@@ -161,7 +161,9 @@
                             <td class="px-4 py-3 text-gray-800">{{ $parte->cantidad_total }}</td>
 
                             {{-- Peso neto --}}
-                            <td class="px-4 py-3 text-gray-800">{{ $parte->peso_neto }}</td>
+                            <td class="px-4 py-2 text-sm text-gray-600">
+                                {{ $carga->peso_neto_proporcional }} Tn
+                            </td>
                         </tr>
 
                         {{-- Subregistros de cargas (no clicables) --}}
