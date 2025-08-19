@@ -5,7 +5,7 @@
     "display": "standalone",
     "background_color": "#ffffff",
     "theme_color": "#13a814",
-    "orientation": "any",
+    "orientation": "natural",
     "icons": [
         {
             "src": "/favicons/web-app-manifest-192x192.png",

@@ -8,6 +8,7 @@ use App\Models\Maquina;
 use App\Models\ParteTrabajoSuministroOperacionMaquina;
 use App\Models\Referencia;
 use App\Models\User;
+use Arr;
 use Carbon\Carbon;
 use Filament\Forms\Components\Actions\Action;
 use Filament\Facades\Filament;
@@ -904,10 +905,17 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
         }
 
         // Técnicos solo ven partes de referencias de su sector
-        if ($user->hasRole('técnico') && $user->sector) {
-            $query->whereHas('referencia', function (Builder $q) use ($user) {
-                $q->where('sector', $user->sector);
-            });
+        if ($user->hasRole('técnico')) {
+            $sectores = array_filter(Arr::wrap($user->sector ?? []));
+
+            if (!empty($sectores)) {
+                $query->whereHas('referencia', function (Builder $q) use ($sectores) {
+                    $q->whereIn('sector', $sectores);
+                });
+            } else {
+                // opcional: no mostrar nada si el técnico no tiene sectores asignados
+                // $query->whereRaw('1=0');
+            }
         }
 
         return $query;

@@ -11,6 +11,7 @@ use App\Models\Proveedor;
 use App\Models\Provincia;
 use App\Models\Referencia;
 use App\Models\User;
+use Arr;
 use Filament\Forms;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Livewire;
@@ -1288,12 +1289,18 @@ class ReferenciaResource extends Resource
     {
         $user = auth()->user();
 
-        if ($user->hasRole('técnico') && $user->sector) {
-            return parent::getEloquentQuery()
-                ->where('sector', $user->sector);
+        if ($user->hasRole('técnico')) {
+            $sectores = array_filter(Arr::wrap($user->sector ?? []));
+            if ($sectores) {
+                return parent::getEloquentQuery()
+                    ->whereIn('sector', $sectores);
+            }
+
+            // si no tiene sectores asignados, que no vea nada (opcional)
+            // return parent::getEloquentQuery()->whereRaw('1=0');
         }
 
-        return parent::getEloquentQuery(); // Administración u otros
+        return parent::getEloquentQuery();
     }
 
     public static function generalFormSchema(): array

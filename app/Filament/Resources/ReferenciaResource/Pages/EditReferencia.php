@@ -46,7 +46,6 @@ class EditReferencia extends EditRecord
                                     'partesTransporteAgrupados' => \App\Models\CargaTransporte::with([
                                         'parteTrabajoSuministroTransporte.cliente',
                                         'parteTrabajoSuministroTransporte.almacen',
-                                        // 👇 importante: trae TODAS las cargas del parte para poder prorratear
                                         'parteTrabajoSuministroTransporte.cargas',
                                         'referencia',
                                     ])
