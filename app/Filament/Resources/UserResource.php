@@ -120,7 +120,7 @@ class UserResource extends Resource
 
                         Section::make('Sector')
                             ->schema([
-                                Select::make('sector')
+                                Select::make('sector') // ← plural
                                     ->label('')
                                     ->options([
                                         '01' => 'Zona Norte Galicia',
@@ -129,8 +129,10 @@ class UserResource extends Resource
                                         '04' => 'Andalucía Occidental',
                                         '05' => 'Otros',
                                     ])
-                                    ->nullable()
+                                    ->multiple()          // ← clave
                                     ->searchable()
+                                    ->preload()
+                                    ->nullable()
                                     ->columnSpan(1),
                             ])
                             ->visible(fn($livewire) => $livewire->record?->hasRole('técnico') ?? true),

@@ -11,6 +11,7 @@ use App\Models\ParteTrabajoSuministroTransporte;
 use App\Models\Poblacion;
 use App\Models\Provincia;
 use App\Models\Referencia;
+use Arr;
 use Awcodes\TableRepeater\Components\TableRepeater;
 use Awcodes\TableRepeater\Header;
 use Filament\Facades\Filament;
@@ -876,11 +877,18 @@ class ParteTrabajoSuministroTransporteResource extends Resource
             $query->where('usuario_id', $user->id);
         }
 
-        if ($user->hasRole('técnico') && $user->sector) {
-            // Mostrar solo partes con cargas que tengan referencias del sector del técnico
-            $query->whereHas('cargas.referencia', function (Builder $q) use ($user) {
-                $q->where('sector', $user->sector);
-            });
+        if ($user->hasRole('técnico')) {
+            $sectores = array_filter(Arr::wrap($user->sector ?? []));
+
+            if (!empty($sectores)) {
+                // Mostrar solo partes con cargas cuyas referencias pertenezcan a alguno de sus sectores
+                $query->whereHas('cargas.referencia', function (Builder $q) use ($sectores) {
+                    $q->whereIn('sector', $sectores);
+                });
+            } else {
+                // Si el técnico no tiene sectores, opcionalmente no mostrar nada:
+                // $query->whereRaw('1=0');
+            }
         }
 
         return $query;

@@ -48,6 +48,10 @@ class User extends Authenticatable
         'remember_token',
     ];
 
+    protected $casts = [
+        'sector' => 'array',
+    ];
+
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
