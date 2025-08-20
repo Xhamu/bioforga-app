@@ -15,6 +15,7 @@ use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\View;
 use Filament\Forms\Form;
@@ -28,6 +29,11 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\HtmlString;
+use Filament\Forms\Components\Actions\Action as FormAction;
+use Illuminate\Database\Eloquent\Model;
+use Filament\Forms\Get;
+use Filament\Forms\Set;
+use Illuminate\Support\Arr;
 
 class ParteTrabajoSuministroAveriaResource extends Resource
 {
@@ -44,7 +50,7 @@ class ParteTrabajoSuministroAveriaResource extends Resource
             ->schema([
                 Section::make('Datos generales')
                     ->schema([
-                        // Usuario actual (solo lectura)
+                        // ── USUARIO ────────────────────────────────────────────────────────────────────
                         Select::make('usuario_id')
                             ->relationship(
                                 'usuario',
@@ -53,77 +59,99 @@ class ParteTrabajoSuministroAveriaResource extends Resource
                                     $user = Filament::auth()->user();
 
                                     if ($user->hasAnyRole(['superadmin', 'administrador', 'administración'])) {
-                                        // Ver todos menos los superadmin
-                                        $query->whereDoesntHave('roles', function ($q) {
-                                            $q->where('name', 'superadmin');
-                                        });
+                                        $query->whereDoesntHave('roles', fn($q) => $q->where('name', 'superadmin'));
                                     } else {
-                                        // Ver solo a sí mismo
                                         $query->where('id', $user->id);
                                     }
                                 }
                             )
-                            ->getOptionLabelFromRecordUsing(fn($record) => $record->name . ' ' . $record->apellidos)
+                            ->getOptionLabelFromRecordUsing(fn($record) => trim($record->name . ' ' . ($record->apellidos ?? '')))
                             ->searchable()
                             ->preload()
                             ->columnSpanFull()
-                            ->default(Filament::auth()->user()->id)
-                            ->reactive()
+                            ->default(fn() => Filament::auth()->id())
+                            ->live() // <- importante para que dispare afterStateUpdated
+                            ->afterStateUpdated(function (Set $set, $state) {
+                                // Reset dependientes
+                                $set('maquina_id', null);
+                                $set('trabajo_realizado', null);
+
+                                if (!$state) {
+                                    return;
+                                }
+
+                                // Auto-select si solo hay 1 máquina
+                                $ids = \App\Models\Maquina::where('operario_id', $state)->pluck('id');
+                                if ($ids->count() === 1) {
+                                    $set('maquina_id', $ids->first());
+                                }
+                            })
                             ->required(),
 
-                        // Máquina (todas)
+                        // ── MÁQUINA ───────────────────────────────────────────────────────────────────
                         Select::make('maquina_id')
                             ->label('Máquina')
-                            ->reactive()
-                            ->options(function (callable $get) {
+                            ->searchable()
+                            ->options(function (Get $get) {
                                 $usuarioId = $get('usuario_id');
-
                                 if (!$usuarioId) {
                                     return [];
                                 }
 
                                 return \App\Models\Maquina::where('operario_id', $usuarioId)
                                     ->get()
-                                    ->mapWithKeys(function ($maquina) {
-                                        return [$maquina->id => "{$maquina->marca} {$maquina->modelo}"];
-                                    })
+                                    ->mapWithKeys(fn($m) => [$m->id => "{$m->marca} {$m->modelo}"])
                                     ->toArray();
                             })
-                            ->afterStateHydrated(function (callable $get, callable $set) {
-                                // Al cargar el formulario por primera vez
+                            ->default(function (Get $get) {
                                 $usuarioId = $get('usuario_id');
-                                if ($usuarioId) {
-                                    $maquinas = \App\Models\Maquina::where('operario_id', $usuarioId)->get();
-                                    $set('maquina_id', $maquinas->count() === 1 ? $maquinas->first()->id : null);
+                                if (!$usuarioId)
+                                    return null;
+
+                                $ids = \App\Models\Maquina::where('operario_id', $usuarioId)->pluck('id');
+                                return $ids->count() === 1 ? $ids->first() : null;
+                            })
+                            // Si ya hay valor (p.ej. edit), no tocar:
+                            ->afterStateHydrated(function ($component, $state, Get $get) {
+                                if (blank($state)) {
+                                    $usuarioId = $get('usuario_id');
+                                    if ($usuarioId) {
+                                        $ids = \App\Models\Maquina::where('operario_id', $usuarioId)->pluck('id');
+                                        if ($ids->count() === 1) {
+                                            $component->state($ids->first());
+                                        }
+                                    }
                                 }
                             })
-                            ->searchable()
-                            ->required()
-                            ->live(), // Para que reaccione a los cambios en vivo
+                            ->live()
+                            ->afterStateUpdated(function (Set $set) {
+                                // Cambia máquina → reset opciones dependientes
+                                $set('trabajo_realizado', null);
+                            })
+                            ->required(),
 
-                        // Tipo: Avería o Mantenimiento
+                        // ── TIPO (avería / mantenimiento) ─────────────────────────────────────────────
                         Select::make('tipo')
                             ->label('Tipo')
-                            ->reactive()
                             ->searchable()
                             ->options([
                                 'averia' => 'Avería',
                                 'mantenimiento' => 'Mantenimiento',
                             ])
+                            ->live()
+                            ->afterStateUpdated(function (Set $set) {
+                                $set('trabajo_realizado', null);
+                            })
                             ->required(),
 
-                        // Trabajo realizado (se rellena según máquina y tipo)
+                        // ── TRABAJO REALIZADO (depende de máquina + tipo) ────────────────────────────
                         Select::make('trabajo_realizado')
-                            ->label(function (callable $get) {
-                                return match ($get('tipo')) {
-                                    'averia' => 'Tipo de avería',
-                                    'mantenimiento' => 'Tipo de mantenimiento',
-                                    default => 'Tipo de ...',
-                                };
+                            ->label(fn(Get $get) => match ($get('tipo')) {
+                                'averia' => 'Tipo de avería',
+                                'mantenimiento' => 'Tipo de mantenimiento',
+                                default => 'Tipo…',
                             })
-                            ->reactive()
-                            ->required()
-                            ->options(function (callable $get) {
+                            ->options(function (Get $get) {
                                 $maquinaId = $get('maquina_id');
                                 $tipo = $get('tipo');
 
@@ -136,23 +164,22 @@ class ParteTrabajoSuministroAveriaResource extends Resource
                                     return [];
                                 }
 
-                                $ids = [];
-
                                 if ($tipo === 'averia') {
-                                    $ids = is_array($maquina->averias) ? $maquina->averias : [];
+                                    $ids = Arr::wrap($maquina->averias);
                                     return \App\Models\PosibleAveria::whereIn('id', $ids)->pluck('nombre', 'id')->toArray();
                                 }
 
                                 if ($tipo === 'mantenimiento') {
-                                    $ids = is_array($maquina->mantenimientos) ? $maquina->mantenimientos : [];
+                                    $ids = Arr::wrap($maquina->mantenimientos);
                                     return \App\Models\PosibleMantenimiento::whereIn('id', $ids)->pluck('nombre', 'id')->toArray();
                                 }
 
                                 return [];
                             })
-                            ->reactive()
                             ->searchable()
-                            ->disabled(fn(callable $get) => !$get('maquina_id') || !$get('tipo')),
+                            ->disabled(fn(Get $get) => !$get('maquina_id') || !$get('tipo'))
+                            ->required(),
+
                         Select::make('actuacion')
                             ->label('Medios utilizados')
                             ->required()
@@ -292,11 +319,70 @@ class ParteTrabajoSuministroAveriaResource extends Resource
                             }),
                     ])
                     ->columns(2)
-                    ->visible(
-                        fn($record) =>
-                        Filament::auth()->user()?->hasAnyRole(['superadmin', 'administración']) &&
-                        filled($record?->fecha_hora_inicio_averia)
-                    ),
+                    ->visible(function ($record) {
+                        if (!$record)
+                            return false;
+
+                        return (
+                            $record->fecha_hora_inicio_averia && !$record->fecha_hora_fin_averia
+                        );
+                    }),
+
+                Section::make('Observaciones')
+                    ->schema([
+                        Textarea::make('observaciones')
+                            ->label('Observaciones')
+                            ->placeholder('Escribe aquí cualquier detalle adicional...')
+                            ->rows(8)
+                            ->columnSpanFull()
+                            ->maxLength(5000),
+
+                        Actions::make([
+                            FormAction::make('addObservaciones')
+                                ->label('Añadir observaciones')
+                                ->icon('heroicon-m-plus')
+                                ->color('success')
+                                ->modalHeading('Añadir observaciones')
+                                ->modalSubmitActionLabel('Guardar')
+                                ->modalWidth('lg')
+                                ->form([
+                                    Textarea::make('nueva_observacion')
+                                        ->label('Nueva observación')
+                                        ->placeholder('Escribe aquí la nueva observación...')
+                                        ->rows(3)
+                                        ->required(),
+                                ])
+                                ->action(function (Model $record, array $data) {
+                                    $append = trim($data['nueva_observacion'] ?? '');
+                                    if ($append === '') {
+                                        return;
+                                    }
+
+                                    $stamp = now()->timezone('Europe/Madrid')->format('d/m/Y H:i');
+                                    $prev = (string) ($record->observaciones ?? '');
+
+                                    $nuevo = ($prev !== '' ? $prev . "\n" : '')
+                                        . '[' . $stamp . '] ' . $append;
+
+                                    $record->update(['observaciones' => $nuevo]);
+
+                                    Notification::make()
+                                        ->title('Observaciones añadidas')
+                                        ->success()
+                                        ->send();
+
+                                    return redirect(request()->header('Referer'));
+                                }),
+                        ])
+                            ->visible(function ($record) {
+                                if (!$record)
+                                    return false;
+
+                                return (
+                                    $record->fecha_hora_inicio_averia && !$record->fecha_hora_fin_averia
+                                );
+                            })->fullWidth()
+                    ]),
 
                 Section::make()
                     ->visible(function ($record) {

@@ -19,6 +19,7 @@ use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\View;
 use Filament\Forms\Form;
@@ -32,6 +33,8 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\HtmlString;
+use Filament\Forms\Components\Actions\Action as FormAction;
+use Illuminate\Database\Eloquent\Model;
 
 class ParteTrabajoSuministroDesplazamientoResource extends Resource
 {
@@ -297,6 +300,62 @@ class ParteTrabajoSuministroDesplazamientoResource extends Resource
                         Filament::auth()->user()?->hasAnyRole(['superadmin', 'administración']) &&
                         filled($record?->fecha_hora_inicio_desplazamiento)
                     ),
+
+                Section::make('Observaciones')
+                    ->schema([
+                        Textarea::make('observaciones')
+                            ->label('Observaciones')
+                            ->placeholder('Escribe aquí cualquier detalle adicional...')
+                            ->rows(8)
+                            ->columnSpanFull()
+                            ->maxLength(5000),
+
+                        Actions::make([
+                            FormAction::make('addObservaciones')
+                                ->label('Añadir observaciones')
+                                ->icon('heroicon-m-plus')
+                                ->color('success')
+                                ->modalHeading('Añadir observaciones')
+                                ->modalSubmitActionLabel('Guardar')
+                                ->modalWidth('lg')
+                                ->form([
+                                    Textarea::make('nueva_observacion')
+                                        ->label('Nueva observación')
+                                        ->placeholder('Escribe aquí la nueva observación...')
+                                        ->rows(3)
+                                        ->required(),
+                                ])
+                                ->action(function (Model $record, array $data) {
+                                    $append = trim($data['nueva_observacion'] ?? '');
+                                    if ($append === '') {
+                                        return;
+                                    }
+
+                                    $stamp = now()->timezone('Europe/Madrid')->format('d/m/Y H:i');
+                                    $prev = (string) ($record->observaciones ?? '');
+
+                                    $nuevo = ($prev !== '' ? $prev . "\n" : '')
+                                        . '[' . $stamp . '] ' . $append;
+
+                                    $record->update(['observaciones' => $nuevo]);
+
+                                    Notification::make()
+                                        ->title('Observaciones añadidas')
+                                        ->success()
+                                        ->send();
+
+                                    return redirect(request()->header('Referer'));
+                                }),
+                        ])
+                            ->visible(function ($record) {
+                                if (!$record)
+                                    return false;
+
+                                return (
+                                    $record->fecha_hora_inicio_desplazamiento && !$record->fecha_hora_fin_desplazamiento
+                                );
+                            })->fullWidth()
+                    ]),
 
                 Section::make()
                     ->visible(function ($record) {

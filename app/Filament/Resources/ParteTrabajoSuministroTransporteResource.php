@@ -25,6 +25,7 @@ use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\TextInput;
@@ -46,8 +47,11 @@ use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
 use Filament\Support\Enums\FontWeight;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Forms\Components\Actions\Action as FormAction;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
+use Filament\Forms\Get;
+use Filament\Forms\Set;
 
 class ParteTrabajoSuministroTransporteResource extends Resource
 {
@@ -65,82 +69,100 @@ class ParteTrabajoSuministroTransporteResource extends Resource
             ->schema([
                 Section::make('Datos del Transporte')
                     ->schema([
+                        // ── USUARIO ────────────────────────────────────────────────────────────────
                         Select::make('usuario_id')
                             ->relationship(
                                 name: 'usuario',
-                                titleAttribute: 'name',
                                 modifyQueryUsing: function ($query) {
                                     $user = Filament::auth()->user();
 
-                                    // Si el usuario tiene el rol de transportista, solo mostrar su propio registro
                                     if ($user->hasRole('transportista')) {
                                         $query->where('id', $user->id);
                                     } else {
-                                        $query->whereHas('roles', function ($q) {
-                                            $q->whereIn('name', ['administración', 'administrador', 'transportista']);
-                                        });
+                                        $query->whereHas(
+                                            'roles',
+                                            fn($q) =>
+                                            $q->whereIn('name', ['administración', 'administrador', 'transportista'])
+                                        );
                                     }
                                 }
                             )
+                            ->getOptionLabelFromRecordUsing(function ($record) {
+                                $ini = $record->apellidos
+                                    ? mb_strtoupper(mb_substr($record->apellidos, 0, 1, 'UTF-8'), 'UTF-8') . '.'
+                                    : '';
+                                return trim($record->name . ' ' . $ini);
+                            })
                             ->searchable()
                             ->preload()
-                            ->default(Filament::auth()->user()->id)
-                            ->getOptionLabelFromRecordUsing(fn($record) => $record->name . ' ' . strtoupper(substr($record->apellidos, 0, 1)) . '.')
+                            ->default(fn() => Filament::auth()->id())
                             ->required()
-                            ->reactive()
-                            ->afterStateUpdated(fn($state, callable $set) => $set('referencia_select', null)),
+                            ->live()
+                            ->afterStateUpdated(function (Set $set, $state) {
+                                // Reset dependientes
+                                $set('camion_id', null);
+                                $set('referencia_select', null); // si de verdad existe ese campo en este form
+                    
+                                if (!$state) {
+                                    return;
+                                }
 
+                                // Auto-seleccionar camión si solo hay 1
+                                $user = \App\Models\User::find($state);
+
+                                if (!$user)
+                                    return;
+
+                                $camiones = $user->proveedor_id
+                                    ? Camion::where('proveedor_id', $user->proveedor_id)->pluck('id')
+                                    : $user->camiones()->pluck('camiones.id'); // asegúrate del alias de la PK en la relación
+                    
+                                if ($camiones->count() === 1) {
+                                    $set('camion_id', $camiones->first());
+                                }
+                            }),
+
+                        // ── CAMIÓN ────────────────────────────────────────────────────────────────
                         Select::make('camion_id')
                             ->label('Camión')
-                            ->options(function (callable $get) {
+                            ->placeholder('- Selecciona primero un usuario -')
+                            ->options(function (Get $get) {
                                 $usuarioId = $get('usuario_id');
                                 if (!$usuarioId) {
-                                    return ['' => '- Selecciona primero un usuario -'];
+                                    return [];
                                 }
 
                                 $usuario = \App\Models\User::find($usuarioId);
 
-                                if ($usuario?->proveedor_id) {
-                                    // Caso con proveedor_id → buscar camiones del proveedor
-                                    $camiones = \App\Models\Camion::where('proveedor_id', $usuario->proveedor_id)->get();
-                                } else {
-                                    // Caso sin proveedor_id → buscar camiones vinculados por camion_user
-                                    $camiones = $usuario->camiones()->get();
-                                }
+                                $camiones = $usuario?->proveedor_id
+                                    ? \App\Models\Camion::where('proveedor_id', $usuario->proveedor_id)->get()
+                                    : $usuario?->camiones()->get();
 
-                                if ($camiones->isEmpty()) {
-                                    return ['' => '- No hay ningún camión vinculado -'];
+                                if (!$camiones || $camiones->isEmpty()) {
+                                    return [];
                                 }
 
                                 return $camiones->mapWithKeys(fn($camion) => [
-                                    $camion->id => mb_convert_encoding(
-                                        '[' . $camion->matricula_cabeza . '] ' . $camion->marca . ' ' . $camion->modelo,
-                                        'UTF-8',
-                                        'UTF-8'
-                                    )
+                                    $camion->id => '[' . $camion->matricula_cabeza . '] ' . $camion->marca . ' ' . $camion->modelo,
                                 ])->toArray();
                             })
-                            ->default(function (callable $get) {
+                            ->default(function (Get $get) {
                                 $usuarioId = $get('usuario_id');
                                 if (!$usuarioId)
                                     return null;
 
                                 $usuario = \App\Models\User::find($usuarioId);
 
-                                if ($usuario?->proveedor_id) {
-                                    // Caso con proveedor_id → buscar camiones del proveedor
-                                    $camiones = \App\Models\Camion::where('proveedor_id', $usuario->proveedor_id)->get();
-                                } else {
-                                    // Caso sin proveedor_id → buscar camiones vinculados por camion_user
-                                    $camiones = $usuario->camiones()->get();
-                                }
-
-                                return $camiones->count() === 1 ? $camiones->first()->id : null;
+                                $ids = $usuario?->proveedor_id
+                                    ? \App\Models\Camion::where('proveedor_id', $usuario->proveedor_id)->pluck('id')
+                                    : $usuario?->camiones()->pluck('camiones.id'); // ajusta el nombre de columna si es necesario
+                    
+                                return ($ids && $ids->count() === 1) ? $ids->first() : null;
                             })
                             ->searchable()
                             ->preload()
                             ->required()
-                            ->reactive() // <- para que se actualice cuando cambia usuario_id
+                            ->live()
                             ->validationMessages([
                                 'required' => 'El :attribute es obligatorio.',
                             ]),
@@ -206,6 +228,36 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                                         $label = "{$almacen->referencia} ({$almacen->monte_parcela}, {$almacen->ayuntamiento})";
                                                         return [$almacen->id => mb_convert_encoding($label, 'UTF-8', 'UTF-8')];
                                                     });
+                                                })
+                                                ->default(function () use ($record) {
+                                                    $usuarioId = $record?->usuario_id;
+
+                                                    $almacenesIds = \DB::table('almacenes_users')
+                                                        ->where('user_id', $usuarioId)
+                                                        ->pluck('almacen_id');
+
+                                                    $almacenes = $almacenesIds->isNotEmpty()
+                                                        ? AlmacenIntermedio::whereIn('id', $almacenesIds)->pluck('id')
+                                                        : AlmacenIntermedio::pluck('id');
+
+                                                    return $almacenes->count() === 1 ? $almacenes->first() : null;
+                                                })
+                                                ->afterStateHydrated(function ($component, $state) use ($record) {
+                                                    if (blank($state)) {
+                                                        $usuarioId = $record?->usuario_id;
+
+                                                        $almacenesIds = \DB::table('almacenes_users')
+                                                            ->where('user_id', $usuarioId)
+                                                            ->pluck('almacen_id');
+
+                                                        $almacenes = $almacenesIds->isNotEmpty()
+                                                            ? AlmacenIntermedio::whereIn('id', $almacenesIds)->pluck('id')
+                                                            : AlmacenIntermedio::pluck('id');
+
+                                                        if ($almacenes->count() === 1) {
+                                                            $component->state($almacenes->first());
+                                                        }
+                                                    }
                                                 })
                                                 ->searchable()
                                                 ->preload()
@@ -558,10 +610,52 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                     ]),
 
                 Section::make('Observaciones')
+                    ->visible(fn($record) => $record)
                     ->schema([
                         Textarea::make('observaciones')
-                            ->rows(4)
-                            ->maxLength(1000),
+                            ->label('Observaciones')
+                            ->placeholder('Escribe aquí cualquier detalle adicional...')
+                            ->rows(8)
+                            ->columnSpanFull()
+                            ->maxLength(5000),
+
+                        Actions::make([
+                            FormAction::make('addObservaciones')
+                                ->label('Añadir observaciones')
+                                ->icon('heroicon-m-plus')
+                                ->color('success')
+                                ->modalHeading('Añadir observaciones')
+                                ->modalSubmitActionLabel('Guardar')
+                                ->modalWidth('lg')
+                                ->form([
+                                    Textarea::make('nueva_observacion')
+                                        ->label('Nueva observación')
+                                        ->placeholder('Escribe aquí la nueva observación...')
+                                        ->rows(3)
+                                        ->required(),
+                                ])
+                                ->action(function (Model $record, array $data) {
+                                    $append = trim($data['nueva_observacion'] ?? '');
+                                    if ($append === '') {
+                                        return;
+                                    }
+
+                                    $stamp = now()->timezone('Europe/Madrid')->format('d/m/Y H:i');
+                                    $prev = (string) ($record->observaciones ?? '');
+
+                                    $nuevo = ($prev !== '' ? $prev . "\n" : '')
+                                        . '[' . $stamp . '] ' . $append;
+
+                                    $record->update(['observaciones' => $nuevo]);
+
+                                    Notification::make()
+                                        ->title('Observaciones añadidas')
+                                        ->success()
+                                        ->send();
+
+                                    return redirect(request()->header('Referer'));
+                                }),
+                        ])->fullWidth()
                     ]),
             ]);
     }
