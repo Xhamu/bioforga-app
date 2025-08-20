@@ -3,7 +3,6 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\ParteTrabajoSuministroOperacionMaquinaResource\Pages;
-use App\Filament\Resources\ParteTrabajoSuministroOperacionMaquinaResource\RelationManagers;
 use App\Models\Maquina;
 use App\Models\ParteTrabajoSuministroOperacionMaquina;
 use App\Models\Referencia;
@@ -12,12 +11,10 @@ use Arr;
 use Carbon\Carbon;
 use Filament\Forms\Components\Actions\Action;
 use Filament\Facades\Filament;
-use Filament\Forms;
 use Filament\Forms\Components\Actions;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\FileUpload;
-use Filament\Forms\Components\Grid;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Section;
@@ -35,13 +32,14 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Enums\FiltersLayout;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
-use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\HtmlString;
 use Filament\Forms\Get;
+use Filament\Forms\Components\Actions\Action as FormAction;
+use Illuminate\Database\Eloquent\Model;
 
 class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
 {
@@ -366,6 +364,62 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                         Filament::auth()->user()?->hasAnyRole(['superadmin', 'administración'])
                     ),
 
+                Section::make('Observaciones')
+                    ->schema([
+                        Textarea::make('observaciones')
+                            ->label('Observaciones')
+                            ->placeholder('Escribe aquí cualquier detalle adicional...')
+                            ->rows(8)
+                            ->columnSpanFull()
+                            ->maxLength(5000),
+
+                        Actions::make([
+                            FormAction::make('addObservaciones')
+                                ->label('Añadir observaciones')
+                                ->icon('heroicon-m-plus')
+                                ->color('success')
+                                ->modalHeading('Añadir observaciones')
+                                ->modalSubmitActionLabel('Guardar')
+                                ->modalWidth('lg')
+                                ->form([
+                                    Textarea::make('nueva_observacion')
+                                        ->label('Nueva observación')
+                                        ->placeholder('Escribe aquí la nueva observación...')
+                                        ->rows(3)
+                                        ->required(),
+                                ])
+                                ->action(function (Model $record, array $data) {
+                                    $append = trim($data['nueva_observacion'] ?? '');
+                                    if ($append === '') {
+                                        return;
+                                    }
+
+                                    $stamp = now()->timezone('Europe/Madrid')->format('d/m/Y H:i');
+                                    $prev = (string) ($record->observaciones ?? '');
+
+                                    $nuevo = ($prev !== '' ? $prev . "\n" : '')
+                                        . '[' . $stamp . '] ' . $append;
+
+                                    $record->update(['observaciones' => $nuevo]);
+
+                                    Notification::make()
+                                        ->title('Observaciones añadidas')
+                                        ->success()
+                                        ->send();
+
+                                    return redirect(request()->header('Referer'));
+                                }),
+                        ])
+                            ->visible(function ($record) {
+                                if (!$record)
+                                    return false;
+
+                                return (
+                                    $record->fecha_hora_inicio_trabajo && !$record->fecha_hora_fin_trabajo
+                                );
+                            })->fullWidth()
+                    ]),
+
                 Section::make()
                     ->visible(function ($record) {
                         if (!$record)
@@ -441,12 +495,22 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                                 ->label('Finalizar trabajo')
                                 ->color('danger')
                                 ->extraAttributes(['class' => 'w-full'])
-                                ->visible(
-                                    fn($record) =>
-                                    $record
-                                    && $record->fecha_hora_inicio_trabajo
-                                    && !$record->fecha_hora_fin_trabajo
-                                )
+                                ->visible(function ($record) {
+                                    if (!$record) {
+                                        return false;
+                                    }
+
+                                    if (!$record->fecha_hora_inicio_trabajo || $record->fecha_hora_fin_trabajo) {
+                                        return false;
+                                    }
+
+                                    if ($record->fecha_hora_parada_trabajo && !$record->fecha_hora_reanudacion_trabajo) {
+                                        return false;
+                                    }
+
+                                    return true;
+                                })
+
                                 ->button()
                                 ->modalHeading('Finalizar trabajo')
                                 ->modalSubmitActionLabel('Finalizar')
@@ -608,14 +672,6 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                             ->openable()
                             ->required()
                             ->columnSpanFull(),
-                    ]),
-
-                Section::make('Observaciones')
-                    ->visible(fn($record) => filled($record?->usuario_id))
-                    ->schema([
-                        Textarea::make('observaciones')
-                            ->rows(4)
-                            ->maxLength(1000),
                     ]),
             ]);
     }

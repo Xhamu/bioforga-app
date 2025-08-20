@@ -28,6 +28,8 @@ use Filament\Tables\Enums\FiltersLayout;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\HtmlString;
+use Filament\Forms\Components\Actions\Action as FormAction;
+use Illuminate\Database\Eloquent\Model;
 
 class ParteTrabajoTallerVehiculosResource extends Resource
 {
@@ -265,7 +267,7 @@ class ParteTrabajoTallerVehiculosResource extends Resource
                     ->columns(1),
 
                 // 🔼 NUEVA sección con los campos solicitados (sin tocar lo demás)
-                Section::make('Observaciones y estado')
+                Section::make('Detalles adicionales')
                     ->schema([
                         Select::make('estado')
                             ->label('Estado')
@@ -277,11 +279,6 @@ class ParteTrabajoTallerVehiculosResource extends Resource
                             ->columnSpanFull()
                             ->required(),
 
-                        Textarea::make('observaciones')
-                            ->label('Observaciones')
-                            ->columnSpanFull()
-                            ->rows(4),
-
                         FileUpload::make('fotos')
                             ->label('Fotos')
                             ->image()
@@ -292,6 +289,62 @@ class ParteTrabajoTallerVehiculosResource extends Resource
                     ])
                     ->visible(fn($record) => $record && $record->fecha_hora_fin_taller_vehiculos)
                     ->columns(2),
+
+                Section::make('Observaciones')
+                    ->schema([
+                        Textarea::make('observaciones')
+                            ->label('Observaciones')
+                            ->placeholder('Escribe aquí cualquier detalle adicional...')
+                            ->rows(8)
+                            ->columnSpanFull()
+                            ->maxLength(5000),
+
+                        Actions::make([
+                            FormAction::make('addObservaciones')
+                                ->label('Añadir observaciones')
+                                ->icon('heroicon-m-plus')
+                                ->color('success')
+                                ->modalHeading('Añadir observaciones')
+                                ->modalSubmitActionLabel('Guardar')
+                                ->modalWidth('lg')
+                                ->form([
+                                    Textarea::make('nueva_observacion')
+                                        ->label('Nueva observación')
+                                        ->placeholder('Escribe aquí la nueva observación...')
+                                        ->rows(3)
+                                        ->required(),
+                                ])
+                                ->action(function (Model $record, array $data) {
+                                    $append = trim($data['nueva_observacion'] ?? '');
+                                    if ($append === '') {
+                                        return;
+                                    }
+
+                                    $stamp = now()->timezone('Europe/Madrid')->format('d/m/Y H:i');
+                                    $prev = (string) ($record->observaciones ?? '');
+
+                                    $nuevo = ($prev !== '' ? $prev . "\n" : '')
+                                        . '[' . $stamp . '] ' . $append;
+
+                                    $record->update(['observaciones' => $nuevo]);
+
+                                    Notification::make()
+                                        ->title('Observaciones añadidas')
+                                        ->success()
+                                        ->send();
+
+                                    return redirect(request()->header('Referer'));
+                                }),
+                        ])
+                            ->visible(function ($record) {
+                                if (!$record)
+                                    return false;
+
+                                return (
+                                    $record->fecha_hora_inicio_taller_vehiculos && !$record->fecha_hora_fin_taller_vehiculos
+                                );
+                            })->fullWidth()
+                    ]),
 
                 Section::make()
                     ->visible(function ($record) {
@@ -353,10 +406,6 @@ class ParteTrabajoTallerVehiculosResource extends Resource
                                         ->default('en_proceso')
                                         ->required(),
 
-                                    Textarea::make('observaciones')
-                                        ->label('Observaciones')
-                                        ->rows(3),
-
                                     FileUpload::make('fotos')
                                         ->label('Fotos')
                                         ->image()
@@ -375,7 +424,6 @@ class ParteTrabajoTallerVehiculosResource extends Resource
                                         'trabajo_realizado' => $data['trabajo_realizado'],
                                         'recambios_utilizados' => $data['recambios_utilizados'],
                                         'estado' => $data['estado'] ?? 'en_proceso',
-                                        'observaciones' => $data['observaciones'] ?? null,
                                         'fotos' => $data['fotos'] ?? [],
                                     ]);
 

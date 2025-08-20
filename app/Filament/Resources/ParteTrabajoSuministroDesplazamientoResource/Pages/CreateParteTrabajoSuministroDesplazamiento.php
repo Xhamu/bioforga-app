@@ -147,8 +147,9 @@ class CreateParteTrabajoSuministroDesplazamiento extends CreateRecord
                         ->options(function (callable $get) {
                             $usuarioId = $get('usuario_id');
 
-                            if (!$usuarioId)
+                            if (!$usuarioId) {
                                 return [];
+                            }
 
                             $usuario = User::find($usuarioId);
 
@@ -160,6 +161,13 @@ class CreateParteTrabajoSuministroDesplazamiento extends CreateRecord
                                     return [$ref->id => $label];
                                 }) ?? [];
                         })
+                        ->afterStateHydrated(function ($component, $state) {
+                            $options = $component->getOptions();
+
+                            if (count($options) === 1 && blank($state)) {
+                                $component->state(array_key_first($options));
+                            }
+                        })
                         ->visible(fn($get) => $get('destino') === 'referencia')
                         ->required(fn($get) => $get('destino') === 'referencia')
                         ->preload(),
@@ -169,6 +177,13 @@ class CreateParteTrabajoSuministroDesplazamiento extends CreateRecord
                         ->searchable()
                         ->options(function () {
                             return \App\Models\Taller::pluck('nombre', 'id');
+                        })
+                        ->afterStateHydrated(function ($component, $state) {
+                            $options = $component->getOptions();
+
+                            if (count($options) === 1 && blank($state)) {
+                                $component->state(array_key_first($options));
+                            }
                         })
                         ->visible(fn($get) => $get('destino') === 'taller')
                         ->required(fn($get) => $get('destino') === 'taller'),
