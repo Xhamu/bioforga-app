@@ -10,9 +10,11 @@ use Filament\Facades\Filament;
 use Filament\Forms;
 use Filament\Forms\Components\Actions;
 use Filament\Forms\Components\Actions\Action;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\View;
 use Filament\Forms\Form;
@@ -26,6 +28,14 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\HtmlString;
+use Filament\Forms\Components\Actions\Action as FormAction;
+use Illuminate\Database\Eloquent\Model;
+use Filament\Forms\Get;
+use Filament\Forms\Set;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class ParteTrabajoSuministroOtrosResource extends Resource
 {
@@ -152,6 +162,78 @@ class ParteTrabajoSuministroOtrosResource extends Resource
                     ])
                     ->columns(1),
 
+                Section::make('Observaciones')
+                    ->schema([
+                        Textarea::make('observaciones')
+                            ->label('Observaciones')
+                            ->placeholder('Escribe aquí cualquier detalle adicional...')
+                            ->rows(8)
+                            ->columnSpanFull()
+                            ->maxLength(5000),
+
+                        Actions::make([
+                            FormAction::make('addObservaciones')
+                                ->label('Añadir observaciones')
+                                ->icon('heroicon-m-plus')
+                                ->color('success')
+                                ->modalHeading('Añadir observaciones')
+                                ->modalSubmitActionLabel('Guardar')
+                                ->modalWidth('lg')
+                                ->form([
+                                    Textarea::make('nueva_observacion')
+                                        ->label('Nueva observación')
+                                        ->placeholder('Escribe aquí la nueva observación...')
+                                        ->rows(3)
+                                        ->required(),
+                                ])
+                                ->action(function (Model $record, array $data) {
+                                    $append = trim($data['nueva_observacion'] ?? '');
+                                    if ($append === '') {
+                                        return;
+                                    }
+
+                                    $stamp = now()->timezone('Europe/Madrid')->format('d/m/Y H:i');
+                                    $prev = (string) ($record->observaciones ?? '');
+
+                                    $nuevo = ($prev !== '' ? $prev . "\n" : '')
+                                        . '[' . $stamp . '] ' . $append;
+
+                                    $record->update(['observaciones' => $nuevo]);
+
+                                    Notification::make()
+                                        ->title('Observaciones añadidas')
+                                        ->success()
+                                        ->send();
+
+                                    return redirect(request()->header('Referer'));
+                                }),
+                        ])
+                            ->visible(function ($record) {
+                                if (!$record)
+                                    return false;
+
+                                return (
+                                    $record->fecha_hora_inicio_otros && !$record->fecha_hora_fin_otros
+                                );
+                            })->fullWidth()
+                    ]),
+
+                Section::make('Fotos')
+                    ->visible(fn($record) => $record && !empty($record->fotos))
+                    ->schema([
+                        FileUpload::make('fotos')
+                            ->label('Fotos')
+                            ->image()
+                            ->multiple()
+                            ->maxFiles(4)
+                            ->directory('parte_trabajo_otros')
+                            ->openable()
+                            ->downloadable()
+                            ->panelLayout('grid')
+                            ->disabled()
+                            ->dehydrated(false),
+                    ]),
+
                 Section::make()
                     ->visible(function ($record) {
                         if (!$record)
@@ -166,7 +248,7 @@ class ParteTrabajoSuministroOtrosResource extends Resource
                             Action::make('Finalizar')
                                 ->label('Finalizar trabajo')
                                 ->color('danger')
-                                ->extraAttributes(['class' => 'w-full']) // Hace que el botón ocupe todo el ancho disponible
+                                ->extraAttributes(['class' => 'w-full'])
                                 ->visible(
                                     fn($record) =>
                                     $record &&
@@ -175,9 +257,28 @@ class ParteTrabajoSuministroOtrosResource extends Resource
                                 )
                                 ->button()
                                 ->modalHeading('Finalizar trabajo')
+                                ->modalDescription('Añade (si quieres) hasta 4 fotos y confirma la ubicación GPS para cerrar el trabajo.')
                                 ->modalSubmitActionLabel('Finalizar')
                                 ->modalWidth('xl')
                                 ->form([
+                                    Section::make('Fotos')
+                                        ->schema([
+                                            FileUpload::make('fotos')
+                                                ->label('Fotos (máx. 4)')
+                                                ->image()
+                                                ->multiple()
+                                                ->maxFiles(4)
+                                                ->reorderable()
+                                                ->openable()
+                                                ->downloadable()
+                                                ->directory('parte_trabajo_otros')
+                                                ->acceptedFileTypes(['image/*'])
+                                                ->preserveFilenames()
+                                                ->panelLayout('grid') // ✅ válido en Filament 3
+                                                ->helperText('Puedes arrastrar para reordenar. Formatos comunes de imagen, hasta 4.'),
+                                        ])
+                                        ->columns(1), // controla el número de columnas del grid
+
                                     TextInput::make('gps_fin_otros')
                                         ->label('GPS')
                                         ->required()
@@ -186,10 +287,32 @@ class ParteTrabajoSuministroOtrosResource extends Resource
                                     View::make('livewire.location-fin-otros')->columnSpanFull(),
                                 ])
                                 ->action(function (array $data, $record) {
-                                    $record->update([
-                                        'fecha_hora_fin_otros' => now(),
-                                        'gps_fin_otros' => $data['gps_fin_otros'],
-                                    ]);
+                                    DB::transaction(function () use ($data, $record) {
+                                        // Merge de fotos nuevas con las existentes (sin duplicados) y límite 4
+                                        $existentes = collect((array) $record->fotos)->filter()->values()->all();
+                                        $nuevas = collect((array) ($data['fotos'] ?? []))->filter()->values()->all();
+
+                                        // Normaliza rutas (por si vienen como arrays con 'path' u objetos)
+                                        $normalizar = function ($item) {
+                                            // Si el FileUpload devuelve array/objeto, intenta extraer la ruta
+                                            if (is_array($item)) {
+                                                return $item['path'] ?? $item['url'] ?? Arr::first($item) ?? null;
+                                            }
+                                            return is_string($item) ? $item : null;
+                                        };
+
+                                        $existentes = array_values(array_filter(array_map($normalizar, $existentes)));
+                                        $nuevas = array_values(array_filter(array_map($normalizar, $nuevas)));
+
+                                        $merged = array_values(array_unique(array_merge($existentes, $nuevas)));
+                                        $merged = array_slice($merged, 0, 4);
+
+                                        $record->update([
+                                            'fecha_hora_fin_otros' => now('Europe/Madrid'),
+                                            'gps_fin_otros' => $data['gps_fin_otros'],
+                                            'fotos' => $merged,
+                                        ]);
+                                    });
 
                                     Notification::make()
                                         ->success()
