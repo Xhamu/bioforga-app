@@ -29,12 +29,14 @@ class ParteTrabajoSuministroOtros extends Model
         'fecha_hora_fin_otros',
         'gps_fin_otros',
 
-        'observaciones'
+        'observaciones',
+        'fotos'
     ];
 
     protected $casts = [
         'fecha_hora_inicio_otros' => 'datetime',
         'fecha_hora_fin_otros' => 'datetime',
+            'fotos' => 'array',
     ];
 
     public function getActivitylogOptions(): LogOptions
