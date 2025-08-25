@@ -219,7 +219,7 @@ class ParteTrabajoSuministroOtrosResource extends Resource
                     ]),
 
                 Section::make('Fotos')
-                    ->visible(fn($record) => $record && !empty($record->fotos))
+                    //->visible(fn($record) => $record && !empty($record->fotos))
                     ->schema([
                         FileUpload::make('fotos')
                             ->label('Fotos')
@@ -229,9 +229,7 @@ class ParteTrabajoSuministroOtrosResource extends Resource
                             ->directory('parte_trabajo_otros')
                             ->openable()
                             ->downloadable()
-                            ->panelLayout('grid')
-                            ->disabled()
-                            ->dehydrated(false),
+                            ->panelLayout('grid'),
                     ]),
 
                 Section::make()
@@ -274,7 +272,7 @@ class ParteTrabajoSuministroOtrosResource extends Resource
                                                 ->directory('parte_trabajo_otros')
                                                 ->acceptedFileTypes(['image/*'])
                                                 ->preserveFilenames()
-                                                ->panelLayout('grid')
+                                                ->panelLayout('grid') // ✅ válido en Filament 3
                                                 ->helperText('Puedes arrastrar para reordenar. Formatos comunes de imagen, hasta 4.'),
                                         ])
                                         ->columns(1), // controla el número de columnas del grid
