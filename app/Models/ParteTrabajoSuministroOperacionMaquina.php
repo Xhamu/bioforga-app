@@ -60,6 +60,15 @@ class ParteTrabajoSuministroOperacionMaquina extends Model
         'fecha_hora_fin_trabajo' => 'datetime',
     ];
 
+    protected static function booted(): void
+    {
+        static::created(function (self $parte) {
+            if ($parte->referencia && $parte->referencia->estado === 'abierto') {
+                $parte->referencia->update(['estado' => 'en_proceso']);
+            }
+        });
+    }
+
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()

@@ -27,4 +27,16 @@ class CreateReferencia extends CreateRecord
         $this->record->usuarios()->sync($this->data['usuarios'] ?? []);
     }
 
+    /**
+     * Asegura "no_facturada" si el estado es "abierto" al crear.
+     */
+    protected function mutateFormDataBeforeCreate(array $data): array
+    {
+        if (($data['estado'] ?? null) === 'abierto') {
+            $data['estado_facturacion'] = 'no_facturada';
+        }
+
+        return $data;
+    }
+
 }

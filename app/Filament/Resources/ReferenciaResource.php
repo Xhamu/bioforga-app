@@ -287,11 +287,6 @@ class ReferenciaResource extends Resource
                             ->numeric()
                             ->required(),
 
-                        Forms\Components\Checkbox::make('certificable')
-                            ->label('¿Certificable?')
-                            ->reactive()
-                            ->afterStateUpdated(fn($state, $set, $get) => $setUniqueRef($set, $get)),
-
                         Forms\Components\Select::make('tipo_certificacion')
                             ->label('Tipo de certificación')
                             ->searchable()
@@ -301,7 +296,6 @@ class ReferenciaResource extends Resource
                                 'sbp' => 'SBP',
                                 'pefc' => 'PEFC',
                             ])
-                            ->visible(fn($get) => $get('certificable') === true)
                             ->reactive()
                             ->afterStateUpdated(fn($state, $set, $get) => $setUniqueRef($set, $get)),
 
@@ -398,8 +392,9 @@ class ReferenciaResource extends Resource
                             ->searchable()
                             ->options([
                                 'abierto' => 'Abierto',
-                                'cerrado' => 'Cerrado',
                                 'en_proceso' => 'En proceso',
+                                'cerrado' => 'Cerrado',
+                                'cerrado_no_procede' => 'Cerrado no procede',
                             ])
                             ->required(),
 
@@ -665,6 +660,7 @@ class ReferenciaResource extends Resource
                                 'abierto' => 'Abierto',
                                 'en_proceso' => 'En proceso',
                                 'cerrado' => 'Cerrado',
+                                'cerrado_no_procede' => 'Cerrado no procede',
                             ])
                             ->query(function ($query, array $data) {
                                 if (!empty($data['value'])) {
@@ -903,12 +899,14 @@ class ReferenciaResource extends Resource
                             'abierto' => 'success',
                             'en_proceso' => 'warning',
                             'cerrado' => 'danger',
+                            'cerrado_no_procede' => 'danger',
                             default => 'secondary',
                         })
                         ->formatStateUsing(fn($state) => match ($state) {
                             'abierto' => 'Abierto',
                             'en_proceso' => 'En proceso',
                             'cerrado' => 'Cerrado',
+                            'cerrado_no_procede' => 'Cerrado',
                             default => ucfirst($state ?? 'Desconocido'),
                         }),
 
@@ -919,11 +917,13 @@ class ReferenciaResource extends Resource
                             'completa' => 'Completa',
                             'parcial' => 'Parcial',
                             'no_facturada' => 'No facturada',
+                            'no_procede' => 'No procede'
                         })
                         ->color(fn(string $state) => match ($state) {
                             'completa' => 'success',
                             'parcial' => 'warning',
                             'no_facturada' => 'gray',
+                            'no_procede' => 'danger'
                         }),
                 ])
                 ->persistFiltersInSession()
@@ -1098,6 +1098,7 @@ class ReferenciaResource extends Resource
                                 'abierto' => 'Abierto',
                                 'en_proceso' => 'En proceso',
                                 'cerrado' => 'Cerrado',
+                                'cerrado_no_procede' => 'Cerrado no procede',
                             ])
                             ->query(function ($query, array $data) {
                                 if (!empty($data['value'])) {
@@ -1586,10 +1587,6 @@ class ReferenciaResource extends Resource
                         ->numeric()
                         ->required(),
 
-                    Forms\Components\Checkbox::make('certificable')
-                        ->label('¿Certificable?')
-                        ->reactive(),
-
                     Forms\Components\Select::make('tipo_certificacion')
                         ->label('Tipo de certificación')
                         ->searchable()
@@ -1599,7 +1596,6 @@ class ReferenciaResource extends Resource
                             'sbp' => 'SBP',
                             'pefc' => 'PEFC',
                         ])
-                        ->visible(fn($get) => $get('certificable') === true)
                         ->reactive(),
 
                     Forms\Components\Checkbox::make('guia_sanidad')
@@ -1703,9 +1699,10 @@ class ReferenciaResource extends Resource
                         ->label('Estado')
                         ->searchable()
                         ->options([
-                            'abierto' => 'Abierto',
-                            'cerrado' => 'Cerrado',
+                            'abierto' => 'Abierto',                            
                             'en_proceso' => 'En proceso',
+                            'cerrado' => 'Cerrado',
+                            'cerrado_no_procede' => 'Cerrado no procede',
                         ])
                         ->required(),
 

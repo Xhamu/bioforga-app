@@ -274,7 +274,7 @@ class ParteTrabajoSuministroOtrosResource extends Resource
                                                 ->directory('parte_trabajo_otros')
                                                 ->acceptedFileTypes(['image/*'])
                                                 ->preserveFilenames()
-                                                ->panelLayout('grid') // ✅ válido en Filament 3
+                                                ->panelLayout('grid')
                                                 ->helperText('Puedes arrastrar para reordenar. Formatos comunes de imagen, hasta 4.'),
                                         ])
                                         ->columns(1), // controla el número de columnas del grid
