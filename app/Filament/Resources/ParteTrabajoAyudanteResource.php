@@ -31,9 +31,6 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\HtmlString;
 use Filament\Forms\Components\Actions\Action as FormAction;
 use Illuminate\Database\Eloquent\Model;
-use Filament\Forms\Get;
-use Filament\Forms\Set;
-use Illuminate\Support\Arr;
 
 class ParteTrabajoAyudanteResource extends Resource
 {
