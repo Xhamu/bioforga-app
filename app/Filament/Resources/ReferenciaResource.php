@@ -19,6 +19,7 @@ use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
+use Filament\Forms\Get;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Support\Enums\FontWeight;
@@ -64,21 +65,24 @@ class ReferenciaResource extends Resource
             'sbp' => 'SB',
         ];
 
-        // Construye el prefijo (todo menos el contador) según sea SU o Servicio
-        $buildRefPrefix = function (callable $get) use ($certMap): string {
-            $refActual = (string) ($get('referencia') ?? '');
+        /**
+         * Devuelve el prefijo (todo menos el contador final de 2 dígitos)
+         */
+        $buildPrefix = function (callable $get) use ($certMap): string {
             $sector = (string) ($get('sector') ?? '01');
-            $fecha = (string) ($get('ref_fecha_fija') ?? now()->format('dmy')); // <- fecha congelada
+            $fecha = (string) ($get('ref_fecha_fija') ?? now()->format('dmy'));
 
-            $esSU = str_contains($refActual, 'SU'); // si tu "tipo" está en otro estado, cámbialo aquí
+            // Detectar SU vs Servicio por campos reales:
+            $esSU = filled($get('formato')) && blank($get('tipo_servicio'));
 
             if ($esSU) {
                 $formato = (string) ($get('formato') ?? 'CA');
 
                 $mid = 'NO';
-                if ($get('certificable')) {
+                // si tienes checkbox/flag de certificable, úsalo aquí
+                if ($get('tipo_certificacion')) {
                     $tc = $get('tipo_certificacion');
-                    if ($tc && isset($certMap[$tc])) {
+                    if (isset($certMap[$tc])) {
                         $mid = $certMap[$tc];
                     }
                 }
@@ -87,32 +91,62 @@ class ReferenciaResource extends Resource
                 return "{$sector}SU{$formato}{$mid}{$fecha}";
             }
 
-            // Servicio: SECTOR + PROV(2) + AYTO(2) + INIC(2) + FECHA
+            // Servicio
             $prov = strtoupper(substr((string) ($get('provincia') ?? ''), 0, 2));
             $ayto = strtoupper(substr((string) ($get('ayuntamiento') ?? ''), 0, 2));
 
-            // Iniciales cliente (o NO si no hay)
+            // Iniciales cliente (o NO)
             $inic = 'NO';
             if ($clienteId = $get('cliente_id')) {
-                $razon = optional(Cliente::find($clienteId))->razon_social;
+                $razon = optional(\App\Models\Cliente::find($clienteId))->razon_social;
                 if ($razon) {
                     $slug = strtoupper(preg_replace('/[^A-Z]/i', '', $razon));
                     $inic = substr($slug, 0, 2) ?: 'NO';
                 }
             }
 
+            // SECTOR + PROV + AYTO + INIC + FECHA
             return "{$sector}{$prov}{$ayto}{$inic}{$fecha}";
         };
 
-        // Setea referencia única añadiendo contador de 2 dígitos, evitando colisiones
-        $setUniqueRef = function (callable $set, callable $get) use ($buildRefPrefix) {
-            $prefix = $buildRefPrefix($get);
+        /**
+         * Setea referencia única preservando el contador actual si es posible.
+         * Excluye el propio registro al comprobar unicidad.
+         */
+        $setUniqueRef = function (callable $set, callable $get) use ($buildPrefix) {
+            $prefix = $buildPrefix($get);
 
+            $current = (string) ($get('referencia') ?? '');
+            // intenta recuperar el contador actual (dos dígitos al final)
+            $contadorActual = null;
+            if (preg_match('/(\d{2})$/', $current, $m)) {
+                $contadorActual = (int) $m[1];
+            }
+
+            $id = $get('id'); // Hidden que añadimos
+
+            // 1) intenta con el contador actual
+            if ($contadorActual !== null) {
+                $try = $prefix . str_pad((string) $contadorActual, 2, '0', STR_PAD_LEFT);
+                $exists = \App\Models\Referencia::where('referencia', $try)
+                    ->when($id, fn($q) => $q->where('id', '<>', $id))
+                    ->exists();
+                if (!$exists) {
+                    $set('referencia', $try);
+                    return;
+                }
+            }
+
+            // 2) busca el siguiente libre
             $i = 1;
             do {
                 $contador = str_pad((string) $i, 2, '0', STR_PAD_LEFT);
                 $ref = $prefix . $contador;
-                $exists = Referencia::where('referencia', $ref)->exists();
+
+                $exists = \App\Models\Referencia::where('referencia', $ref)
+                    ->when($id, fn($q) => $q->where('id', '<>', $id))
+                    ->exists();
+
                 $i++;
             } while ($exists);
 
@@ -590,67 +624,66 @@ class ReferenciaResource extends Resource
                             })
                             ->placeholder('Todos'),
 
-                        SelectFilter::make('interviniente')
-                            ->label('Interviniente')
-                            ->options(function () {
-                                // Leer el valor actual del filtro tipo_referencia desde la request de Filament
-                                $tipoReferencia = request()->input('tableFilters.tipo_referencia.value');
+                        // Sustituye tu SelectFilter::make('interviniente') por:
+                        Filter::make('interviniente')
+                            ->label('Tipo de interviniente')
+                            ->form([
+                                Radio::make('tipo')
+                                    ->label('Tipo de interviniente')
+                                    ->options([
+                                        'proveedor' => 'Proveedor',
+                                        'cliente' => 'Cliente',
+                                    ])
+                                    ->inline()
+                                    ->reactive(),
 
-                                if ($tipoReferencia === 'suministro') {
-                                    // Solo proveedores
-                                    return \App\Models\Proveedor::query()
-                                        ->orderBy('razon_social')
-                                        ->get()
-                                        ->mapWithKeys(fn($proveedor) => [
-                                            'proveedor_' . $proveedor->id => $proveedor->razon_social,
-                                        ])
-                                        ->toArray();
+                                Select::make('id')
+                                    ->label('Interviniente')
+                                    ->searchable()
+                                    ->preload()
+                                    ->options(function (Get $get) {
+                                        if ($get('tipo') === 'proveedor') {
+                                            return \App\Models\Proveedor::query()
+                                                ->where(function ($q) {
+                                                    $q->whereNull('tipo_servicio')
+                                                        ->orWhereNotIn('tipo_servicio', ['Logística', 'logistica', 'LOGÍSTICA']);
+                                                })
+                                                ->orderBy('razon_social')
+                                                ->pluck('razon_social', 'id')
+                                                ->toArray();
+                                        }
+                                        if ($get('tipo') === 'cliente') {
+                                            return \App\Models\Cliente::query()
+                                                ->orderBy('razon_social')
+                                                ->pluck('razon_social', 'id')
+                                                ->toArray();
+                                        }
+                                        return []; // sin tipo seleccionado
+                                    })
+                                    ->disabled(fn(Get $get) => blank($get('tipo'))),
+                            ])
+                            ->query(function (Builder $query, array $data) {
+                                $tipo = $data['tipo'] ?? null;
+                                $id = $data['id'] ?? null;
+
+                                if ($tipo === 'proveedor' && $id) {
+                                    $query->where('proveedor_id', $id);
+                                } elseif ($tipo === 'cliente' && $id) {
+                                    $query->where('cliente_id', $id);
                                 }
-
-                                if ($tipoReferencia === 'servicio') {
-                                    // Solo clientes
-                                    return \App\Models\Cliente::query()
-                                        ->orderBy('razon_social')
-                                        ->get()
-                                        ->mapWithKeys(fn($cliente) => [
-                                            'cliente_' . $cliente->id => $cliente->razon_social,
-                                        ])
-                                        ->toArray();
-                                }
-
-                                // Si no hay tipo_referencia → mostrar ambos
-                                $proveedores = \App\Models\Proveedor::query()
-                                    ->orderBy('razon_social')
-                                    ->get()
-                                    ->mapWithKeys(fn($proveedor) => [
-                                        'proveedor_' . $proveedor->id => $proveedor->razon_social,
-                                    ]);
-
-                                $clientes = \App\Models\Cliente::query()
-                                    ->orderBy('razon_social')
-                                    ->get()
-                                    ->mapWithKeys(fn($cliente) => [
-                                        'cliente_' . $cliente->id => $cliente->razon_social,
-                                    ]);
-
-                                return $proveedores->merge($clientes)->toArray();
                             })
-                            ->searchable()
-                            ->placeholder('Todos')
-                            ->query(function ($query, array $data) {
-                                if (!empty($data['value'])) {
-                                    [$tipo, $id] = explode('_', $data['value']);
-
-                                    if ($tipo === 'proveedor') {
-                                        return $query->where('proveedor_id', $id);
-                                    }
-
-                                    if ($tipo === 'cliente') {
-                                        return $query->where('cliente_id', $id);
-                                    }
+                            ->indicateUsing(function (array $data) {
+                                if (!($data['tipo'] ?? null) || !($data['id'] ?? null)) {
+                                    return null;
                                 }
 
-                                return $query;
+                                $etiqueta = match ($data['tipo']) {
+                                    'proveedor' => optional(\App\Models\Proveedor::find($data['id']))?->razon_social,
+                                    'cliente' => optional(\App\Models\Cliente::find($data['id']))?->razon_social,
+                                    default => null,
+                                };
+
+                                return $etiqueta ? "Interviniente: {$etiqueta}" : null;
                             }),
 
                         SelectFilter::make('estado')
@@ -1029,66 +1062,66 @@ class ReferenciaResource extends Resource
                             })
                             ->placeholder('Todos'),
 
-                        SelectFilter::make('interviniente')
-                            ->label('Interviniente')
-                            ->options(function () {
-                                $tipoReferencia = request()->input('tableFilters.tipo_referencia.value');
+                        // Sustituye tu SelectFilter::make('interviniente') por:
+                        Filter::make('interviniente')
+                            ->label('Tipo de interviniente')
+                            ->form([
+                                Radio::make('tipo')
+                                    ->label('Tipo de interviniente')
+                                    ->options([
+                                        'proveedor' => 'Proveedor',
+                                        'cliente' => 'Cliente',
+                                    ])
+                                    ->inline()
+                                    ->reactive(),
 
-                                if ($tipoReferencia === 'suministro') {
-                                    // Solo proveedores
-                                    return Proveedor::query()
-                                        ->orderBy('razon_social')
-                                        ->get()
-                                        ->mapWithKeys(fn($proveedor) => [
-                                            'proveedor_' . $proveedor->id => $proveedor->razon_social,
-                                        ])
-                                        ->toArray();
+                                Select::make('id')
+                                    ->label('Interviniente')
+                                    ->searchable()
+                                    ->preload()
+                                    ->options(function (Get $get) {
+                                        if ($get('tipo') === 'proveedor') {
+                                            return \App\Models\Proveedor::query()
+                                                ->where(function ($q) {
+                                                    $q->whereNull('tipo_servicio')
+                                                        ->orWhereNotIn('tipo_servicio', ['Logística', 'logistica', 'LOGÍSTICA']);
+                                                })
+                                                ->orderBy('razon_social')
+                                                ->pluck('razon_social', 'id')
+                                                ->toArray();
+                                        }
+                                        if ($get('tipo') === 'cliente') {
+                                            return \App\Models\Cliente::query()
+                                                ->orderBy('razon_social')
+                                                ->pluck('razon_social', 'id')
+                                                ->toArray();
+                                        }
+                                        return []; // sin tipo seleccionado
+                                    })
+                                    ->disabled(fn(Get $get) => blank($get('tipo'))),
+                            ])
+                            ->query(function (Builder $query, array $data) {
+                                $tipo = $data['tipo'] ?? null;
+                                $id = $data['id'] ?? null;
+
+                                if ($tipo === 'proveedor' && $id) {
+                                    $query->where('proveedor_id', $id);
+                                } elseif ($tipo === 'cliente' && $id) {
+                                    $query->where('cliente_id', $id);
                                 }
-
-                                if ($tipoReferencia === 'servicio') {
-                                    // Solo clientes
-                                    return Cliente::query()
-                                        ->orderBy('razon_social')
-                                        ->get()
-                                        ->mapWithKeys(fn($cliente) => [
-                                            'cliente_' . $cliente->id => $cliente->razon_social,
-                                        ])
-                                        ->toArray();
-                                }
-
-                                // Si no hay tipo_referencia → mostrar ambos
-                                $proveedores = Proveedor::query()
-                                    ->orderBy('razon_social')
-                                    ->get()
-                                    ->mapWithKeys(fn($proveedor) => [
-                                        'proveedor_' . $proveedor->id => $proveedor->razon_social,
-                                    ]);
-
-                                $clientes = Cliente::query()
-                                    ->orderBy('razon_social')
-                                    ->get()
-                                    ->mapWithKeys(fn($cliente) => [
-                                        'cliente_' . $cliente->id => $cliente->razon_social,
-                                    ]);
-
-                                return $proveedores->merge($clientes)->toArray();
                             })
-                            ->searchable()
-                            ->placeholder('Todos')
-                            ->query(function ($query, array $data) {
-                                if (!empty($data['value'])) {
-                                    [$tipo, $id] = explode('_', $data['value']);
-
-                                    if ($tipo === 'proveedor') {
-                                        return $query->where('proveedor_id', $id);
-                                    }
-
-                                    if ($tipo === 'cliente') {
-                                        return $query->where('cliente_id', $id);
-                                    }
+                            ->indicateUsing(function (array $data) {
+                                if (!($data['tipo'] ?? null) || !($data['id'] ?? null)) {
+                                    return null;
                                 }
 
-                                return $query;
+                                $etiqueta = match ($data['tipo']) {
+                                    'proveedor' => optional(\App\Models\Proveedor::find($data['id']))?->razon_social,
+                                    'cliente' => optional(\App\Models\Cliente::find($data['id']))?->razon_social,
+                                    default => null,
+                                };
+
+                                return $etiqueta ? "Interviniente: {$etiqueta}" : null;
                             }),
 
                         SelectFilter::make('estado')
@@ -1306,6 +1339,103 @@ class ReferenciaResource extends Resource
 
     public static function generalFormSchema(): array
     {
+        // --- Helpers para construir referencia de forma consistente ---
+        $certMap = [
+            'sure_induestrial' => 'SI',
+            'sure_foresal' => 'SF',
+            'pefc' => 'PF',
+            'sbp' => 'SB',
+        ];
+
+        /**
+         * Devuelve el prefijo (todo menos el contador final de 2 dígitos)
+         */
+        $buildPrefix = function (callable $get) use ($certMap): string {
+            $sector = (string) ($get('sector') ?? '01');
+            $fecha = (string) ($get('ref_fecha_fija') ?? now()->format('dmy'));
+
+            // Detectar SU vs Servicio por campos reales:
+            $esSU = filled($get('formato')) && blank($get('tipo_servicio'));
+
+            if ($esSU) {
+                $formato = (string) ($get('formato') ?? 'CA');
+
+                $mid = 'NO';
+                // si tienes checkbox/flag de certificable, úsalo aquí
+                if ($get('tipo_certificacion')) {
+                    $tc = $get('tipo_certificacion');
+                    if (isset($certMap[$tc])) {
+                        $mid = $certMap[$tc];
+                    }
+                }
+
+                // SECTOR + SU + FORMATO + MID + FECHA
+                return "{$sector}SU{$formato}{$mid}{$fecha}";
+            }
+
+            // Servicio
+            $prov = strtoupper(substr((string) ($get('provincia') ?? ''), 0, 2));
+            $ayto = strtoupper(substr((string) ($get('ayuntamiento') ?? ''), 0, 2));
+
+            // Iniciales cliente (o NO)
+            $inic = 'NO';
+            if ($clienteId = $get('cliente_id')) {
+                $razon = optional(\App\Models\Cliente::find($clienteId))->razon_social;
+                if ($razon) {
+                    $slug = strtoupper(preg_replace('/[^A-Z]/i', '', $razon));
+                    $inic = substr($slug, 0, 2) ?: 'NO';
+                }
+            }
+
+            // SECTOR + PROV + AYTO + INIC + FECHA
+            return "{$sector}{$prov}{$ayto}{$inic}{$fecha}";
+        };
+
+        /**
+         * Setea referencia única preservando el contador actual si es posible.
+         * Excluye el propio registro al comprobar unicidad.
+         */
+        $setUniqueRef = function (callable $set, callable $get) use ($buildPrefix) {
+            $prefix = $buildPrefix($get);
+
+            $current = (string) ($get('referencia') ?? '');
+            // intenta recuperar el contador actual (dos dígitos al final)
+            $contadorActual = null;
+            if (preg_match('/(\d{2})$/', $current, $m)) {
+                $contadorActual = (int) $m[1];
+            }
+
+            $id = $get('id'); // Hidden que añadimos
+
+            // 1) intenta con el contador actual
+            if ($contadorActual !== null) {
+                $try = $prefix . str_pad((string) $contadorActual, 2, '0', STR_PAD_LEFT);
+                $exists = \App\Models\Referencia::where('referencia', $try)
+                    ->when($id, fn($q) => $q->where('id', '<>', $id))
+                    ->exists();
+                if (!$exists) {
+                    $set('referencia', $try);
+                    return;
+                }
+            }
+
+            // 2) busca el siguiente libre
+            $i = 1;
+            do {
+                $contador = str_pad((string) $i, 2, '0', STR_PAD_LEFT);
+                $ref = $prefix . $contador;
+
+                $exists = \App\Models\Referencia::where('referencia', $ref)
+                    ->when($id, fn($q) => $q->where('id', '<>', $id))
+                    ->exists();
+
+                $i++;
+            } while ($exists);
+
+            $set('referencia', $ref);
+        };
+        // ----------------------------------------------------------------
+
         return [
             // Fecha fija también aquí para cuando uses este schema suelto
             Forms\Components\Hidden::make('ref_fecha_fija')
@@ -1596,7 +1726,8 @@ class ReferenciaResource extends Resource
                             'sbp' => 'SBP',
                             'pefc' => 'PEFC',
                         ])
-                        ->reactive(),
+                        ->reactive()
+                        ->afterStateUpdated(fn($state, $set, $get) => $setUniqueRef($set, $get)),
 
                     Forms\Components\Checkbox::make('guia_sanidad')
                         ->label('¿Guía de sanidad?')
@@ -1699,7 +1830,7 @@ class ReferenciaResource extends Resource
                         ->label('Estado')
                         ->searchable()
                         ->options([
-                            'abierto' => 'Abierto',                            
+                            'abierto' => 'Abierto',
                             'en_proceso' => 'En proceso',
                             'cerrado' => 'Cerrado',
                             'cerrado_no_procede' => 'Cerrado no procede',
