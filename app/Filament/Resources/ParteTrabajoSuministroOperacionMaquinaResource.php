@@ -603,7 +603,7 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                                 ->color('danger')
                                 ->icon('heroicon-o-lock-closed')
                                 ->extraAttributes(['class' => 'w-full'])
-                                ->visible(fn($record) => $record && $record->referencia && $record->referencia->estado === 'en_proceso')
+                                ->visible(fn($record) => $record && $record->referencia && $record->referencia->estado !== 'cerrado')
                                 ->button()
                                 ->modalHeading('Finalizar trabajo y cerrar referencia')
                                 ->modalSubmitActionLabel('Finalizar y cerrar referencia')
