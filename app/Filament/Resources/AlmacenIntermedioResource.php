@@ -6,15 +6,21 @@ use App\Filament\Resources\AlmacenIntermedioResource\Pages;
 use App\Filament\Resources\AlmacenIntermedioResource\RelationManagers;
 use App\Models\AlmacenIntermedio;
 use Filament\Forms;
-use Filament\Forms\Components\View;
 use Filament\Forms\Form;
+use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Repeater;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\View;
 use Filament\Resources\Resource;
 use Filament\Support\Enums\FontWeight;
 use Filament\Tables;
-use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
+use Filament\Tables\Columns\TextColumn;
+use Illuminate\Database\Eloquent\Builder;   // <— IMPORTANTE
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Filament\Forms\Components\Fieldset;
+use Filament\Forms\Get;
 
 class AlmacenIntermedioResource extends Resource
 {
@@ -75,36 +81,6 @@ class AlmacenIntermedioResource extends Resource
                                     ])
                                     ->columns(2),
 
-                                Forms\Components\Section::make('Producto')
-                                    ->schema([
-                                        Forms\Components\Select::make('producto_especie')
-                                            ->label('Especie')
-                                            ->searchable()
-                                            ->options([
-                                                'pino' => 'Pino',
-                                                'eucalipto' => 'Eucalipto',
-                                                'acacia' => 'Acacia',
-                                                'frondosa' => 'Frondosa',
-                                                'otros' => 'Otros',
-                                            ])
-                                            ->required(),
-                                        Forms\Components\Select::make('producto_tipo')
-                                            ->label('Tipo')
-                                            ->searchable()
-                                            ->options([
-                                                'troza' => 'Troza',
-                                                'tacos' => 'Tacos',
-                                                'puntal' => 'Puntal',
-                                            ])
-                                            ->required(),
-
-                                        Forms\Components\TextInput::make('cantidad_aprox')
-                                            ->label('Cantidad')
-                                            ->numeric()
-                                            ->required(),
-                                    ])->columns(3)
-                                    ->visible(fn($get) => !empty($get('referencia'))),
-
                                 Forms\Components\Section::make('Usuarios')
                                     ->schema([
                                         Forms\Components\Select::make('usuarios')
@@ -127,8 +103,166 @@ class AlmacenIntermedioResource extends Resource
                                     ->visible(fn($get) => !empty($get('referencia'))),
                             ]),
 
+                        Forms\Components\Tabs\Tab::make('Entradas')
+                            ->schema([
+                                Repeater::make('entradasAlmacen')
+                                    ->relationship('entradasAlmacen')
+                                    ->label('Entradas de material')
+                                    ->orderable('fecha') // o 'id'
+                                    ->defaultItems(0)
+                                    ->createItemButtonLabel('Añadir entrada')
+                                    ->reorderable()
+                                    ->columns(12) // grid interno del repeater
+                                    ->schema([
+                                        // Fila 1: Fecha + Tipo
+                                        DatePicker::make('fecha')
+                                            ->label('Fecha')
+                                            ->default(now('Europe/Madrid'))
+                                            ->timezone('Europe/Madrid')
+                                            ->required()
+                                            ->helperText('Fecha de entrada al almacén')
+                                            ->columnSpan([
+                                                'default' => 12,
+                                                'md' => 6,
+                                                'xl' => 6,
+                                            ]),
+
+                                        Select::make('tipo')
+                                            ->label('Tipo')
+                                            ->options([
+                                                'madera' => 'Madera',
+                                                'astilla' => 'Astilla',
+                                            ])
+                                            ->required()
+                                            ->native(false)
+                                            ->columnSpan([
+                                                'default' => 12,
+                                                'md' => 6,
+                                                'xl' => 6,
+                                            ]),
+
+                                        // Fila 2: Proveedor + Transporte (empresa + matrícula)
+                                        Select::make('proveedor_id')
+                                            ->label('Proveedor')
+                                            ->searchable()
+                                            ->preload()
+                                            ->placeholder('Selecciona un proveedor')
+                                            ->relationship(
+                                                name: 'proveedor',
+                                                titleAttribute: 'razon_social',
+                                                modifyQueryUsing: fn(Builder $query) => $query->orderBy('razon_social')
+                                            )
+                                            ->reactive() // <- para que notifique a los campos dependientes
+                                            ->columnSpan([
+                                                'default' => 12,
+                                                'md' => 6,
+                                                'xl' => 6,
+                                            ]),
+
+                                        Fieldset::make('Transporte')
+                                            ->schema([
+                                                // Usuario transportista dependiente del proveedor seleccionado
+                                                Select::make('transportista_id')
+                                                    ->label('Usuario transportista')
+                                                    ->searchable()
+                                                    ->preload()
+                                                    ->options(function (Get $get) {
+                                                        $proveedorId = $get('proveedor_id');
+                                                        if (!$proveedorId) {
+                                                            return [];
+                                                        }
+
+                                                        return \App\Models\User::query()
+                                                            ->where('proveedor_id', $proveedorId)
+                                                            ->whereHas('roles', fn(Builder $q) => $q->where('name', 'transportista'))
+                                                            ->orderBy('name')
+                                                            ->get()
+                                                            ->mapWithKeys(fn($u) => [
+                                                                $u->id => trim($u->name . ' ' . $u->apellidos),
+                                                            ])
+                                                            ->toArray();
+                                                    })
+                                                    ->disabled(fn(Get $get) => blank($get('proveedor_id')))
+                                                    ->reactive()
+                                                    ->required()
+                                                    ->columnSpan([
+                                                        'default' => 12,
+                                                        'md' => 8,
+                                                        'xl' => 8,
+                                                    ]),
+
+                                                // Camiones del usuario transportista seleccionado
+                                                Select::make('camion_id')
+                                                    ->label('Camión (matrícula)')
+                                                    ->searchable()
+                                                    ->preload()
+                                                    ->options(function (Get $get) {
+                                                        $proveedorId = $get('proveedor_id');
+                                                        if (!$proveedorId)
+                                                            return [];
+
+                                                        return \App\Models\Camion::query()
+                                                            ->where('proveedor_id', $proveedorId)
+                                                            ->orderBy('matricula_cabeza')
+                                                            ->get()
+                                                            ->mapWithKeys(fn($c) => [
+                                                                $c->id => $c->matricula_cabeza
+                                                                    . (($c->marca || $c->modelo) ? ' · ' . trim(($c->marca ?? '') . ' ' . ($c->modelo ?? '')) : ''),
+                                                            ])
+                                                            ->toArray();
+                                                    })
+                                                    ->disabled(fn(Get $get) => blank($get('proveedor_id')))
+                                                    ->required()
+                                                    ->columnSpan([
+                                                        'default' => 12,
+                                                        'md' => 4,
+                                                        'xl' => 4,
+                                                    ]),
+                                            ])
+                                            ->columns(12)
+                                            ->columnSpan([
+                                                'default' => 12,
+                                                'md' => 6,
+                                                'xl' => 6,
+                                            ]),
+
+                                        // Fila 3: Cantidad + Especie
+                                        TextInput::make('cantidad')
+                                            ->label('Cantidad')
+                                            ->numeric()
+                                            ->minValue(0)
+                                            ->step('0.001')
+                                            ->required()
+                                            ->suffix('t') // cámbialo a 'm³' si aplica
+                                            ->helperText('Usa punto para decimales (ej. 12.500)')
+                                            ->columnSpan([
+                                                'default' => 12,
+                                                'md' => 6,
+                                                'xl' => 6,
+                                            ]),
+
+                                        Select::make('especie')
+                                            ->label('Especie')
+                                            ->options([
+                                                'pino' => 'Pino',
+                                                'eucalipto' => 'Eucalipto',
+                                                'acacia' => 'Acacia',
+                                                'frondosa' => 'Frondosa',
+                                                'otros' => 'Otros',
+                                            ])
+                                            ->searchable()
+                                            ->native(false)
+                                            ->columnSpan([
+                                                'default' => 12,
+                                                'md' => 6,
+                                                'xl' => 6,
+                                            ]),
+                                    ])
+                                    ->columnSpanFull(), // el repeater ocupa todo el ancho de la Tab
+                            ]),
+
                         // TAB NUEVO
-                        Forms\Components\Tabs\Tab::make('Partes de trabajo')
+                        Forms\Components\Tabs\Tab::make('Suministro almacén')
                             ->schema([
                                 Forms\Components\View::make('filament.resources.referencia-resource.partials.partes-trabajo-almacen')
                                     ->viewData([

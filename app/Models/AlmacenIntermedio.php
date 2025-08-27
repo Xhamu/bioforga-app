@@ -40,6 +40,11 @@ class AlmacenIntermedio extends Authenticatable
         return $this->belongsToMany(User::class, 'almacenes_users', 'almacen_id', 'user_id')->withTimestamps()->withTrashed();
     }
 
+    public function entradasAlmacen()
+    {
+        return $this->hasMany(\App\Models\AlmacenEntrada::class, 'almacen_intermedio_id');
+    }
+
     public function getEstadoMostrarAttribute()
     {
         $estado = $this->estado;
