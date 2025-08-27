@@ -8,15 +8,26 @@ return new class extends Migration {
     public function up(): void
     {
         Schema::table('parte_trabajo_suministro_desplazamiento', function (Blueprint $table) {
-            $table->unsignedBigInteger('vehiculo_id')->nullable()->after('usuario_id');
-            $table->string('destino')->nullable()->after('vehiculo_id');
+            if (!Schema::hasColumn('parte_trabajo_suministro_desplazamiento', 'vehiculo_id')) {
+                $table->unsignedBigInteger('vehiculo_id')->nullable()->after('usuario_id');
+            }
+
+            if (!Schema::hasColumn('parte_trabajo_suministro_desplazamiento', 'destino')) {
+                $table->string('destino')->nullable()->after('vehiculo_id');
+            }
         });
     }
 
     public function down(): void
     {
         Schema::table('parte_trabajo_suministro_desplazamiento', function (Blueprint $table) {
-            $table->dropColumn(['vehiculo_id', 'destino']);
+            if (Schema::hasColumn('parte_trabajo_suministro_desplazamiento', 'vehiculo_id')) {
+                $table->dropColumn('vehiculo_id');
+            }
+
+            if (Schema::hasColumn('parte_trabajo_suministro_desplazamiento', 'destino')) {
+                $table->dropColumn('destino');
+            }
         });
     }
 };
