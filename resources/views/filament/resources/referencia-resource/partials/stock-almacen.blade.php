@@ -1,5 +1,6 @@
 <x-filament::section>
     @php
+        // Catálogo fijo → siempre se muestran estas certificaciones
         $certCatalog = [
             'sure_induestrial' => 'SURE - Industrial',
             'sure_foresal' => 'SURE - Forestal',
@@ -10,30 +11,14 @@
         $ordenCerts = ['sure_induestrial', 'sure_foresal', 'sbp', 'pefc', '__none__'];
         $fmtNum = fn($n) => number_format((float) $n, 2, ',', '.');
 
-        // OJO: referencia se carga DENTRO de parteTrabajoSuministroTransporte
+        // ===== IMPORTANTE: eager load de la referencia en el PARTE =====
         $with = [
-            'parteTrabajoSuministroTransporte.referencia:id,tipo_certificacion',
-            'parteTrabajoSuministroTransporte: id,almacen_id,cliente_id,referencia_id,tipo_certificacion',
+            'parteTrabajoSuministroTransporte.cliente',
+            'parteTrabajoSuministroTransporte.usuario',
+            'parteTrabajoSuministroTransporte.referencia', // <<--- este es el bueno
         ];
 
-        $mapAliases = [
-            'sure-industrial' => 'sure_induestrial',
-            'sure_industrial' => 'sure_induestrial',
-            'sure-foresal' => 'sure_foresal',
-            'sure_forestal' => 'sure_foresal',
-        ];
-        $valid = ['sure_induestrial', 'sure_foresal', 'sbp', 'pefc'];
-
-        $normCertKey = function ($parte) use ($mapAliases, $valid) {
-            // Prioriza la referencia (según tu modelo), y si no, el propio parte
-            $code =
-                (string) (data_get($parte, 'referencia.tipo_certificacion') ??
-                    (data_get($parte, 'tipo_certificacion') ?? ''));
-
-            $code = $mapAliases[$code] ?? $code;
-            return in_array($code, $valid, true) ? $code : '__none__';
-        };
-
+        // Normaliza especie (como ya tenías)
         $normEspecie = function ($parte) {
             $raw = $parte?->tipo_biomasa;
             if (is_array($raw)) {
@@ -47,13 +32,29 @@
             return $raw !== '' ? $raw : 'Sin especificar';
         };
 
-        $entradasAgg = collect(); // especie
+        // Normaliza certificación leyendo SOLO de Referencia (igual que “por especie” pero por cert)
+        $normCertKey = function ($parte) {
+            $code = (string) (data_get($parte, 'referencia.tipo_certificacion') ?? '');
+            // alias comunes por si hay variantes
+            $map = [
+                'sure-industrial' => 'sure_induestrial',
+                'sure_industrial' => 'sure_induestrial',
+                'sure-foresal' => 'sure_foresal',
+                'sure_forestal' => 'sure_foresal',
+            ];
+            $code = $map[$code] ?? $code;
+            $valid = ['sure_induestrial', 'sure_foresal', 'sbp', 'pefc'];
+            return in_array($code, $valid, true) ? $code : '__none__';
+        };
+
+        // Agregados
+        $entradasAgg = collect(); // por especie
         $salidasAgg = collect();
-        $entradasCertAgg = collect(array_fill_keys(array_keys($certCatalog), 0.0)); // cert
+        $entradasCertAgg = collect(array_fill_keys(array_keys($certCatalog), 0.0)); // por certificación
         $salidasCertAgg = collect(array_fill_keys(array_keys($certCatalog), 0.0));
 
         if ($recordId) {
-            // ENTRADAS (ref -> este almacén, sin cliente)
+            // ===== ENTRADAS: referencia -> ESTE almacén (sin cliente)
             $entradasByParte = \App\Models\CargaTransporte::with($with)
                 ->whereNull('deleted_at')
                 ->whereHas(
@@ -72,7 +73,7 @@
                 })
                 ->values();
 
-            // SALIDAS (este almacén -> cliente)
+            // ===== SALIDAS: ESTE almacén -> cliente
             $salidasByParte = \App\Models\CargaTransporte::with($with)
                 ->whereNull('deleted_at')
                 ->where('almacen_id', $recordId)
@@ -89,7 +90,7 @@
                 })
                 ->values();
 
-            // especie (como ya te funciona)
+            // === Por especie (igual que antes)
             $entradasAgg = $entradasByParte
                 ->groupBy('especie')
                 ->map(fn($it) => (float) collect($it)->sum('cantidad_total'));
@@ -97,7 +98,7 @@
                 ->groupBy('especie')
                 ->map(fn($it) => (float) collect($it)->sum('cantidad_total'));
 
-            // certificación
+            // === Por certificación (sumando sobre la clave certKey)
             foreach ($entradasByParte as $row) {
                 $entradasCertAgg[$row->certKey] += $row->cantidad_total;
             }
@@ -106,11 +107,13 @@
             }
         }
 
+        // Claves ordenadas para pintar
         $certKeysOrdenadas = collect($ordenCerts);
         $todasEspecies = $entradasAgg->keys()->merge($salidasAgg->keys())->unique()->sort()->values();
 
-        $totalE = (float) $entradasAgg->sum();
-        $totalS = (float) $salidasAgg->sum();
+        // KPIs especie
+        $totalE = (float) ($entradasAgg->sum() ?? 0);
+        $totalS = (float) ($salidasAgg->sum() ?? 0);
         $totalStock = $totalE - $totalS;
     @endphp
 
@@ -184,8 +187,6 @@
             </div>
         @endforeach
     </div>
-
-    <br />
 
     {{-- ======== BLOQUE: Stock por Especie ======== --}}
     <x-slot name="heading">Stock</x-slot>
