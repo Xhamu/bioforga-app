@@ -10,6 +10,7 @@ use Filament\Facades\Filament;
 use Filament\Forms;
 use Filament\Forms\Components\Actions;
 use Filament\Forms\Components\Actions\Action;
+use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Section;
@@ -78,6 +79,26 @@ class ParteTrabajoSuministroOtrosResource extends Resource
                             ->required(),
                     ])
                     ->columns(3),
+
+                Section::make('Fecha y horas')
+                    ->visible(fn($record) => $record && filled($record->fecha_hora_fin_otros))
+                    ->schema([
+                        DateTimePicker::make('fecha_hora_inicio_otros')
+                            ->label('Hora de inicio')
+                            ->seconds(false)
+                            ->timezone('Europe/Madrid')
+                            ->closeOnDateSelection()
+                            ->live(),
+
+                        DateTimePicker::make('fecha_hora_fin_otros')
+                            ->label('Hora de finalización')
+                            ->seconds(false)
+                            ->timezone('Europe/Madrid')
+                            ->closeOnDateSelection()
+                            ->live()
+                            ->rule('after:fecha_hora_inicio_otros'),
+                    ])
+                    ->columns(2),
 
                 Section::make('')
                     ->schema([
@@ -219,7 +240,7 @@ class ParteTrabajoSuministroOtrosResource extends Resource
                     ]),
 
                 Section::make('Fotos')
-                    //->visible(fn($record) => $record && !empty($record->fotos))
+                    ->visible(fn($record) => $record && filled($record->fecha_hora_fin_otros))
                     ->schema([
                         FileUpload::make('fotos')
                             ->label('Fotos')
