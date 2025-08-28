@@ -546,19 +546,48 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                             ->label('GPS descarga')
                             ->content(fn($record) => new \Illuminate\Support\HtmlString($record->gps_descarga_mostrar)),
 
+                        Select::make('destino_tipo')
+                            ->label('Destino')
+                            ->options([
+                                'cliente' => 'Cliente',
+                                'almacen' => 'Almacén intermedio',
+                            ])
+                            ->live()
+                            ->dehydrated(false) // 👈 NO se guarda en BD
+                            // Al hidratar (editar), si no hay valor todavía, dedúcelo del registro:
+                            ->afterStateHydrated(function (Get $get, Set $set, $record) {
+                                if ($get('destino_tipo'))
+                                    return;
+
+                                if ($record?->almacen_id) {
+                                    $set('destino_tipo', 'almacen');
+                                } elseif ($record?->cliente_id) {
+                                    $set('destino_tipo', 'cliente');
+                                }
+                            })
+                            ->afterStateUpdated(function (string $state, Set $set) {
+                                if ($state === 'cliente') {
+                                    $set('almacen_id', null);
+                                } elseif ($state === 'almacen') {
+                                    $set('cliente_id', null);
+                                }
+                            }),
+
                         Select::make('cliente_id')
                             ->label('Cliente')
                             ->options(fn() => \App\Models\Cliente::where('tipo_cliente', 'suministro')->pluck('razon_social', 'id'))
                             ->searchable()
                             ->preload()
-                            ->visible(fn($record) => $record?->cliente_id !== null),
+                            ->visible(fn(Get $get) => $get('destino_tipo') === 'cliente')
+                            ->required(fn(Get $get) => $get('destino_tipo') === 'cliente'),
 
                         Select::make('almacen_id')
                             ->label('Almacén intermedio')
-                            ->options(fn() => AlmacenIntermedio::pluck('referencia', 'id'))
+                            ->options(fn() => \App\Models\AlmacenIntermedio::pluck('referencia', 'id'))
                             ->searchable()
                             ->preload()
-                            ->visible(fn($record) => $record?->almacen_id !== null),
+                            ->visible(fn(Get $get) => $get('destino_tipo') === 'almacen')
+                            ->required(fn(Get $get) => $get('destino_tipo') === 'almacen'),
 
                         Select::make('tipo_biomasa')
                             ->label('Tipo de biomasa')
@@ -592,7 +621,11 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                             ->openable()
                             ->required()
                             ->columnSpanFull()
-                            ->visible(fn($record) => $record?->cliente_id !== null),
+                            ->visible(fn($record) => $record?->cliente_id !== null)
+                            ->validationMessages([
+                                'required' => 'Debes subir la foto del ticket de pesada.',
+                                'image' => 'El archivo debe ser una imagen válida.',
+                            ]),
 
                         FileUpload::make('carta_porte')
                             ->label('Carta de porte')
@@ -602,7 +635,11 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                             ->openable()
                             ->required()
                             ->columnSpanFull()
-                            ->visible(fn($record) => $record?->almacen_id !== null),
+                            ->visible(fn($record) => $record?->almacen_id !== null)
+                            ->validationMessages([
+                                'required' => 'Debes subir la foto de la carta de porte.',
+                                'image' => 'El archivo debe ser una imagen válida.',
+                            ]),
                     ])
                     ->columns([
                         'default' => 1,

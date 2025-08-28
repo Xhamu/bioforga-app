@@ -1,6 +1,8 @@
 <x-filament::section>
     @php
-        // Catálogo fijo → siempre se muestran estas certificaciones
+        // ===== utilidades que ya tienes arriba =====
+        $fmtNum = fn($n) => number_format((float) $n, 2, ',', '.');
+
         $certCatalog = [
             'sure_induestrial' => 'SURE - Industrial',
             'sure_foresal' => 'SURE - Forestal',
@@ -9,52 +11,152 @@
             '__none__' => 'Sin certificar',
         ];
         $ordenCerts = ['sure_induestrial', 'sure_foresal', 'sbp', 'pefc', '__none__'];
-        $fmtNum = fn($n) => number_format((float) $n, 2, ',', '.');
 
-        // ===== IMPORTANTE: eager load de la referencia en el PARTE =====
-        $with = [
-            'parteTrabajoSuministroTransporte.cliente',
-            'parteTrabajoSuministroTransporte.usuario',
-            'parteTrabajoSuministroTransporte.referencia', // <<--- este es el bueno
-        ];
+        $normCertKeyFromRef = function (?string $raw): string {
+            $raw = (string) ($raw ?? '');
+            $normalize = function (string $s): string {
+                $s = mb_strtolower($s, 'UTF-8');
+                $s = strtr($s, [
+                    'á' => 'a',
+                    'é' => 'e',
+                    'í' => 'i',
+                    'ó' => 'o',
+                    'ú' => 'u',
+                    'à' => 'a',
+                    'è' => 'e',
+                    'ì' => 'i',
+                    'ò' => 'o',
+                    'ù' => 'u',
+                    'ä' => 'a',
+                    'ë' => 'e',
+                    'ï' => 'i',
+                    'ö' => 'o',
+                    'ü' => 'u',
+                    'ñ' => 'n',
+                ]);
+                return preg_replace('/[\s_\-]+/u', '', $s);
+            };
+            $n = $normalize($raw);
 
-        // Normaliza especie (como ya tenías)
-        $normEspecie = function ($parte) {
-            $raw = $parte?->tipo_biomasa;
-            if (is_array($raw)) {
-                $raw = collect($raw)->filter()->map(fn($v) => trim((string) $v))->values();
-                if ($raw->count() === 1) {
-                    return $raw->first();
-                }
-                return $raw->count() > 1 ? 'Mixto' : 'Sin especificar';
-            }
-            $raw = trim((string) ($raw ?? ''));
-            return $raw !== '' ? $raw : 'Sin especificar';
-        };
-
-        // Normaliza certificación leyendo SOLO de Referencia (igual que “por especie” pero por cert)
-        $normCertKey = function ($parte) {
-            $code = (string) (data_get($parte, 'referencia.tipo_certificacion') ?? '');
-            // alias comunes por si hay variantes
             $map = [
-                'sure-industrial' => 'sure_induestrial',
-                'sure_industrial' => 'sure_induestrial',
-                'sure-foresal' => 'sure_foresal',
-                'sure_forestal' => 'sure_foresal',
+                'sureinduestrial' => 'sure_induestrial',
+                'sureindustrial' => 'sure_induestrial',
+                'sureforesal' => 'sure_foresal',
+                'sureforestal' => 'sure_foresal',
+                'sbp' => 'sbp',
+                'pefc' => 'pefc',
             ];
-            $code = $map[$code] ?? $code;
-            $valid = ['sure_induestrial', 'sure_foresal', 'sbp', 'pefc'];
-            return in_array($code, $valid, true) ? $code : '__none__';
+            if (isset($map[$n])) {
+                return $map[$n];
+            }
+
+            if (str_contains($n, 'industrial') || str_contains($n, 'indust')) {
+                return 'sure_induestrial';
+            }
+            if (str_contains($n, 'forestal') || str_contains($n, 'foresal') || str_contains($n, 'forest')) {
+                return 'sure_foresal';
+            }
+            if ($n === 'sbp') {
+                return 'sbp';
+            }
+            if ($n === 'pefc') {
+                return 'pefc';
+            }
+
+            return '__none__';
         };
 
-        // Agregados
-        $entradasAgg = collect(); // por especie
-        $salidasAgg = collect();
-        $entradasCertAgg = collect(array_fill_keys(array_keys($certCatalog), 0.0)); // por certificación
-        $salidasCertAgg = collect(array_fill_keys(array_keys($certCatalog), 0.0));
+        // Inicializa agregados
+        $entradasCertAgg = collect(array_fill_keys(array_keys($certCatalog), 0.0));
+        $salidasCertAgg = collect(array_fill_keys(array_keys($certCatalog), 0.0)); // por ahora en 0
+
+        // -------- Diagnóstico con whereHas (parte → almacén) --------
+        if (request('debug_cert')) {
+            dump([
+                'recordId' => $recordId,
+                'cargas_total_con_parte_al_almacen' => \App\Models\CargaTransporte::whereHas(
+                    'parteTrabajoSuministroTransporte',
+                    fn($q) => $q->where('almacen_id', $recordId),
+                )->count(),
+                'cargas_con_ref_y_parte_al_almacen' => \App\Models\CargaTransporte::whereNotNull('referencia_id')
+                    ->whereHas('parteTrabajoSuministroTransporte', fn($q) => $q->where('almacen_id', $recordId))
+                    ->count(),
+                'cargas_con_ref_y_parte_al_almacen_sin_cliente' => \App\Models\CargaTransporte::whereNotNull(
+                    'referencia_id',
+                )
+                    ->whereHas(
+                        'parteTrabajoSuministroTransporte',
+                        fn($q) => $q->where('almacen_id', $recordId)->whereNull('cliente_id'),
+                    )
+                    ->count(),
+            ]);
+        }
+        // -----------------------------------------------------------
 
         if ($recordId) {
-            // ===== ENTRADAS: referencia -> ESTE almacén (sin cliente)
+            // ENTRADAS: referencia -> ESTE almacén (almacen_id en el PARTE; sin cliente)
+            $cargasEntrada = \App\Models\CargaTransporte::query()
+                ->with([
+                    'referencia:id,tipo_certificacion',
+                    'parteTrabajoSuministroTransporte:id,almacen_id,cliente_id',
+                ])
+                ->whereNull('deleted_at')
+                ->whereNotNull('referencia_id') // viene de referencia
+                ->whereHas(
+                    'parteTrabajoSuministroTransporte',
+                    fn($q) => $q->where('almacen_id', $recordId)->whereNull('cliente_id'),
+                )
+                ->get();
+
+            if (request('debug_cert')) {
+                dump('CARGAS ENTRADA (whereHas parte->almacen_id, ref_id not null, cliente_id null)');
+                dump(
+                    $cargasEntrada
+                        ->map(function ($c) use ($normCertKeyFromRef) {
+                            return [
+                                'carga_id' => $c->id,
+                                'referencia_id' => $c->referencia_id,
+                                'ref_cert_raw' => optional($c->referencia)->tipo_certificacion,
+                                'ref_cert_norm' => $normCertKeyFromRef(optional($c->referencia)->tipo_certificacion),
+                                'parte_almacen' => optional($c->parteTrabajoSuministroTransporte)->almacen_id,
+                                'parte_cliente' => optional($c->parteTrabajoSuministroTransporte)->cliente_id,
+                                'cantidad' => (float) $c->cantidad,
+                            ];
+                        })
+                        ->toArray(),
+                );
+            }
+
+            foreach ($cargasEntrada as $c) {
+                $key = $normCertKeyFromRef(optional($c->referencia)->tipo_certificacion);
+                $entradasCertAgg[$key] += (float) $c->cantidad;
+            }
+        }
+
+        $certKeysOrdenadas = collect($ordenCerts);
+
+        // ===== Agregados por ESPECIE (como ya te funcionaba) =====
+        $entradasAgg = collect();
+        $salidasAgg = collect();
+
+        if ($recordId) {
+            $with = ['parteTrabajoSuministroTransporte.cliente', 'parteTrabajoSuministroTransporte.usuario'];
+
+            // Normalizador de especie
+            $normEspecie = function ($parte) {
+                $raw = $parte?->tipo_biomasa;
+                if (is_array($raw)) {
+                    $raw = collect($raw)->filter()->map(fn($v) => trim((string) $v))->values();
+                    if ($raw->count() === 1) {
+                        return $raw->first();
+                    }
+                    return $raw->count() > 1 ? 'Mixto' : 'Sin especificar';
+                }
+                $raw = trim((string) ($raw ?? ''));
+                return $raw !== '' ? $raw : 'Sin especificar';
+            };
+
+            // ENTRADAS por especie: ref -> este almacén (sin cliente)
             $entradasByParte = \App\Models\CargaTransporte::with($with)
                 ->whereNull('deleted_at')
                 ->whereHas(
@@ -63,55 +165,42 @@
                 )
                 ->get()
                 ->groupBy('parte_trabajo_suministro_transporte_id')
-                ->map(function ($cargas) use ($normEspecie, $normCertKey) {
+                ->map(function ($cargas) use ($normEspecie) {
                     $parte = $cargas->first()->parteTrabajoSuministroTransporte;
                     return (object) [
                         'especie' => $normEspecie($parte),
-                        'certKey' => $normCertKey($parte),
                         'cantidad_total' => (float) $cargas->sum('cantidad'),
                     ];
                 })
                 ->values();
 
-            // ===== SALIDAS: ESTE almacén -> cliente
+            // SALIDAS por especie: este almacén -> cliente
             $salidasByParte = \App\Models\CargaTransporte::with($with)
                 ->whereNull('deleted_at')
                 ->where('almacen_id', $recordId)
                 ->whereHas('parteTrabajoSuministroTransporte', fn($q) => $q->whereNotNull('cliente_id'))
                 ->get()
                 ->groupBy('parte_trabajo_suministro_transporte_id')
-                ->map(function ($cargas) use ($normEspecie, $normCertKey) {
+                ->map(function ($cargas) use ($normEspecie) {
                     $parte = $cargas->first()->parteTrabajoSuministroTransporte;
                     return (object) [
                         'especie' => $normEspecie($parte),
-                        'certKey' => $normCertKey($parte),
                         'cantidad_total' => (float) $cargas->sum('cantidad'),
                     ];
                 })
                 ->values();
 
-            // === Por especie (igual que antes)
+            // Agregados finales por especie
             $entradasAgg = $entradasByParte
                 ->groupBy('especie')
                 ->map(fn($it) => (float) collect($it)->sum('cantidad_total'));
             $salidasAgg = $salidasByParte
                 ->groupBy('especie')
                 ->map(fn($it) => (float) collect($it)->sum('cantidad_total'));
-
-            // === Por certificación (sumando sobre la clave certKey)
-            foreach ($entradasByParte as $row) {
-                $entradasCertAgg[$row->certKey] += $row->cantidad_total;
-            }
-            foreach ($salidasByParte as $row) {
-                $salidasCertAgg[$row->certKey] += $row->cantidad_total;
-            }
         }
 
-        // Claves ordenadas para pintar
-        $certKeysOrdenadas = collect($ordenCerts);
+        // Conjuntos y KPIs especie
         $todasEspecies = $entradasAgg->keys()->merge($salidasAgg->keys())->unique()->sort()->values();
-
-        // KPIs especie
         $totalE = (float) ($entradasAgg->sum() ?? 0);
         $totalS = (float) ($salidasAgg->sum() ?? 0);
         $totalStock = $totalE - $totalS;
@@ -142,7 +231,7 @@
                     <tr class="bg-gray-100">
                         <td class="px-4 py-3 text-gray-800">{{ $label }}</td>
                         <td class="px-4 py-3 text-right text-gray-800">{{ $fmtNum($e) }}</td>
-                        <td class="px-4 py-3 text-right text-gray-800">{{ $fmtNum($s) }}</td>
+                        <td class="px-4 py-3 text-right text-gray-800">- Por definir -</td>
                         <td class="px-4 py-3 text-right {{ $st >= 0 ? 'text-green-700' : 'text-red-700' }}">
                             {{ $fmtNum($st) }}
                         </td>
