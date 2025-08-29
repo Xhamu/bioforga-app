@@ -63,6 +63,19 @@ class ParteTrabajoSuministroTransporteResource extends Resource
     public static ?string $label = 'suministro del transportista';
     public static ?string $pluralLabel = 'Suministros del transportista';
 
+    // Eliminar el boton de create si tiene un parte activo.
+    // Ahora mismo se muestra el botón, pero al darle redirige al parte activo.
+    
+    /*public static function canCreate(): bool
+    {
+        $model = static::getModel();
+
+        return !$model::query()
+            ->where('usuario_id', Auth::id())
+            ->whereNull('fecha_hora_descarga')
+            ->exists();
+    }*/
+
     public static function form(Form $form): Form
     {
         return $form

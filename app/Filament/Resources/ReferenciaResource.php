@@ -240,7 +240,7 @@ class ReferenciaResource extends Resource
                                 '01' => 'Zona Norte Galicia',
                                 '02' => 'Zona Sur Galicia',
                                 '03' => 'Andalucía Oriental',
-                                '04' => 'Andalucía Occidental',
+                                '04' => 'Andalucía Occidental y Sur Portugal',
                                 '05' => 'Otros',
                             ])
                             ->columnSpanFull()
@@ -612,7 +612,7 @@ class ReferenciaResource extends Resource
                                 '01' => 'Zona Norte Galicia',
                                 '02' => 'Zona Sur Galicia',
                                 '03' => 'Andalucía Oriental',
-                                '04' => 'Andalucía Occidental',
+                                '04' => 'Andalucía Occidental y Sur Portugal',
                                 '05' => 'Otros',
                             ])
                             ->query(function ($query, array $data) {
@@ -1050,7 +1050,7 @@ class ReferenciaResource extends Resource
                                 '01' => 'Zona Norte Galicia',
                                 '02' => 'Zona Sur Galicia',
                                 '03' => 'Andalucía Oriental',
-                                '04' => 'Andalucía Occidental',
+                                '04' => 'Andalucía Occidental y Sur Portugal',
                                 '05' => 'Otros',
                             ])
                             ->query(function ($query, array $data) {
@@ -1593,7 +1593,7 @@ class ReferenciaResource extends Resource
                             '01' => 'Zona Norte Galicia',
                             '02' => 'Zona Sur Galicia',
                             '03' => 'Andalucía Oriental',
-                            '04' => 'Andalucía Occidental',
+                            '04' => 'Andalucía Occidental y Sur Portugal',
                             '05' => 'Otros',
                         ])
                         ->required()

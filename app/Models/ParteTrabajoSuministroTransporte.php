@@ -9,7 +9,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-
 class ParteTrabajoSuministroTransporte extends Model
 {
     use HasFactory, Notifiable, SoftDeletes;

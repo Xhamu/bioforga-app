@@ -49,7 +49,6 @@
             if (isset($map[$n])) {
                 return $map[$n];
             }
-
             if (str_contains($n, 'industrial') || str_contains($n, 'indust')) {
                 return 'sure_induestrial';
             }
@@ -62,70 +61,27 @@
             if ($n === 'pefc') {
                 return 'pefc';
             }
-
             return '__none__';
         };
 
         // Inicializa agregados
         $entradasCertAgg = collect(array_fill_keys(array_keys($certCatalog), 0.0));
-        $salidasCertAgg = collect(array_fill_keys(array_keys($certCatalog), 0.0)); // por ahora en 0
-
-        // -------- Diagnóstico con whereHas (parte → almacén) --------
-        if (request('debug_cert')) {
-            dump([
-                'recordId' => $recordId,
-                'cargas_total_con_parte_al_almacen' => \App\Models\CargaTransporte::whereHas(
-                    'parteTrabajoSuministroTransporte',
-                    fn($q) => $q->where('almacen_id', $recordId),
-                )->count(),
-                'cargas_con_ref_y_parte_al_almacen' => \App\Models\CargaTransporte::whereNotNull('referencia_id')
-                    ->whereHas('parteTrabajoSuministroTransporte', fn($q) => $q->where('almacen_id', $recordId))
-                    ->count(),
-                'cargas_con_ref_y_parte_al_almacen_sin_cliente' => \App\Models\CargaTransporte::whereNotNull(
-                    'referencia_id',
-                )
-                    ->whereHas(
-                        'parteTrabajoSuministroTransporte',
-                        fn($q) => $q->where('almacen_id', $recordId)->whereNull('cliente_id'),
-                    )
-                    ->count(),
-            ]);
-        }
-        // -----------------------------------------------------------
+        $salidasCertAgg = collect(array_fill_keys(array_keys($certCatalog), 0.0));
 
         if ($recordId) {
-            // ENTRADAS: referencia -> ESTE almacén (almacen_id en el PARTE; sin cliente)
+            // ENTRADAS: referencia -> este almacén (sin cliente)
             $cargasEntrada = \App\Models\CargaTransporte::query()
                 ->with([
                     'referencia:id,tipo_certificacion',
                     'parteTrabajoSuministroTransporte:id,almacen_id,cliente_id',
                 ])
                 ->whereNull('deleted_at')
-                ->whereNotNull('referencia_id') // viene de referencia
+                ->whereNotNull('referencia_id')
                 ->whereHas(
                     'parteTrabajoSuministroTransporte',
                     fn($q) => $q->where('almacen_id', $recordId)->whereNull('cliente_id'),
                 )
                 ->get();
-
-            if (request('debug_cert')) {
-                dump('CARGAS ENTRADA (whereHas parte->almacen_id, ref_id not null, cliente_id null)');
-                dump(
-                    $cargasEntrada
-                        ->map(function ($c) use ($normCertKeyFromRef) {
-                            return [
-                                'carga_id' => $c->id,
-                                'referencia_id' => $c->referencia_id,
-                                'ref_cert_raw' => optional($c->referencia)->tipo_certificacion,
-                                'ref_cert_norm' => $normCertKeyFromRef(optional($c->referencia)->tipo_certificacion),
-                                'parte_almacen' => optional($c->parteTrabajoSuministroTransporte)->almacen_id,
-                                'parte_cliente' => optional($c->parteTrabajoSuministroTransporte)->cliente_id,
-                                'cantidad' => (float) $c->cantidad,
-                            ];
-                        })
-                        ->toArray(),
-                );
-            }
 
             foreach ($cargasEntrada as $c) {
                 $key = $normCertKeyFromRef(optional($c->referencia)->tipo_certificacion);
@@ -135,14 +91,13 @@
 
         $certKeysOrdenadas = collect($ordenCerts);
 
-        // ===== Agregados por ESPECIE (como ya te funcionaba) =====
+        // ===== Agregados por ESPECIE =====
         $entradasAgg = collect();
         $salidasAgg = collect();
 
         if ($recordId) {
             $with = ['parteTrabajoSuministroTransporte.cliente', 'parteTrabajoSuministroTransporte.usuario'];
 
-            // Normalizador de especie
             $normEspecie = function ($parte) {
                 $raw = $parte?->tipo_biomasa;
                 if (is_array($raw)) {
@@ -156,7 +111,6 @@
                 return $raw !== '' ? $raw : 'Sin especificar';
             };
 
-            // ENTRADAS por especie: ref -> este almacén (sin cliente)
             $entradasByParte = \App\Models\CargaTransporte::with($with)
                 ->whereNull('deleted_at')
                 ->whereHas(
@@ -174,7 +128,6 @@
                 })
                 ->values();
 
-            // SALIDAS por especie: este almacén -> cliente
             $salidasByParte = \App\Models\CargaTransporte::with($with)
                 ->whereNull('deleted_at')
                 ->where('almacen_id', $recordId)
@@ -190,7 +143,6 @@
                 })
                 ->values();
 
-            // Agregados finales por especie
             $entradasAgg = $entradasByParte
                 ->groupBy('especie')
                 ->map(fn($it) => (float) collect($it)->sum('cantidad_total'));
@@ -199,7 +151,30 @@
                 ->map(fn($it) => (float) collect($it)->sum('cantidad_total'));
         }
 
-        // Conjuntos y KPIs especie
+        // ======== REGULARIZACIÓN SOLO PARA "CTB BARRANTES" ========
+        if ($recordId) {
+            $almacen = \App\Models\AlmacenIntermedio::find($recordId);
+            if ($almacen && trim((string) $almacen->referencia) === 'CTB BARRANTES') {
+                // Toneladas
+                $tnForestal = 501.34;
+                $tnIndustrial = 11.2;
+
+                // Conversión tn -> m³ (densidad 1 por defecto)
+                $m3Forestal = $tnForestal;
+                $m3Industrial = $tnIndustrial;
+
+                // Certificación → arranca stock con estos valores
+                $entradasCertAgg['sure_foresal'] += $m3Forestal;
+                $entradasCertAgg['sure_induestrial'] += $m3Industrial;
+
+                // Especie → todo a una sola categoría: "Regulación"
+                $m3Total = $m3Forestal + $m3Industrial;
+                $entradasAgg['Regulación'] = (float) ($entradasAgg['Regulación'] ?? 0) + $m3Total;
+                //$salidasAgg['Regulación'] = (float) ($salidasAgg['Regulación'] ?? 0) + $m3Total;
+            }
+        }
+        // ==========================================================
+
         $todasEspecies = $entradasAgg->keys()->merge($salidasAgg->keys())->unique()->sort()->values();
         $totalE = (float) ($entradasAgg->sum() ?? 0);
         $totalS = (float) ($salidasAgg->sum() ?? 0);

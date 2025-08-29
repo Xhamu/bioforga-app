@@ -104,6 +104,7 @@ class ProveedorResource extends Resource
                                 'Combustible' => 'Combustible',
                                 'Alojamiento' => 'Alojamiento',
                                 'Taller' => 'Taller',
+                                'Materia Prima' => 'Materia Prima',
                                 'Otros' => 'Otros',
                             ])
                             ->nullable()
@@ -280,6 +281,7 @@ class ProveedorResource extends Resource
                                 'Combustible' => 'Combustible',
                                 'Alojamiento' => 'Alojamiento',
                                 'Taller' => 'Taller',
+                                'Materia Prima' => 'Materia Prima',
                                 'Otros' => 'Otros',
                             ])
                             ->searchable()
@@ -348,6 +350,7 @@ class ProveedorResource extends Resource
                                 'Combustible' => 'Combustible',
                                 'Alojamiento' => 'Alojamiento',
                                 'Taller' => 'Taller',
+                                'Materia Prima' => 'Materia Prima',
                                 'Otros' => 'Otros',
                             ])
                             ->searchable()

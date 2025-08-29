@@ -126,7 +126,7 @@ class UserResource extends Resource
                                         '01' => 'Zona Norte Galicia',
                                         '02' => 'Zona Sur Galicia',
                                         '03' => 'Andalucía Oriental',
-                                        '04' => 'Andalucía Occidental',
+                                        '04' => 'Andalucía Occidental y Sur Portugal',
                                         '05' => 'Otros',
                                     ])
                                     ->multiple()          // ← clave
