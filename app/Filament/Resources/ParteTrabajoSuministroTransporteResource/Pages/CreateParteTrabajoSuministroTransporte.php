@@ -46,6 +46,8 @@ class CreateParteTrabajoSuministroTransporte extends CreateRecord
         $yaAbierto = $model::query()
             ->where('usuario_id', Auth::id())
             ->whereNull('fecha_hora_descarga')
+            ->whereNull('peso_neto')
+            ->whereNull('deleted_at')
             ->exists();
 
         if ($yaAbierto) {
