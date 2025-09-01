@@ -20,6 +20,8 @@ class CreateParteTrabajoSuministroTransporte extends CreateRecord
         $abierto = $model::query()
             ->where('usuario_id', Auth::id())
             ->whereNull('fecha_hora_descarga')
+            ->whereNull('peso_neto')
+            ->whereNull('deleted_at')
             ->first();
 
         if ($abierto) {
@@ -29,7 +31,7 @@ class CreateParteTrabajoSuministroTransporte extends CreateRecord
                 ->danger()
                 ->send();
 
-            $this->redirect(ParteTrabajoSuministroTransporteResource::getUrl('edit', [
+            $this->redirect(ParteTrabajoSuministroTransporteResource::getUrl('view', [
                 'record' => $abierto->getKey(),
             ]));
         }
