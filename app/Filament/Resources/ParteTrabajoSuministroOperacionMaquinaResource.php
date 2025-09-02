@@ -61,13 +61,29 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                             ->relationship(
                                 name: 'usuario',
                                 titleAttribute: 'name',
-                                modifyQueryUsing: fn($query) => self::getUsuariosPermitidosQuery()
+                                modifyQueryUsing: function ($query) {
+                                    $permitidos = self::getUsuariosPermitidosQuery()->pluck('id');
+
+                                    $currentRecordUserId = request()->route('record')?->usuario_id
+                                        ?? (method_exists($this, 'getRecord') ? $this->getRecord()?->usuario_id : null);
+
+                                    if ($currentRecordUserId) {
+                                        $permitidos = $permitidos->push($currentRecordUserId)->unique();
+                                    }
+
+                                    $query->whereIn('id', $permitidos);
+                                },
                             )
                             ->getOptionLabelFromRecordUsing(fn($record) => $record->name . ' ' . $record->apellidos)
                             ->searchable()
                             ->preload()
                             ->placeholder('- Selecciona un usuario -')
-                            ->default(function () {
+
+                            // 2) Solo pon default en CREATE. En edit/view respeta el valor del registro.
+                            ->default(function (?Model $record) {
+                                if ($record) {
+                                    return null;
+                                }
                                 $usuarios = self::getUsuariosPermitidosQuery()->pluck('id');
                                 return $usuarios->count() === 1 ? $usuarios->first() : null;
                             })
@@ -77,10 +93,11 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                                     $set('maquina_id', null);
                                     return;
                                 }
-
-                                $maquinas = \App\Models\Maquina::where('operario_id', $state)->pluck('id');
+                                $maquinas = Maquina::where('operario_id', $state)->pluck('id');
                                 $set('maquina_id', $maquinas->count() === 1 ? $maquinas->first() : null);
-                            }),
+                            })
+                            ->disabledOn('view')
+                            ->dehydrated(fn() => false),
 
                         Select::make('maquina_id')
                             ->label('Máquina')
@@ -411,13 +428,19 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                                 }),
                         ])
                             ->visible(function ($record) {
-                                if (!$record)
+                                if (!$record) {
                                     return false;
+                                }
+
+                                if (!auth()->user()?->hasRole('operarios')) {
+                                    return false;
+                                }
 
                                 return (
                                     $record->fecha_hora_inicio_trabajo && !$record->fecha_hora_fin_trabajo
                                 );
-                            })->fullWidth()
+                            })
+                            ->fullWidth()
                     ]),
 
                 Section::make()
@@ -445,7 +468,8 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                                     $record &&
                                     $record->fecha_hora_inicio_trabajo &&
                                     !$record->fecha_hora_parada_trabajo &&
-                                    !$record->fecha_hora_fin_trabajo
+                                    !$record->fecha_hora_fin_trabajo &&
+                                    auth()->user()?->hasRole('operarios')
                                 )
                                 ->requiresConfirmation()
                                 ->form([
@@ -472,7 +496,8 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                                     $record &&
                                     $record->fecha_hora_parada_trabajo &&
                                     !$record->fecha_hora_reanudacion_trabajo &&
-                                    !$record->fecha_hora_fin_trabajo
+                                    !$record->fecha_hora_fin_trabajo &&
+                                    auth()->user()?->hasRole('operarios')
                                 )
                                 ->button()
                                 ->requiresConfirmation()
@@ -500,6 +525,10 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                                         return false;
                                     }
 
+                                    if (!auth()->user()?->hasRole('operarios')) {
+                                        return false;
+                                    }
+
                                     if (!$record->fecha_hora_inicio_trabajo || $record->fecha_hora_fin_trabajo) {
                                         return false;
                                     }
@@ -510,7 +539,6 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
 
                                     return true;
                                 })
-
                                 ->button()
                                 ->modalHeading('Finalizar trabajo')
                                 ->modalSubmitActionLabel('Finalizar')
