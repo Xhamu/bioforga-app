@@ -56,48 +56,16 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
             ->schema([
                 Section::make('Datos generales')
                     ->schema([
-                        Select::make('usuario_id')
-                            ->label('Usuario')
-                            ->relationship(
-                                name: 'usuario',
-                                titleAttribute: 'name',
-                                modifyQueryUsing: function ($query) {
-                                    $permitidos = self::getUsuariosPermitidosQuery()->pluck('id');
-
-                                    $currentRecordUserId = request()->route('record')?->usuario_id
-                                        ?? (method_exists($this, 'getRecord') ? $this->getRecord()?->usuario_id : null);
-
-                                    if ($currentRecordUserId) {
-                                        $permitidos = $permitidos->push($currentRecordUserId)->unique();
-                                    }
-
-                                    $query->whereIn('id', $permitidos);
-                                },
-                            )
-                            ->getOptionLabelFromRecordUsing(fn($record) => $record->name . ' ' . $record->apellidos)
-                            ->searchable()
-                            ->preload()
-                            ->placeholder('- Selecciona un usuario -')
-
-                            // 2) Solo pon default en CREATE. En edit/view respeta el valor del registro.
-                            ->default(function (?Model $record) {
-                                if ($record) {
-                                    return null;
-                                }
-                                $usuarios = self::getUsuariosPermitidosQuery()->pluck('id');
-                                return $usuarios->count() === 1 ? $usuarios->first() : null;
-                            })
-                            ->reactive()
-                            ->afterStateUpdated(function ($state, callable $set) {
-                                if (!$state) {
-                                    $set('maquina_id', null);
-                                    return;
-                                }
-                                $maquinas = Maquina::where('operario_id', $state)->pluck('id');
-                                $set('maquina_id', $maquinas->count() === 1 ? $maquinas->first() : null);
-                            })
-                            ->disabledOn('view')
-                            ->dehydrated(fn() => false),
+                        Select::make('usuario_id')->label('Usuario')->relationship(name: 'usuario', titleAttribute: 'name', modifyQueryUsing: fn($query) => self::getUsuariosPermitidosQuery())->getOptionLabelFromRecordUsing(fn($record) => $record->name . ' ' . $record->apellidos)->searchable()->preload()->placeholder('- Selecciona un usuario -')->default(function () {
+                            $usuarios = self::getUsuariosPermitidosQuery()->pluck('id');
+                            return $usuarios->count() === 1 ? $usuarios->first() : null;
+                        })->reactive()->afterStateUpdated(function ($state, callable $set) {
+                            if (!$state) {
+                                $set('maquina_id', null);
+                                return;
+                            }$maquinas = \App\Models\Maquina::where('operario_id', $state)->pluck('id');
+                            $set('maquina_id', $maquinas->count() === 1 ? $maquinas->first() : null);
+                        }),
 
                         Select::make('maquina_id')
                             ->label('Máquina')
