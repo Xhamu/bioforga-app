@@ -225,7 +225,14 @@ class ReferenciaResource extends Resource
                             ->required(),
 
                         Forms\Components\TextInput::make('ubicacion_gps')
-                            ->label('GPS'),
+                            ->label('GPS')
+                            ->suffixAction(
+                                Forms\Components\Actions\Action::make('verMapa')
+                                    ->icon('heroicon-o-map')
+                                    ->tooltip('Abrir en Google Maps')
+                                    ->url(fn($state) => $state ? "https://www.google.com/maps?q={$state}" : null, true)
+                                    ->openUrlInNewTab()
+                            ),
 
                         Forms\Components\TextInput::make('finca')
                             ->label('Finca')
@@ -1578,7 +1585,14 @@ class ReferenciaResource extends Resource
                         ->label('Monte / Parcela')
                         ->required(),
                     Forms\Components\TextInput::make('ubicacion_gps')
-                        ->label('GPS'),
+                        ->label('GPS')
+                        ->suffixAction(
+                            Forms\Components\Actions\Action::make('verMapa')
+                                ->icon('heroicon-o-map')
+                                ->tooltip('Abrir en Google Maps')
+                                ->url(fn($state) => $state ? "https://www.google.com/maps?q={$state}" : null, true)
+                                ->openUrlInNewTab()
+                        ),
                     Forms\Components\TextInput::make('finca')
                         ->label('Finca')
                         ->visible(function ($get) {
