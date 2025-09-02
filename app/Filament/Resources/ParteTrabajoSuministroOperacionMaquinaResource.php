@@ -56,16 +56,57 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
             ->schema([
                 Section::make('Datos generales')
                     ->schema([
-                        Select::make('usuario_id')->label('Usuario')->relationship(name: 'usuario', titleAttribute: 'name', modifyQueryUsing: fn($query) => self::getUsuariosPermitidosQuery())->getOptionLabelFromRecordUsing(fn($record) => $record->name . ' ' . $record->apellidos)->searchable()->preload()->placeholder('- Selecciona un usuario -')->default(function () {
-                            $usuarios = self::getUsuariosPermitidosQuery()->pluck('id');
-                            return $usuarios->count() === 1 ? $usuarios->first() : null;
-                        })->reactive()->afterStateUpdated(function ($state, callable $set) {
-                            if (!$state) {
-                                $set('maquina_id', null);
-                                return;
-                            }$maquinas = \App\Models\Maquina::where('operario_id', $state)->pluck('id');
-                            $set('maquina_id', $maquinas->count() === 1 ? $maquinas->first() : null);
-                        }),
+                        Select::make('usuario_id')
+                            ->label('Usuario')
+                            ->relationship(
+                                name: 'usuario',
+                                titleAttribute: 'name',
+                                modifyQueryUsing: function (Builder $query) {
+                                    $permitidos = self::getUsuariosPermitidosQuery()->pluck('id');
+
+                                    // Puede venir el modelo o el ID en la ruta, según tu setup
+                                    $routeRecord = request()->route('record');
+
+                                    $currentRecordUserId = null;
+
+                                    if ($routeRecord instanceof Model) {
+                                        $currentRecordUserId = $routeRecord->usuario_id;
+                                    } elseif (is_numeric($routeRecord)) {
+                                        $currentRecordUserId = ParteTrabajoSuministroOperacionMaquina::query()
+                                            ->whereKey($routeRecord)
+                                            ->value('usuario_id');
+                                    }
+
+                                    if ($currentRecordUserId) {
+                                        $permitidos->push($currentRecordUserId);
+                                    }
+
+                                    $query->whereIn('id', $permitidos->unique());
+                                },
+                            )
+                            ->getOptionLabelFromRecordUsing(fn($record) => $record->name . ' ' . $record->apellidos)
+                            ->searchable()
+                            ->preload()
+                            ->placeholder('- Selecciona un usuario -')
+                            ->default(function (?Model $record) {
+                                // En edit/view no tocar el valor
+                                if ($record) {
+                                    return null;
+                                }
+                                $usuarios = self::getUsuariosPermitidosQuery()->pluck('id');
+                                return $usuarios->count() === 1 ? $usuarios->first() : null;
+                            })
+                            ->reactive()
+                            ->afterStateUpdated(function ($state, callable $set) {
+                                if (!$state) {
+                                    $set('maquina_id', null);
+                                    return;
+                                }
+                                $maquinas = \App\Models\Maquina::where('operario_id', $state)->pluck('id');
+                                $set('maquina_id', $maquinas->count() === 1 ? $maquinas->first() : null);
+                            })
+                            ->disabledOn('view')
+                            ->dehydrated(fn() => false),
 
                         Select::make('maquina_id')
                             ->label('Máquina')
@@ -437,7 +478,7 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                                     $record->fecha_hora_inicio_trabajo &&
                                     !$record->fecha_hora_parada_trabajo &&
                                     !$record->fecha_hora_fin_trabajo &&
-                                    auth()->user()?->hasRole('operarios')
+                                    auth()->user()?->hasAnyRole(['operarios', 'superadmin', 'administración'])
                                 )
                                 ->requiresConfirmation()
                                 ->form([
@@ -465,7 +506,7 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                                     $record->fecha_hora_parada_trabajo &&
                                     !$record->fecha_hora_reanudacion_trabajo &&
                                     !$record->fecha_hora_fin_trabajo &&
-                                    auth()->user()?->hasRole('operarios')
+                                    auth()->user()?->hasAnyRole(['operarios', 'superadmin', 'administración'])
                                 )
                                 ->button()
                                 ->requiresConfirmation()
@@ -493,7 +534,7 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                                         return false;
                                     }
 
-                                    if (!auth()->user()?->hasRole('operarios')) {
+                                    if (!auth()->user()?->hasAnyRole(['operarios', 'superadmin', 'administración'])) {
                                         return false;
                                     }
 
@@ -599,7 +640,13 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                                 ->color('danger')
                                 ->icon('heroicon-o-lock-closed')
                                 ->extraAttributes(['class' => 'w-full'])
-                                ->visible(fn($record) => $record && $record->referencia && $record->referencia->estado !== 'cerrado')
+                                ->visible(
+                                    fn($record) =>
+                                    $record &&
+                                    $record->referencia &&
+                                    $record->referencia->estado !== 'cerrado' &&
+                                    auth()->user()?->hasAnyRole(['operarios', 'superadmin', 'administración'])
+                                )
                                 ->button()
                                 ->modalHeading('Finalizar trabajo y cerrar referencia')
                                 ->modalSubmitActionLabel('Finalizar y cerrar referencia')
