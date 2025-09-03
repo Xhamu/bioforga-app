@@ -441,7 +441,14 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                                     return false;
                                 }
 
-                                if (!auth()->user()?->hasRole('operarios')) {
+                                $user = auth()->user();
+
+                                if (!$user?->hasAnyRole(['operarios', 'superadmin', 'administración', 'proveedor de servicio'])) {
+                                    return false;
+                                }
+
+                                // Exclusión: no mostrar si tiene simultáneamente 'operarios' y 'técnico'
+                                if ($user->hasAllRoles(['operarios', 'técnico'])) {
                                     return false;
                                 }
 
