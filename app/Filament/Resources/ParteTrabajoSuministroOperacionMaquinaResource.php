@@ -478,7 +478,19 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                                     $record->fecha_hora_inicio_trabajo &&
                                     !$record->fecha_hora_parada_trabajo &&
                                     !$record->fecha_hora_fin_trabajo &&
-                                    auth()->user()?->hasAnyRole(['operarios', 'superadmin', 'administración'])
+                                    (function () {
+                                        $u = auth()->user();
+                                        if (!$u)
+                                            return false;
+
+                                        // Pueden ver: operarios, superadmin, administración, proveedor de servicio
+                                        $allowed = $u->hasAnyRole(['operarios', 'superadmin', 'administración', 'proveedor de servicio']);
+
+                                        // No mostrar si tiene simultáneamente operarios + técnico
+                                        $exclude = $u->hasAllRoles(['operarios', 'técnico']);
+
+                                        return $allowed && !$exclude;
+                                    })()
                                 )
                                 ->requiresConfirmation()
                                 ->form([
@@ -506,7 +518,19 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                                     $record->fecha_hora_parada_trabajo &&
                                     !$record->fecha_hora_reanudacion_trabajo &&
                                     !$record->fecha_hora_fin_trabajo &&
-                                    auth()->user()?->hasAnyRole(['operarios', 'superadmin', 'administración'])
+                                    (function () {
+                                        $u = auth()->user();
+                                        if (!$u)
+                                            return false;
+
+                                        // Roles que sí pueden ver
+                                        $allowed = $u->hasAnyRole(['operarios', 'superadmin', 'administración', 'proveedor de servicio']);
+
+                                        // Exclusión: operarios + técnico a la vez
+                                        $exclude = $u->hasAllRoles(['operarios', 'técnico']);
+
+                                        return $allowed && !$exclude;
+                                    })()
                                 )
                                 ->button()
                                 ->requiresConfirmation()
@@ -534,7 +558,14 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                                         return false;
                                     }
 
-                                    if (!auth()->user()?->hasAnyRole(['operarios', 'superadmin', 'administración'])) {
+                                    $user = auth()->user();
+
+                                    if (!$user?->hasAnyRole(['operarios', 'superadmin', 'administración', 'proveedor de servicio'])) {
+                                        return false;
+                                    }
+
+                                    // Exclusión: no mostrar si tiene simultáneamente 'operarios' y 'técnico'
+                                    if ($user->hasAllRoles(['operarios', 'técnico'])) {
                                         return false;
                                     }
 
@@ -645,7 +676,19 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                                     $record &&
                                     $record->referencia &&
                                     $record->referencia->estado !== 'cerrado' &&
-                                    auth()->user()?->hasAnyRole(['operarios', 'superadmin', 'administración'])
+                                    (function () {
+                                        $u = auth()->user();
+                                        if (!$u)
+                                            return false;
+
+                                        // Roles permitidos
+                                        $allowed = $u->hasAnyRole(['operarios', 'superadmin', 'administración', 'proveedor de servicio']);
+
+                                        // Exclusión: usuarios que tengan a la vez 'operarios' y 'técnico'
+                                        $exclude = $u->hasAllRoles(['operarios', 'técnico']);
+
+                                        return $allowed && !$exclude;
+                                    })()
                                 )
                                 ->button()
                                 ->modalHeading('Finalizar trabajo y cerrar referencia')
