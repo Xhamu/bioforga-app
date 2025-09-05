@@ -6,7 +6,7 @@
         @if (empty($markers) || count($markers) === 0)
             <p class="text-sm text-gray-500">No hay referencias con ubicación GPS para mostrar.</p>
         @else
-            <div id="referencias-map" style="height: 480px; border-radius: 12px; overflow: hidden;"></div>
+            <div id="referencias-map" style="height: 800px; border-radius: 12px; overflow: hidden;"></div>
         @endif
     </x-filament::section>
 </div>
@@ -79,11 +79,27 @@
                 const isActual = refActualIdNorm !== null && String(p.id) === refActualIdNorm;
 
                 const popupHtml = `
-      <div style="min-width:220px">
-        <div style="font-weight:600; margin-bottom:6px;">${p.titulo}</div>
-        <a href="${p.url}" class="text-primary-600 underline" target="_self" rel="noopener">Abrir referencia</a>
-      </div>
-    `;
+                  <div style="min-width:220px; font-family:Arial, sans-serif; color:#1f2937;">
+                    <div style="font-weight:600; margin-bottom:10px; font-size:14px; color:#111827;">
+                      ${p.titulo}
+                    </div>
+                
+                    <div style="display:flex; flex-direction:column; gap:6px;">
+                      <a href="${p.url}" 
+                          style="display:inline-block; text-align:center; padding:8px 12px; background: rgb(var(--primary-500)); color:#111827; font-size:13px; font-weight:600; border-radius:6px; text-decoration:none; box-shadow:0 1px 2px rgba(0,0,0,0.05);"
+                          target="_self" rel="noopener">
+                          📄 Abrir referencia
+                      </a>
+                  
+                      <a href="https://www.google.com/maps?q=${p.lat},${p.lng}" 
+                         style="display:inline-block; text-align:center; padding:8px 12px; background:#f3f4f6; color:#374151; font-size:13px; font-weight:500; border-radius:6px; text-decoration:none; border:1px solid #e5e7eb;"
+                         target="_blank" rel="noopener">
+                         🌍 Ver en Google Maps
+                      </a>
+                    </div>
+                  </div>
+                `;
+
 
                 const m = L.marker([p.lat, p.lng], {
                     icon: isActual ? iconResaltado : iconDefault,

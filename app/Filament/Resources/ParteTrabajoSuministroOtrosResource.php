@@ -81,7 +81,12 @@ class ParteTrabajoSuministroOtrosResource extends Resource
                     ->columns(3),
 
                 Section::make('Fecha y horas')
-                    ->visible(fn($record) => $record && filled($record->fecha_hora_fin_otros))
+                    ->visible(
+                        fn($record) =>
+                        $record
+                        && filled($record->fecha_hora_fin_otros)
+                        || auth()->user()->hasAnyRole(['superadmin', 'administración'])
+                    )
                     ->schema([
                         DateTimePicker::make('fecha_hora_inicio_otros')
                             ->label('Hora de inicio')
@@ -350,11 +355,12 @@ class ParteTrabajoSuministroOtrosResource extends Resource
     {
         return $table
             ->columns([
-                TextColumn::make('created_at')
+                TextColumn::make('fecha_hora_inicio_otros')
                     ->label('Fecha y hora')
                     ->weight(FontWeight::Bold)
-                    ->dateTime()
-                    ->timezone('Europe/Madrid'),
+                    ->dateTime('d/m/Y H:i')
+                    ->timezone('Europe/Madrid')
+                    ->sortable(),
 
                 TextColumn::make('usuario')
                     ->label('Usuario')
