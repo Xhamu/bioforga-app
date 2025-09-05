@@ -12,6 +12,7 @@ use App\Models\Provincia;
 use App\Models\Referencia;
 use App\Models\User;
 use Arr;
+use DB;
 use Filament\Forms;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Livewire;
@@ -187,6 +188,8 @@ class ReferenciaResource extends Resource
                         'Triturado Suelo' => 'Triturado Suelo',
                         'Triturado Camión' => 'Triturado Camión',
                         'Saca autocargador' => 'Saca autocargador',
+                        'Carga de suelo' => 'Carga de suelo',
+                        'Otros' => 'Otros',
                     ])
                     ->columnSpanFull()
                     ->visible(fn($get) => !empty($get('referencia')) && strpos((string) $get('referencia'), 'SU') === false),
@@ -311,6 +314,7 @@ class ReferenciaResource extends Resource
                                 'copas' => 'Copas',
                                 'rama' => 'Rama',
                                 'raices' => 'Raíces',
+                                'otros' => 'Otros',
                             ])
                             ->required(),
 
@@ -652,20 +656,25 @@ class ReferenciaResource extends Resource
                                         if ($get('tipo') === 'proveedor') {
                                             return \App\Models\Proveedor::query()
                                                 ->where(function ($q) {
-                                                    $q->whereNull('tipo_servicio')
-                                                        ->orWhereNotIn('tipo_servicio', ['Logística', 'logistica', 'LOGÍSTICA']);
+                                                    $q->whereNull('tipo_servicio') // permitir nulos
+                                                        ->orWhereNotIn(
+                                                            DB::raw('LOWER(tipo_servicio)'),
+                                                            ['logística', 'logistica', 'combustible', 'alojamiento']
+                                                        );
                                                 })
                                                 ->orderBy('razon_social')
                                                 ->pluck('razon_social', 'id')
                                                 ->toArray();
                                         }
+
                                         if ($get('tipo') === 'cliente') {
                                             return \App\Models\Cliente::query()
                                                 ->orderBy('razon_social')
                                                 ->pluck('razon_social', 'id')
                                                 ->toArray();
                                         }
-                                        return []; // sin tipo seleccionado
+
+                                        return [];
                                     })
                                     ->disabled(fn(Get $get) => blank($get('tipo'))),
                             ])
@@ -1090,20 +1099,25 @@ class ReferenciaResource extends Resource
                                         if ($get('tipo') === 'proveedor') {
                                             return \App\Models\Proveedor::query()
                                                 ->where(function ($q) {
-                                                    $q->whereNull('tipo_servicio')
-                                                        ->orWhereNotIn('tipo_servicio', ['Logística', 'logistica', 'LOGÍSTICA']);
+                                                    $q->whereNull('tipo_servicio') // permitir nulos
+                                                        ->orWhereNotIn(
+                                                            DB::raw('LOWER(tipo_servicio)'),
+                                                            ['logística', 'logistica', 'combustible', 'alojamiento']
+                                                        );
                                                 })
                                                 ->orderBy('razon_social')
                                                 ->pluck('razon_social', 'id')
                                                 ->toArray();
                                         }
+
                                         if ($get('tipo') === 'cliente') {
                                             return \App\Models\Cliente::query()
                                                 ->orderBy('razon_social')
                                                 ->pluck('razon_social', 'id')
                                                 ->toArray();
                                         }
-                                        return []; // sin tipo seleccionado
+
+                                        return [];
                                     })
                                     ->disabled(fn(Get $get) => blank($get('tipo'))),
                             ])
@@ -1477,6 +1491,8 @@ class ReferenciaResource extends Resource
                     'Triturado Suelo' => 'Triturado Suelo',
                     'Triturado Camión' => 'Triturado Camión',
                     'Saca autocargador' => 'Saca autocargador',
+                    'Carga de suelo' => 'Carga de suelo',
+                    'Otros' => 'Otros',
                 ])
                 ->columnSpanFull()
                 ->visible(function ($get) {
@@ -1714,6 +1730,7 @@ class ReferenciaResource extends Resource
                             'copas' => 'Copas',
                             'rama' => 'Rama',
                             'raices' => 'Raíces',
+                            'otros' => 'Otros',
                         ])
                         ->required(),
 

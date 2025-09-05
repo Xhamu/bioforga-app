@@ -10,6 +10,7 @@ use Filament\Forms;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Actions;
 use Filament\Forms\Components\Actions\Action;
+use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Section;
@@ -74,6 +75,45 @@ class ParteTrabajoAyudanteResource extends Resource
                     ])
                     ->columns(3),
 
+                Section::make('Fecha y horas')
+                    ->visible(
+                        fn($record) =>
+                        $record
+                        && filled($record->fecha_hora_fin_ayudante)
+                        || auth()->user()->hasAnyRole(['superadmin', 'administración'])
+                    )
+                    ->schema([
+                        DateTimePicker::make('fecha_hora_inicio_ayudante')
+                            ->label('Hora de inicio')
+                            ->seconds(false)
+                            ->timezone('Europe/Madrid')
+                            ->closeOnDateSelection()
+                            ->live(),
+
+                        DateTimePicker::make('fecha_hora_parada_ayudante')
+                            ->label('Hora de parada')
+                            ->seconds(false)
+                            ->timezone('Europe/Madrid')
+                            ->closeOnDateSelection()
+                            ->live(),
+
+                        DateTimePicker::make('fecha_hora_reanudacion_ayudante')
+                            ->label('Hora de reanudación')
+                            ->seconds(false)
+                            ->timezone('Europe/Madrid')
+                            ->closeOnDateSelection()
+                            ->live(),
+
+                        DateTimePicker::make('fecha_hora_fin_ayudante')
+                            ->label('Hora de finalización')
+                            ->seconds(false)
+                            ->timezone('Europe/Madrid')
+                            ->closeOnDateSelection()
+                            ->live()
+                            ->rule('after:fecha_hora_inicio_ayudante'),
+                    ])
+                    ->columns(2),
+
                 Section::make('')
                     ->schema([
                         Select::make('maquina_id')
@@ -107,7 +147,6 @@ class ParteTrabajoAyudanteResource extends Resource
                             ->relationship('tipologia', 'nombre')
                             ->searchable()
                             ->preload()
-                            ->required()
                             ->visible(fn($record) => filled($record?->fecha_hora_inicio_ayudante))
                             ->columnSpanFull(),
 

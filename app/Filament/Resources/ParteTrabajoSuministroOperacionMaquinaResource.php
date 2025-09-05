@@ -22,6 +22,8 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\TimePicker;
+use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\ToggleButtons;
 use Filament\Forms\Components\View;
 use Filament\Forms\Form;
 use Filament\Notifications\Notification;
@@ -640,117 +642,24 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                                             ->rows(4)
                                             ->maxLength(1000),
 
-                                        TextInput::make('gps_fin_trabajo')
-                                            ->label('GPS')
-                                            ->required()
-                                            ->readOnly(fn() => !Auth::user()?->hasAnyRole(['administración', 'superadmin'])),
-
-                                        View::make('livewire.location-fin-trabajo'),
-                                    ];
-                                })
-
-                                ->action(function (array $data, $record) {
-                                    $record->update([
-                                        'horas_encendido' => $data['horas_encendido'] ?? null,
-                                        'horas_rotor' => $data['horas_rotor'] ?? null,
-                                        'horas_trabajo' => $data['horas_trabajo'] ?? null,
-                                        'cantidad_producida' => $data['cantidad_producida'] ?? null,
-                                        'tipo_cantidad_producida' => $data['tipo_cantidad_producida'] ?? null,
-                                        'horometro' => $data['horometro'] ?? null,
-                                        'consumo_gasoil' => $data['consumo_gasoil'] ?? null,
-                                        'consumo_cuchillas' => $data['consumo_cuchillas'] ?? null,
-                                        'consumo_muelas' => $data['consumo_muelas'] ?? null,
-                                        'fecha_hora_fin_trabajo' => now(),
-                                        'observaciones' => $data['observaciones'] ?? null,
-                                        'gps_fin_trabajo' => $data['gps_fin_trabajo'] ?? null,
-                                    ]);
-
-                                    Notification::make()
-                                        ->success()
-                                        ->title('Trabajo finalizado correctamente')
-                                        ->send();
-
-                                    return redirect(ParteTrabajoSuministroOperacionMaquinaResource::getUrl());
-                                }),
-
-                            Action::make('FinalizarYCerrarReferencia')
-                                ->label('Finalizar trabajo y cerrar referencia')
-                                ->color('danger')
-                                ->icon('heroicon-o-lock-closed')
-                                ->extraAttributes(['class' => 'w-full'])
-                                ->visible(
-                                    fn($record) =>
-                                    $record &&
-                                    $record->referencia &&
-                                    $record->referencia->estado !== 'cerrado' &&
-                                    (function () {
-                                        $u = auth()->user();
-                                        if (!$u)
-                                            return false;
-
-                                        // Roles permitidos
-                                        $allowed = $u->hasAnyRole(['operarios', 'superadmin', 'administración', 'proveedor de servicio']);
-
-                                        // Exclusión: usuarios que tengan a la vez 'operarios' y 'técnico'
-                                        $exclude = $u->hasAllRoles(['operarios', 'técnico']);
-
-                                        return $allowed && !$exclude;
-                                    })()
-                                )
-                                ->button()
-                                ->modalHeading('Finalizar trabajo y cerrar referencia')
-                                ->modalSubmitActionLabel('Finalizar y cerrar referencia')
-                                ->modalWidth('xl')
-                                ->form(function (Get $get) {
-                                    $tipoHoras = Maquina::find($get('maquina_id'))?->tipo_horas ?? [];
-                                    $tipoConsumos = Maquina::find($get('maquina_id'))?->tipo_consumo ?? [];
-
-                                    return [
-                                        Select::make('tipo_cantidad_producida')
-                                            ->label('Tipo de cantidad')
+                                        ToggleButtons::make('cerrar_referencia')
+                                            ->label('¿Cerrar referencia?')
                                             ->options([
-                                                'camiones' => 'Camiones',
-                                                'toneladas' => 'Toneladas',
-                                                'metros_cubicos' => 'Metros cúbicos (m³)'
+                                                true => 'Sí',
+                                                false => 'No',
                                             ])
-                                            ->searchable()
-                                            ->reactive()
-                                            ->required(),
-
-                                        TextInput::make('cantidad_producida')
-                                            ->numeric()
-                                            ->label(fn(Get $get) => 'Cantidad producida (' . ($get('tipo_cantidad_producida') ?? 'camiones/tn') . ')')
-                                            ->visible(fn(Get $get) => filled($get('tipo_cantidad_producida')))
-                                            ->required(),
-
-                                        // Campos de tipo horas
-                                        ...collect($tipoHoras)->map(
-                                            fn($hora) =>
-                                            TimePicker::make($hora)
-                                                ->label(ucfirst(str_replace('_', ' ', $hora)))
-                                                ->withoutSeconds()
-                                                ->required()
-                                        )->toArray(),
-
-                                        // Campos de tipo consumo
-                                        ...collect($tipoConsumos)->map(
-                                            fn($consumo) =>
-                                            TextInput::make('consumo_' . $consumo)
-                                                ->label(ucfirst(str_replace('_', ' ', $consumo)))
-                                                ->numeric()
-                                                ->required()
-                                        )->toArray(),
-
-                                        FileUpload::make('horometro')
-                                            ->label('Foto easygreen o horómetro')
-                                            ->disk('public')
-                                            ->directory('horometros')
-                                            ->required(),
-
-                                        Textarea::make('observaciones')
-                                            ->rows(4)
-                                            ->maxLength(1000),
-
+                                            ->icons([
+                                                true => 'heroicon-o-check-circle',
+                                                false => 'heroicon-o-x-circle',
+                                            ])
+                                            ->colors([
+                                                true => 'success',
+                                                false => 'danger',
+                                            ])
+                                            ->inline()
+                                            ->columnSpanFull()
+                                            ->default(false),
+                                            
                                         TextInput::make('gps_fin_trabajo')
                                             ->label('GPS')
                                             ->required()
@@ -760,7 +669,6 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                                     ];
                                 })
                                 ->action(function (array $data, $record) {
-                                    // Finalizar trabajo igual que en la otra acción
                                     $record->update([
                                         'horas_encendido' => $data['horas_encendido'] ?? null,
                                         'horas_rotor' => $data['horas_rotor'] ?? null,
@@ -776,14 +684,24 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                                         'gps_fin_trabajo' => $data['gps_fin_trabajo'] ?? null,
                                     ]);
 
-                                    // Cerrar la referencia
-                                    if ($record->referencia && $record->referencia->estado === 'en_proceso') {
-                                        $record->referencia->update(['estado' => 'cerrado']);
+                                    if (!empty($data['cerrar_referencia'])) {
+                                        if ($record->referencia) {
+                                            $record->referencia->update(['estado' => 'cerrado']);
+
+                                            $record->referencia->usuarios()->sync([]);
+                                        }
                                     }
 
                                     Notification::make()
                                         ->success()
-                                        ->title('Trabajo finalizado y referencia cerrada')
+                                        ->title(
+                                            !empty($data['cerrar_referencia'])
+                                            ? 'Trabajo finalizado y referencia cerrada'
+                                            : 'Trabajo finalizado correctamente'
+                                        )
+                                        ->body(!empty($data['cerrar_referencia'])
+                                            ? 'Se ha marcado la referencia como cerrada y se han desvinculado los usuarios.'
+                                            : null)
                                         ->send();
 
                                     return redirect(ParteTrabajoSuministroOperacionMaquinaResource::getUrl());

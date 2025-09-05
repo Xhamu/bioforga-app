@@ -188,6 +188,7 @@ class EditReferencia extends EditRecord
                                     'markers' => Referencia::query()
                                         ->withoutTrashed()
                                         ->whereNotNull('ubicacion_gps')
+                                        ->where('estado', '!=', 'cerrado')
                                         ->where('ubicacion_gps', '!=', '')
                                         ->select('id', 'referencia', 'provincia', 'ayuntamiento', 'ubicacion_gps')
                                         ->get()
