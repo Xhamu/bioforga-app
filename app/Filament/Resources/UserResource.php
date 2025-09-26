@@ -9,6 +9,7 @@ use App\Models\Referencia;
 use App\Models\User;
 use App\Models\Vehiculo;
 use Filament\Forms;
+use Filament\Forms\Components\Builder;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -26,6 +27,7 @@ use Filament\Tables\Columns\Layout\Split;
 use Filament\Tables\Columns\Layout\Stack;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Enums\FiltersLayout;
+use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
@@ -266,6 +268,26 @@ class UserResource extends Resource
                             )
                             ->multiple()
                             ->preload(),
+
+                        SelectFilter::make('ocultar_bloqueados')
+                            ->label('Ocultar bloqueados')
+                            ->searchable()
+                            ->options([
+                                '1' => 'Sí',
+                                '0' => 'No',
+                            ])
+                            ->query(function (Builder $q, array $data) {
+                                $val = $data['value'] ?? null;
+
+                                if ($val === '1') {
+                                    return $q->where('is_blocked', false);
+                                }
+
+                                return $q;
+                            })
+                            ->indicateUsing(function (array $data): ?string {
+                                return (($data['value'] ?? null) === '1') ? 'No bloqueados' : null;
+                            }),
                     ],
                     layout: FiltersLayout::AboveContent
                 )
@@ -398,10 +420,30 @@ class UserResource extends Resource
                             )
                             ->multiple()
                             ->preload(),
+
+                        SelectFilter::make('ocultar_bloqueados')
+                            ->label('Ocultar bloqueados')
+                            ->searchable()
+                            ->options([
+                                '1' => 'Sí',
+                                '0' => 'No',
+                            ])
+                            ->query(function (Builder $q, array $data) {
+                                $val = $data['value'] ?? null;
+
+                                if ($val === '1') {
+                                    return $q->where('is_blocked', false);
+                                }
+
+                                return $q;
+                            })
+                            ->indicateUsing(function (array $data): ?string {
+                                return (($data['value'] ?? null) === '1') ? 'No bloqueados' : null;
+                            }),
                     ],
                     layout: FiltersLayout::AboveContent
                 )
-                ->filtersFormColumns(2)
+                ->filtersFormColumns(3)
                 ->headerActions([
                     Action::make('exportar_partes_trabajo')
                         ->label('Exportar partes de trabajo')

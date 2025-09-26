@@ -19,6 +19,7 @@ use Filament\Forms\Components\Livewire;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
 use Filament\Notifications\Notification;
@@ -351,6 +352,19 @@ class ReferenciaResource extends Resource
                     ->columns(2)
                     ->visible(fn($get) => !empty($get('referencia'))),
 
+                Forms\Components\Section::make('Trabajo en lluvia')
+                    ->schema([
+                        Toggle::make('trabajo_lluvia')
+                            ->label('Trabajo bajo lluvia')
+                            ->helperText('Indica si el trabajo se realiza aunque haya lluvia')
+                            ->onIcon('heroicon-o-check')
+                            ->offIcon('heroicon-o-x-mark')
+                            ->onColor('success')
+                            ->offColor('danger')
+                            ->default(false),
+                    ])
+                    ->visible(fn($get) => !empty($get('referencia'))),
+
                 Forms\Components\Section::make('Tarifa')
                     ->schema([
                         Forms\Components\Section::make('')
@@ -485,7 +499,8 @@ class ReferenciaResource extends Resource
                     TextColumn::make('referencia')
                         ->label('Referencia')
                         ->weight(FontWeight::Bold)
-                        ->searchable(),
+                        ->searchable()
+                        ->tooltip(fn($record) => $record->observaciones ?? 'Sin observaciones'),
 
                     Panel::make([
                         Grid::make(['default' => 1, 'md' => 2])
@@ -781,8 +796,25 @@ class ReferenciaResource extends Resource
                                 $n = count($data['values']);
                                 return $n === 1 ? '1 municipio' : "{$n} municipios";
                             }),
+
+                        SelectFilter::make('trabajo_lluvia')
+                            ->label('Trabajo en lluvia')
+                            ->searchable()
+                            ->options([
+                                'si' => 'Si',
+                                'no' => 'No',
+                            ])
+                            ->query(function ($query, array $data) {
+                                if (!empty($data['value'])) {
+                                    return $query->where('trabajo_lluvia', $data['value']);
+                                }
+
+                                return $query;
+                            })
+                            ->placeholder('Todos')
+                            ->columnSpanFull(),
                     ],
-                    layout: FiltersLayout::AboveContent
+                    layout: FiltersLayout::AboveContentCollapsible
                 )
                 ->filtersFormColumns(2)
                 ->headerActions([
@@ -900,7 +932,9 @@ class ReferenciaResource extends Resource
                     TextColumn::make('referencia')
                         ->label('Referencia')
                         ->weight(FontWeight::Bold)
-                        ->searchable(),
+                        ->searchable()
+                        ->alignCenter()
+                        ->tooltip(fn($record) => $record->observaciones ?? 'Sin observaciones'),
 
                     TextColumn::make('ayuntamiento')
                         ->label('Municipio (Monte)')
@@ -920,7 +954,9 @@ class ReferenciaResource extends Resource
 
                     TextColumn::make('interviniente')
                         ->label('Interviniente')
-                        ->icon('heroicon-m-building-office'),
+                        ->icon('heroicon-m-building-office')
+                        ->formatStateUsing(fn($state) => \Illuminate\Support\Str::limit($state, 20)) // muestra solo 20 caracteres
+                        ->tooltip(fn($record) => $record->interviniente), // tooltip con el texto completo
 
                     TextColumn::make('cantidad_aprox')
                         ->label('Cantidad (aprox.)')
@@ -1223,8 +1259,25 @@ class ReferenciaResource extends Resource
                                 $n = count($data['values']);
                                 return $n === 1 ? "Municipio: {$data['values'][0]}" : "{$n} municipios";
                             }),
+
+                        SelectFilter::make('trabajo_lluvia')
+                            ->label('Trabajo en lluvia')
+                            ->searchable()
+                            ->options([
+                                'si' => 'Si',
+                                'no' => 'No',
+                            ])
+                            ->query(function ($query, array $data) {
+                                if (!empty($data['value'])) {
+                                    return $query->where('trabajo_lluvia', $data['value']);
+                                }
+
+                                return $query;
+                            })
+                            ->placeholder('Todos')
+                            ->columnSpanFull(),
                     ],
-                    layout: FiltersLayout::AboveContent
+                    layout: FiltersLayout::AboveContentCollapsible
                 )
                 ->filtersFormColumns(2)
                 ->headerActions([
@@ -1768,6 +1821,19 @@ class ReferenciaResource extends Resource
                 ->visible(function ($get) {
                     return !empty($get('referencia'));
                 }),
+
+            Forms\Components\Section::make('Trabajo en lluvia')
+                ->schema([
+                    Toggle::make('trabajo_lluvia')
+                        ->label('Trabajo bajo lluvia')
+                        ->helperText('Indica si el trabajo se realiza aunque haya lluvia')
+                        ->onIcon('heroicon-o-check')
+                        ->offIcon('heroicon-o-x-mark')
+                        ->onColor('success')
+                        ->offColor('danger')
+                        ->default(false),
+                ])
+                ->visible(fn($get) => !empty($get('referencia'))),
 
             Forms\Components\Section::make('Tarifa')
                 ->schema([
