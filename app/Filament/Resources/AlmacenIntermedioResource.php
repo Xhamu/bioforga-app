@@ -108,7 +108,7 @@ class AlmacenIntermedioResource extends Resource
                                 Repeater::make('entradasAlmacen')
                                     ->relationship('entradasAlmacen')
                                     ->label('Entradas de material')
-                                    ->orderable('fecha') // o 'id'
+                                    //->orderable('fecha') // o 'id'
                                     ->defaultItems(0)
                                     ->createItemButtonLabel('Añadir entrada')
                                     ->reorderable()
@@ -120,7 +120,7 @@ class AlmacenIntermedioResource extends Resource
                                             ->default(now('Europe/Madrid'))
                                             ->timezone('Europe/Madrid')
                                             ->required()
-                                            ->helperText('Fecha de entrada al almacén')
+                                            ->native(false)
                                             ->columnSpan([
                                                 'default' => 12,
                                                 'md' => 6,

@@ -523,7 +523,7 @@ class ParteTrabajoTallerMaquinariaResource extends Resource
                 Tables\Filters\TrashedFilter::make()
                     ->visible(fn() => Filament::auth()->user()?->hasRole('superadmin'))
                     ->columnSpanFull(),
-            ], layout: FiltersLayout::AboveContent)
+            ], layout: FiltersLayout::AboveContentCollapsible)
             ->filtersFormColumns(2)
             ->actions([
                 Tables\Actions\ViewAction::make()
