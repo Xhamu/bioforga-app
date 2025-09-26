@@ -23,6 +23,7 @@ use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
+use Monzer\FilamentChatifyIntegration\ChatifyPlugin;
 use Phpsa\FilamentAuthentication\Widgets\LatestUsersWidget;
 
 class AdminPanelProvider extends PanelProvider
@@ -93,6 +94,7 @@ class AdminPanelProvider extends PanelProvider
                         'default' => 1,
                         'sm' => 3,
                     ]),
+                //ChatifyPlugin::make(),
             ])
 
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
