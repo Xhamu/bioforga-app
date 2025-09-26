@@ -298,7 +298,7 @@ class ProveedorResource extends Resource
                             ->columnSpanFull()
                             ->visible(fn() => Filament::auth()->user()?->hasRole('superadmin')),
                     ],
-                    layout: FiltersLayout::AboveContent
+                    layout: FiltersLayout::AboveContentCollapsible
                 )
                 ->filtersFormColumns(1)
                 ->actions([
@@ -367,7 +367,7 @@ class ProveedorResource extends Resource
                             ->columnSpanFull()
                             ->visible(fn() => Filament::auth()->user()?->hasRole('superadmin')),
                     ],
-                    layout: FiltersLayout::AboveContent
+                    layout: FiltersLayout::AboveContentCollapsible
                 )
                 ->filtersFormColumns(2)
                 ->actions([

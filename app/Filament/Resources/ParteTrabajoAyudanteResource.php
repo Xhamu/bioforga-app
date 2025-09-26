@@ -517,7 +517,7 @@ class ParteTrabajoAyudanteResource extends Resource
                         ->columnSpanFull()
                         ->visible(fn() => auth()->user()?->hasRole('superadmin')),
                 ],
-                layout: FiltersLayout::AboveContent
+                layout: FiltersLayout::AboveContentCollapsible
             )
             ->filtersFormColumns(3)
             ->actions([

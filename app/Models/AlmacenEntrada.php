@@ -19,6 +19,10 @@ class AlmacenEntrada extends Model
         'especie'
     ];
 
+    protected $casts = [
+        'fecha' => 'date',
+    ];
+
     public function transportista()
     {
         return $this->belongsTo(\App\Models\User::class, 'transportista_id');

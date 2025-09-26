@@ -289,7 +289,7 @@ class UserResource extends Resource
                                 return (($data['value'] ?? null) === '1') ? 'No bloqueados' : null;
                             }),
                     ],
-                    layout: FiltersLayout::AboveContent
+                    layout: FiltersLayout::AboveContentCollapsible
                 )
                 ->filtersFormColumns(2)
                 ->actions([
@@ -441,7 +441,7 @@ class UserResource extends Resource
                                 return (($data['value'] ?? null) === '1') ? 'No bloqueados' : null;
                             }),
                     ],
-                    layout: FiltersLayout::AboveContent
+                    layout: FiltersLayout::AboveContentCollapsible
                 )
                 ->filtersFormColumns(3)
                 ->headerActions([

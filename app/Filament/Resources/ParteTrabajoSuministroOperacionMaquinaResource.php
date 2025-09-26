@@ -991,7 +991,7 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                         ->preload()
                         ->placeholder('Todos'),
                 ],
-                layout: FiltersLayout::AboveContent
+                layout: FiltersLayout::AboveContentCollapsible
             )
             ->filtersFormColumns(2)
             ->headerActions([
