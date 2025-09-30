@@ -20,6 +20,33 @@ class CreateParteTrabajoSuministroDesplazamiento extends CreateRecord
 {
     protected static string $resource = ParteTrabajoSuministroDesplazamientoResource::class;
 
+    protected static bool $canCreateAnother = false;
+
+    public function mount(): void
+    {
+        $model = static::getResource()::getModel();
+
+        $abierto = $model::query()
+            ->where('usuario_id', Auth::id())
+            ->whereNull('fecha_hora_fin_desplazamiento')
+            ->whereNull('deleted_at')
+            ->first();
+
+        if ($abierto) {
+            Notification::make()
+                ->title('Ya tienes un parte abierto')
+                ->body('Debes cerrarlo antes de crear uno nuevo.')
+                ->danger()
+                ->send();
+
+            $this->redirect(ParteTrabajoSuministroDesplazamientoResource::getUrl('view', [
+                'record' => $abierto->getKey(),
+            ]));
+        }
+
+        parent::mount();
+    }
+
     public function getFormActions(): array
     {
         return [

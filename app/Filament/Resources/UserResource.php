@@ -421,25 +421,7 @@ class UserResource extends Resource
                             ->multiple()
                             ->preload(),
 
-                        SelectFilter::make('ocultar_bloqueados')
-                            ->label('Ocultar bloqueados')
-                            ->searchable()
-                            ->options([
-                                '1' => 'Sí',
-                                '0' => 'No',
-                            ])
-                            ->query(function (Builder $q, array $data) {
-                                $val = $data['value'] ?? null;
 
-                                if ($val === '1') {
-                                    return $q->where('is_blocked', false);
-                                }
-
-                                return $q;
-                            })
-                            ->indicateUsing(function (array $data): ?string {
-                                return (($data['value'] ?? null) === '1') ? 'No bloqueados' : null;
-                            }),
                     ],
                     layout: FiltersLayout::AboveContentCollapsible
                 )
