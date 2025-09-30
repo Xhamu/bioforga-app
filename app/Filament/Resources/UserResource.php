@@ -20,6 +20,7 @@ use Filament\Resources\Resource;
 use Filament\Support\Enums\FontWeight;
 use Filament\Tables;
 use Filament\Tables\Actions\Action;
+use Filament\Tables\Columns\BadgeColumn;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\Layout\Grid;
 use Filament\Tables\Columns\Layout\Panel;
@@ -244,6 +245,14 @@ class UserResource extends Resource
                                         ->label('Teléfono')
                                         ->searchable()
                                         ->icon('heroicon-m-phone'),
+
+                                    BadgeColumn::make('is_blocked')
+                                        ->label('Estado')
+                                        ->formatStateUsing(fn($state) => $state == 1 ? 'Bloqueado' : 'Activo')
+                                        ->colors([
+                                            'danger' => fn($state) => $state == 1,
+                                            'success' => fn($state) => $state == 0,
+                                        ]),
                                 ]),
 
                             ]),
@@ -268,26 +277,6 @@ class UserResource extends Resource
                             )
                             ->multiple()
                             ->preload(),
-
-                        SelectFilter::make('ocultar_bloqueados')
-                            ->label('Ocultar bloqueados')
-                            ->searchable()
-                            ->options([
-                                '1' => 'Sí',
-                                '0' => 'No',
-                            ])
-                            ->query(function (Builder $q, array $data) {
-                                $val = $data['value'] ?? null;
-
-                                if ($val === '1') {
-                                    return $q->where('is_blocked', false);
-                                }
-
-                                return $q;
-                            })
-                            ->indicateUsing(function (array $data): ?string {
-                                return (($data['value'] ?? null) === '1') ? 'No bloqueados' : null;
-                            }),
                     ],
                     layout: FiltersLayout::AboveContentCollapsible
                 )
@@ -400,6 +389,14 @@ class UserResource extends Resource
                         ->label('Teléfono')
                         ->searchable()
                         ->icon('heroicon-m-phone'),
+
+                    BadgeColumn::make('is_blocked')
+                        ->label('Estado')
+                        ->formatStateUsing(fn($state) => $state == 1 ? 'Bloqueado' : 'Activo')
+                        ->colors([
+                            'danger' => fn($state) => $state == 1,
+                            'success' => fn($state) => $state == 0,
+                        ]),
                 ])
                 ->persistFiltersInSession()
                 ->filters(
@@ -420,12 +417,10 @@ class UserResource extends Resource
                             )
                             ->multiple()
                             ->preload(),
-
-
                     ],
                     layout: FiltersLayout::AboveContentCollapsible
                 )
-                ->filtersFormColumns(3)
+                ->filtersFormColumns(2)
                 ->headerActions([
                     Action::make('exportar_partes_trabajo')
                         ->label('Exportar partes de trabajo')
