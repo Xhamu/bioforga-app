@@ -4,6 +4,7 @@ namespace App\Filament\Pages;
 
 use App\Filament\Resources\ReferenciaResource;
 use App\Models\Referencia;
+use App\Models\Proveedor;
 use Filament\Pages\Page;
 use Filament\Forms\Form;
 use Filament\Forms\Components\Section;
@@ -24,7 +25,6 @@ class MapaReferencias extends Page implements HasForms
     protected static ?int $navigationSort = 30;
     protected static string $view = 'filament.pages.mapa-referencias';
 
-    // ⬇️ Usamos un array para el estado del formulario
     public ?array $data = [];
 
     public function mount(): void
@@ -35,21 +35,11 @@ class MapaReferencias extends Page implements HasForms
     public function form(Form $form): Form
     {
         return $form
-            ->statePath('data') // ⬅️ IMPRESCINDIBLE
+            ->statePath('data')
             ->schema([
-                Section::make('Filtros')
-                    ->columns(4)
+                Section::make('')
+                    ->columns(3)
                     ->schema([
-                        DatePicker::make('desde')
-                            ->label('Creación desde')
-                            ->native(false)
-                            ->live(debounce: 400),
-
-                        DatePicker::make('hasta')
-                            ->label('Creación hasta')
-                            ->native(false)
-                            ->live(debounce: 400),
-
                         Select::make('estado')
                             ->label('Estado')
                             ->searchable()
@@ -60,7 +50,7 @@ class MapaReferencias extends Page implements HasForms
                                 'cerrado_no_procede' => 'Cerrado no procede',
                             ])
                             ->placeholder('Todos')
-                            ->live(), // ⬅️ en lugar de ->reactive()
+                            ->live(),
 
                         Select::make('sector')
                             ->label('Sector')
@@ -74,61 +64,107 @@ class MapaReferencias extends Page implements HasForms
                             ->multiple()
                             ->searchable()
                             ->placeholder('Todos')
-                            ->live(), // ⬅️ en lugar de ->reactive()
+                            ->live(),
+
+                        Select::make('tipo_proveedor')
+                            ->label('Tipo de Proveedor')
+                            ->options([
+                                'Logística' => 'Logística',
+                                'Servicios' => 'Servicios',
+                                'Suministro' => 'Suministro',
+                                'Combustible' => 'Combustible',
+                                'Alojamiento' => 'Alojamiento',
+                                'Taller' => 'Taller',
+                                'Materia Prima' => 'Materia Prima',
+                                'Otros' => 'Otros',
+                            ])
+                            ->multiple()
+                            ->searchable()
+                            ->placeholder('Todos')
+                            ->live(),
                     ]),
             ]);
     }
 
-    /** Query filtrada */
-    protected function query(): Builder
+    /** Query de referencias (con filtros del formulario) */
+    protected function referenciasQuery(): Builder
     {
-        // ⬇️ Lee SIEMPRE el estado del form
         $state = $this->form->getState();
         $estado = $state['estado'] ?? null;
         $sector = array_filter((array) ($state['sector'] ?? []));
-        $desde = $state['desde'] ?? null;
-        $hasta = $state['hasta'] ?? null;
 
-        $q = Referencia::query()
-            ->whereNotNull('ubicacion_gps');
+        $q = Referencia::query()->whereNotNull('ubicacion_gps');
 
         if (!blank($estado)) {
             $q->where('estado', $estado);
         }
 
         if (!empty($sector)) {
-            // Si en BD guardas '01', '02'... asegúrate de comparar como string
             $q->whereIn('sector', array_map('strval', $sector));
-        }
-
-        if (!blank($desde)) {
-            $q->whereDate('created_at', '>=', $desde);
-        }
-        if (!blank($hasta)) {
-            $q->whereDate('created_at', '<=', $hasta);
         }
 
         return $q->latest('created_at');
     }
 
-    /** Markers para el mapa */
+    /** Query de proveedores con ubicación */
+    protected function proveedoresQuery(): Builder
+    {
+        return Proveedor::query()
+            ->whereNotNull('ubicacion_gps')
+            ->latest('updated_at');
+    }
+
+    /** Marcadores combinados para el mapa */
     public function getMarkersProperty(): array
     {
-        return $this->query()->get()
+        // 🔹 1. Referencias
+        $refMarkers = $this->referenciasQuery()
+            ->get()
             ->map(function (Referencia $r) {
                 [$lat, $lng] = $this->splitLatLng($r->ubicacion_gps);
 
                 return [
-                    'id' => $r->id,
+                    'id' => 'ref-' . $r->id,
+                    'type' => 'referencia',
                     'titulo' => $r->referencia,
                     'lat' => $lat,
                     'lng' => $lng,
-                    'url' => ReferenciaResource::getUrl('edit', ['record' => $r]),
+                    'color' => '#3B82F6', // azul
+                    'url' => \App\Filament\Resources\ReferenciaResource::getUrl('edit', ['record' => $r]),
                 ];
-            })
-            ->filter(fn($p) => is_finite($p['lat']) && is_finite($p['lng']))
-            ->values()
-            ->all();
+            });
+
+        // 🔹 2. Proveedores
+        $provMarkers = $this->proveedoresQuery()
+            ->get()
+            ->map(function (Proveedor $p) {
+                [$lat, $lng] = $this->splitLatLng($p->ubicacion_gps);
+
+                $url = null;
+                if (class_exists(\App\Filament\Resources\ProveedorResource::class)) {
+                    $url = \App\Filament\Resources\ProveedorResource::getUrl('edit', ['record' => $p]);
+                }
+
+                return [
+                    'id' => 'prov-' . $p->id,
+                    'type' => 'proveedor',
+                    'titulo' => $p->razon_social ?? $p->email,
+                    'lat' => $lat,
+                    'lng' => $lng,
+                    'color' => '#10B981', // verde
+                    'url' => $url,
+                ];
+            });
+
+        // 🔹 3. Combinar ambas colecciones
+        $markers = collect()
+            ->merge($refMarkers)
+            ->merge($provMarkers)
+            ->filter(fn($m) => is_finite($m['lat']) && is_finite($m['lng']))
+            ->values();
+
+        // 🔹 4. Devolver como array
+        return $markers->all();
     }
 
     protected function splitLatLng(?string $value): array
@@ -136,7 +172,15 @@ class MapaReferencias extends Page implements HasForms
         if (!$value)
             return [NAN, NAN];
 
+        // Normaliza separadores y dobles espacios
         $value = str_replace([';', '  '], [',', ' '], trim($value));
+
+        // Acepta "lat, lng" (con o sin espacio)
+        if (preg_match('/^\s*(-?\d{1,2}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)\s*$/', $value, $m)) {
+            return [floatval($m[1]), floatval($m[2])];
+        }
+
+        // Fallback muy permisivo por si llega "lat lng"
         $parts = preg_split('/[,; ]+/', $value);
         $lat = isset($parts[0]) ? floatval(str_replace(',', '.', $parts[0])) : NAN;
         $lng = isset($parts[1]) ? floatval(str_replace(',', '.', $parts[1])) : NAN;
