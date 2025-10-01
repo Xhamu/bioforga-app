@@ -90,6 +90,11 @@ class User extends Authenticatable
         return $this->belongsToMany(\App\Models\Camion::class, 'camion_user', 'user_id', 'camion_id');
     }
 
+    public function maquinas()
+    {
+        return $this->belongsToMany(\App\Models\Maquina::class, 'maquina_user');
+    }
+
     public function getNombreApellidosAttribute()
     {
         return $this->name . ' ' . $this->apellidos;
@@ -108,4 +113,17 @@ class User extends Authenticatable
 
         return true;
     }
+
+    public function statuses()
+    {
+        return $this->hasMany(\App\Models\UserStatus::class);
+    }
+
+    public function activeStatus()
+    {
+        return $this->hasOne(\App\Models\UserStatus::class)
+            ->whereNull('ended_at')
+            ->latestOfMany('started_at');
+    }
+
 }
