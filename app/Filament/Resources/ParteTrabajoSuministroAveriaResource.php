@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\ParteTrabajoSuministroAveriaResource\Pages;
 use App\Filament\Resources\ParteTrabajoSuministroAveriaResource\RelationManagers;
+use App\Models\Maquina;
 use App\Models\ParteTrabajoSuministroAveria;
 use App\Models\Taller;
 use Carbon\Carbon;
@@ -94,40 +95,58 @@ class ParteTrabajoSuministroAveriaResource extends Resource
                             ->searchable()
                             ->options(function (Get $get) {
                                 $usuarioId = $get('usuario_id');
-                                if (!$usuarioId) {
-                                    return [];
-                                }
+                                $operariosIds = collect($get('operarios') ?? [])->filter()->values()->all();
 
-                                return \App\Models\Maquina::where('operario_id', $usuarioId)
+                                // Si tienes campo múltiple 'operarios', priorízalo; si no, usa 'usuario_id'
+                                $ids = !empty($operariosIds) ? $operariosIds : ($usuarioId ? [$usuarioId] : []);
+
+                                if (empty($ids))
+                                    return [];
+
+                                return Maquina::query()
+                                    ->whereIn('operario_id', $ids) // máquinas con campo directo
+                                    ->orWhereHas('operarios', fn($q) => $q->whereIn('users.id', $ids)) // máquinas vinculadas en pivot
+                                    ->orderBy('marca')
+                                    ->orderBy('modelo')
                                     ->get()
                                     ->mapWithKeys(fn($m) => [$m->id => "{$m->marca} {$m->modelo}"])
                                     ->toArray();
                             })
                             ->default(function (Get $get) {
                                 $usuarioId = $get('usuario_id');
-                                if (!$usuarioId)
+                                $operariosIds = collect($get('operarios') ?? [])->filter()->values()->all();
+                                $ids = !empty($operariosIds) ? $operariosIds : ($usuarioId ? [$usuarioId] : []);
+
+                                if (empty($ids))
                                     return null;
 
-                                $ids = \App\Models\Maquina::where('operario_id', $usuarioId)->pluck('id');
-                                return $ids->count() === 1 ? $ids->first() : null;
+                                $maquinas = Maquina::query()
+                                    ->whereIn('operario_id', $ids)
+                                    ->orWhereHas('operarios', fn($q) => $q->whereIn('users.id', $ids))
+                                    ->pluck('id');
+
+                                return $maquinas->count() === 1 ? $maquinas->first() : null;
                             })
-                            // Si ya hay valor (p.ej. edit), no tocar:
                             ->afterStateHydrated(function ($component, $state, Get $get) {
                                 if (blank($state)) {
                                     $usuarioId = $get('usuario_id');
-                                    if ($usuarioId) {
-                                        $ids = \App\Models\Maquina::where('operario_id', $usuarioId)->pluck('id');
-                                        if ($ids->count() === 1) {
-                                            $component->state($ids->first());
+                                    $operariosIds = collect($get('operarios') ?? [])->filter()->values()->all();
+                                    $ids = !empty($operariosIds) ? $operariosIds : ($usuarioId ? [$usuarioId] : []);
+
+                                    if (!empty($ids)) {
+                                        $maquinas = Maquina::query()
+                                            ->whereIn('operario_id', $ids)
+                                            ->orWhereHas('operarios', fn($q) => $q->whereIn('users.id', $ids))
+                                            ->pluck('id');
+
+                                        if ($maquinas->count() === 1) {
+                                            $component->state($maquinas->first());
                                         }
                                     }
                                 }
                             })
                             ->live()
-                            ->afterStateUpdated(function (Set $set) {
-                                // Cambia máquina → reset opciones dependientes
-                                $set('trabajo_realizado', null);
-                            })
+                            ->afterStateUpdated(fn(Set $set) => $set('trabajo_realizado', null))
                             ->required(),
 
                         // ── TIPO (avería / mantenimiento) ─────────────────────────────────────────────
@@ -159,7 +178,7 @@ class ParteTrabajoSuministroAveriaResource extends Resource
                                     return [];
                                 }
 
-                                $maquina = \App\Models\Maquina::find($maquinaId);
+                                $maquina = Maquina::find($maquinaId);
                                 if (!$maquina) {
                                     return [];
                                 }

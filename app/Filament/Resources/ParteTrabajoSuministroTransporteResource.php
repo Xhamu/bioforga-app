@@ -65,7 +65,7 @@ class ParteTrabajoSuministroTransporteResource extends Resource
 
     // Eliminar el boton de create si tiene un parte activo.
     // Ahora mismo se muestra el botón, pero al darle redirige al parte activo.
-    
+
     /*public static function canCreate(): bool
     {
         $model = static::getModel();
@@ -1025,13 +1025,25 @@ class ParteTrabajoSuministroTransporteResource extends Resource
             $sectores = array_filter(Arr::wrap($user->sector ?? []));
 
             if (!empty($sectores)) {
-                // Mostrar solo partes con cargas cuyas referencias pertenezcan a alguno de sus sectores
-                $query->whereHas('cargas.referencia', function (Builder $q) use ($sectores) {
-                    $q->whereIn('sector', $sectores);
+                $query->where(function (Builder $q) use ($sectores) {
+                    // A) Partes con cargas cuya referencia es de alguno de sus sectores
+                    $q->whereHas('cargas', function (Builder $c) use ($sectores) {
+                        $c->whereHas('referencia', fn(Builder $r) => $r->whereIn('sector', $sectores));
+                    })
+                        // OR
+                        // B) Partes con cargas en almacén intermedio (cualquier almacén)
+                        ->orWhereHas('cargas', function (Builder $c) {
+                            $c->whereNotNull('almacen_id');
+                        })
+                        // (opcional) si también quieres incluir partes cuyo DESTINO FINAL es un almacén:
+                        ->orWhere(function (Builder $p) {
+                            $p->whereNotNull('almacen_id'); // campo en el propio parte
+                        });
                 });
             } else {
-                // Si el técnico no tiene sectores, opcionalmente no mostrar nada:
-                // $query->whereRaw('1=0');
+                // Si el técnico no tiene sectores, dejamos el comportamiento que ya tenías (sin ampliar).
+                // Si prefieres que, aun sin sectores, vea los de almacén intermedio, descomenta:
+                // $query->whereHas('cargas', fn (Builder $c) => $c->whereNotNull('almacen_id'));
             }
         }
 

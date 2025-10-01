@@ -5,6 +5,7 @@ namespace App\Providers\Filament;
 use App\Filament\Pages\Auth\Register;
 use App\Filament\Resources\Auth\Login\Login;
 use App\Filament\Widgets\AccountWidget;
+use App\Filament\Widgets\EstadoUsuarioWidget;
 use App\Filament\Widgets\PartesTrabajoActivos;
 use App\Filament\Widgets\ResumenPartesActivos;
 use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
@@ -23,6 +24,7 @@ use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
+use Monzer\FilamentChatifyIntegration\ChatifyPlugin;
 use Phpsa\FilamentAuthentication\Widgets\LatestUsersWidget;
 
 class AdminPanelProvider extends PanelProvider
@@ -93,6 +95,7 @@ class AdminPanelProvider extends PanelProvider
                         'default' => 1,
                         'sm' => 3,
                     ]),
+                //ChatifyPlugin::make(),
             ])
 
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
@@ -106,6 +109,7 @@ class AdminPanelProvider extends PanelProvider
                 AccountWidget::class,
                 PartesTrabajoActivos::class,
                 ResumenPartesActivos::class,
+                EstadoUsuarioWidget::class,
             ])
             ->middleware([
                 EncryptCookies::class,
