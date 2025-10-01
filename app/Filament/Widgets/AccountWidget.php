@@ -8,7 +8,7 @@ class AccountWidget extends Widget
 {
     protected static string $view = 'filament.widgets.account-widget';
 
-    protected int|string|array $columnSpan = 2;
+    protected int|string|array $columnSpan = 'full';
 
     public function getUserFullName(): string
     {
