@@ -520,7 +520,7 @@ class ParteTrabajoTallerVehiculosResource extends Resource
                 Tables\Filters\TrashedFilter::make()
                     ->visible(fn() => Filament::auth()->user()?->hasRole('superadmin'))
                     ->columnSpanFull(),
-            ], layout: FiltersLayout::AboveContent)
+            ], layout: FiltersLayout::AboveContentCollapsible)
             ->filtersFormColumns(3)
             ->actions([
                 Tables\Actions\ViewAction::make(),

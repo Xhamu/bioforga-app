@@ -51,6 +51,7 @@ class Referencia extends Model
         'precio_horas',
         'estado_facturacion',
         'tipo_cantidad',
+        'trabajo_lluvia'
     ];
 
     public function getActivitylogOptions(): LogOptions

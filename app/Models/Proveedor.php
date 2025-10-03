@@ -32,6 +32,7 @@ class Proveedor extends Authenticatable
         'poblacion',
         'codigo_postal',
         'direccion',
+        'ubicacion_gps',
 
         'nombre_contacto',
         'cargo_contacto',

@@ -160,6 +160,19 @@ class ProveedorResource extends Resource
                                 'required' => 'La :attribute es obligatorio.',
                             ])
                             ->columnSpan(['default' => 2, 'md' => 2]),
+
+                        TextInput::make('ubicacion_gps')
+                            ->label('Ubicación GPS')
+                            ->placeholder('42.170778, -8.495739')
+                            ->rules([
+                                'nullable',
+                                'regex:/^-?\d{1,2}\.\d+,\s-?\d{1,3}\.\d+$/'
+                            ])
+                            ->validationMessages([
+                                'regex' => 'El formato de la ubicación GPS no es válido. Usa el formato: 42.170778, -8.495739',
+                            ])
+                            ->helperText('Introduce la latitud y longitud separadas por coma y espacio.')
+                            ->columnSpan(['default' => 2, 'md' => 2]),
                     ])
                     ->columns(['default' => 1, 'md' => 2])
                     ->columnSpanFull(),
@@ -298,7 +311,7 @@ class ProveedorResource extends Resource
                             ->columnSpanFull()
                             ->visible(fn() => Filament::auth()->user()?->hasRole('superadmin')),
                     ],
-                    layout: FiltersLayout::AboveContent
+                    layout: FiltersLayout::AboveContentCollapsible
                 )
                 ->filtersFormColumns(1)
                 ->actions([
@@ -367,7 +380,7 @@ class ProveedorResource extends Resource
                             ->columnSpanFull()
                             ->visible(fn() => Filament::auth()->user()?->hasRole('superadmin')),
                     ],
-                    layout: FiltersLayout::AboveContent
+                    layout: FiltersLayout::AboveContentCollapsible
                 )
                 ->filtersFormColumns(2)
                 ->actions([

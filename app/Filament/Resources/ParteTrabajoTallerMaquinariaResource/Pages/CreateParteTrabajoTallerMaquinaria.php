@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\ParteTrabajoTallerMaquinariaResource\Pages;
 
 use App\Filament\Resources\ParteTrabajoTallerMaquinariaResource;
+use Auth;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -15,6 +16,33 @@ use Filament\Forms\Components\TextInput\Mask;
 class CreateParteTrabajoTallerMaquinaria extends CreateRecord
 {
     protected static string $resource = ParteTrabajoTallerMaquinariaResource::class;
+
+    protected static bool $canCreateAnother = false;
+
+    public function mount(): void
+    {
+        $model = static::getResource()::getModel();
+
+        $abierto = $model::query()
+            ->where('usuario_id', Auth::id())
+            ->whereNull('fecha_hora_fin_taller_maquinaria')
+            ->whereNull('deleted_at')
+            ->first();
+
+        if ($abierto) {
+            Notification::make()
+                ->title('Ya tienes un parte abierto')
+                ->body('Debes cerrarlo antes de crear uno nuevo.')
+                ->danger()
+                ->send();
+
+            $this->redirect(ParteTrabajoTallerMaquinariaResource::getUrl('view', [
+                'record' => $abierto->getKey(),
+            ]));
+        }
+
+        parent::mount();
+    }
 
     public function getFormActions(): array
     {

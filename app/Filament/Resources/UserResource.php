@@ -8,7 +8,9 @@ use App\Models\Maquina;
 use App\Models\Referencia;
 use App\Models\User;
 use App\Models\Vehiculo;
+use App\Services\ChatService;
 use Filament\Forms;
+use Filament\Forms\Components\Builder;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -19,6 +21,7 @@ use Filament\Resources\Resource;
 use Filament\Support\Enums\FontWeight;
 use Filament\Tables;
 use Filament\Tables\Actions\Action;
+use Filament\Tables\Columns\BadgeColumn;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\Layout\Grid;
 use Filament\Tables\Columns\Layout\Panel;
@@ -26,6 +29,7 @@ use Filament\Tables\Columns\Layout\Split;
 use Filament\Tables\Columns\Layout\Stack;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Enums\FiltersLayout;
+use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
@@ -242,6 +246,14 @@ class UserResource extends Resource
                                         ->label('Teléfono')
                                         ->searchable()
                                         ->icon('heroicon-m-phone'),
+
+                                    BadgeColumn::make('is_blocked')
+                                        ->label('Estado')
+                                        ->formatStateUsing(fn($state) => $state == 1 ? 'Bloqueado' : 'Activo')
+                                        ->colors([
+                                            'danger' => fn($state) => $state == 1,
+                                            'success' => fn($state) => $state == 0,
+                                        ]),
                                 ]),
 
                             ]),
@@ -267,7 +279,7 @@ class UserResource extends Resource
                             ->multiple()
                             ->preload(),
                     ],
-                    layout: FiltersLayout::AboveContent
+                    layout: FiltersLayout::AboveContentCollapsible
                 )
                 ->filtersFormColumns(2)
                 ->actions([
@@ -378,6 +390,14 @@ class UserResource extends Resource
                         ->label('Teléfono')
                         ->searchable()
                         ->icon('heroicon-m-phone'),
+
+                    BadgeColumn::make('is_blocked')
+                        ->label('Estado')
+                        ->formatStateUsing(fn($state) => $state == 1 ? 'Bloqueado' : 'Activo')
+                        ->colors([
+                            'danger' => fn($state) => $state == 1,
+                            'success' => fn($state) => $state == 0,
+                        ]),
                 ])
                 ->persistFiltersInSession()
                 ->filters(
@@ -399,7 +419,7 @@ class UserResource extends Resource
                             ->multiple()
                             ->preload(),
                     ],
-                    layout: FiltersLayout::AboveContent
+                    layout: FiltersLayout::AboveContentCollapsible
                 )
                 ->filtersFormColumns(2)
                 ->headerActions([
@@ -431,6 +451,20 @@ class UserResource extends Resource
                                 ])
                                 ->log('impersonation');
                         }),
+
+                    Action::make('Enviar mensaje')
+                        ->form([
+                            Forms\Components\Textarea::make('body')->label('Mensaje')->required(),
+                        ])
+                        ->action(function (array $data, User $record) {
+                            $service = app(ChatService::class);
+                            $conv = $service->startDirect(auth()->user(), $record);
+                            $service->sendMessage($conv, auth()->user(), $data['body']);
+                            Notification::make()
+                                ->title('Mensaje enviado')
+                                ->success()->send();
+                        })
+                        ->modalHeading(fn(User $record) => 'Mensaje a ' . $record->name),
 
                     Tables\Actions\EditAction::make(),
 

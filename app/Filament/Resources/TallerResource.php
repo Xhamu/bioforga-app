@@ -187,7 +187,7 @@ class TallerResource extends Resource
                     ->visible(fn() => Filament::auth()->user()?->hasRole('superadmin'))
                     ->columnSpanFull(),
 
-            ], layout: Tables\Enums\FiltersLayout::AboveContent)
+            ], layout: Tables\Enums\FiltersLayout::AboveContentCollapsible)
             ->filtersFormColumns(3)
             ->actions([
                 Tables\Actions\EditAction::make(),

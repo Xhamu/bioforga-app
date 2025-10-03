@@ -5,6 +5,8 @@ namespace App\Providers\Filament;
 use App\Filament\Pages\Auth\Register;
 use App\Filament\Resources\Auth\Login\Login;
 use App\Filament\Widgets\AccountWidget;
+use App\Filament\Widgets\EstadoUsuarioWidget;
+use App\Filament\Widgets\InboxWidget;
 use App\Filament\Widgets\PartesTrabajoActivos;
 use App\Filament\Widgets\ResumenPartesActivos;
 use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
@@ -23,6 +25,7 @@ use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
+use Monzer\FilamentChatifyIntegration\ChatifyPlugin;
 use Phpsa\FilamentAuthentication\Widgets\LatestUsersWidget;
 
 class AdminPanelProvider extends PanelProvider
@@ -93,18 +96,22 @@ class AdminPanelProvider extends PanelProvider
                         'default' => 1,
                         'sm' => 3,
                     ]),
+                //ChatifyPlugin::make(),
             ])
 
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
             ->pages([
                 Pages\Dashboard::class,
+                \App\Filament\Pages\MapaReferencias::class,
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->widgets([
                 AccountWidget::class,
                 PartesTrabajoActivos::class,
                 ResumenPartesActivos::class,
+                EstadoUsuarioWidget::class,
+                InboxWidget::class,
             ])
             ->middleware([
                 EncryptCookies::class,
