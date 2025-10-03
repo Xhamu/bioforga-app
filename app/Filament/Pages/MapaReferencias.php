@@ -212,21 +212,68 @@ class MapaReferencias extends Page implements HasForms
 
     protected function splitLatLng(?string $value): array
     {
-        if (!$value)
+        if (!$value) {
             return [NAN, NAN];
-
-        // Normaliza separadores y dobles espacios
-        $value = str_replace([';', '  '], [',', ' '], trim($value));
-
-        // Acepta "lat, lng" (con o sin espacio)
-        if (preg_match('/^\s*(-?\d{1,2}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)\s*$/', $value, $m)) {
-            return [floatval($m[1]), floatval($m[2])];
         }
 
-        // Fallback muy permisivo por si llega "lat lng"
-        $parts = preg_split('/[,; ]+/', $value);
-        $lat = isset($parts[0]) ? floatval(str_replace(',', '.', $parts[0])) : NAN;
-        $lng = isset($parts[1]) ? floatval(str_replace(',', '.', $parts[1])) : NAN;
+        // Normalización básica
+        $raw = trim((string) $value);
+        $raw = str_replace([';', '|'], ',', $raw);      // uniformar separadores
+        $raw = preg_replace('/\s+/', ' ', $raw);        // colapsar espacios
+
+        // Intento 1: separar por coma
+        $parts = array_values(array_filter(explode(',', $raw), fn($v) => trim($v) !== ''));
+
+        // Caso especial: valores con coma decimal separados por comas (ej: "42,123, -8,543")
+        if (
+            count($parts) > 2 &&
+            preg_match('/^-?\d+$/', trim($parts[0])) &&
+            preg_match('/^\d+$/', trim($parts[1]))
+        ) {
+            $parts = [
+                $parts[0] . '.' . $parts[1],
+                $parts[2] . (isset($parts[3]) ? '.' . $parts[3] : ''),
+            ];
+        }
+
+        // Intento 2: si no hay al menos 2 partes, probar con espacio
+        if (count($parts) < 2) {
+            $parts = preg_split('/\s+/', $raw);
+            if (count($parts) < 2) {
+                return [NAN, NAN];
+            }
+        }
+
+        $convert = function (string $coord): float {
+            $coord = trim($coord);
+
+            // DMS → Decimal (acepta formatos tipo: 42°27'13"N, 42 27 13 N, 42° 27' 13" N)
+            // grupos: grados, minutos, segundos(dec), dirección opcional
+            if (preg_match('/^\s*(\d+)[°\s]+(\d+)[\'\s]+([\d.,]+)"?\s*([NSEW])?\s*$/i', $coord, $m)) {
+                $deg = (float) $m[1];
+                $min = (float) $m[2];
+                $sec = (float) str_replace(',', '.', $m[3]);
+                $dir = strtoupper($m[4] ?? '');
+
+                $decimal = $deg + ($min / 60) + ($sec / 3600);
+                if (in_array($dir, ['S', 'W'], true)) {
+                    $decimal *= -1;
+                }
+                return $decimal;
+            }
+
+            // Decimal con coma
+            $coord = str_replace(',', '.', $coord);
+            return (float) $coord;
+        };
+
+        $lat = $convert((string) $parts[0]);
+        $lng = $convert((string) $parts[1]);
+
+        // Validaciones: rango y descartar 0,0 (suele ser placeholder)
+        if ($lat === 0.0 || $lng === 0.0 || abs($lat) > 90 || abs($lng) > 180) {
+            return [NAN, NAN];
+        }
 
         return [$lat, $lng];
     }
