@@ -9,8 +9,6 @@
     </x-filament::section>
 
     <x-filament::section>
-        <x-slot name="heading">Mapa de referencias</x-slot>
-
         <div id="ref-map-wrapper" wire:key="map-wrapper" x-data x-init="$nextTick(() => window.initRefMap?.())"
             data-markers='@json($this->markers, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT)' style="position: relative;">
             <div id="referencias-map" wire:ignore style="height: 600px; border-radius: 12px; overflow: hidden;"></div>

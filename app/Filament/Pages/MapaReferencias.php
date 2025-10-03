@@ -5,6 +5,7 @@ namespace App\Filament\Pages;
 use App\Filament\Resources\ReferenciaResource;
 use App\Models\Referencia;
 use App\Models\Proveedor;
+use Filament\Facades\Filament;
 use Filament\Forms\Components\Toggle;
 use Filament\Pages\Page;
 use Filament\Forms\Form;
@@ -28,11 +29,24 @@ class MapaReferencias extends Page implements HasForms
 
     public ?array $data = [];
 
-    public function mount(): void
+    /** ⛔️ Ocultar en navegación si el usuario no tiene rol permitido */
+    public static function shouldRegisterNavigation(): bool
     {
-        $this->form->fill();
+        $user = Filament::auth()->user();
+
+        return $user?->hasAnyRole(['superadmin', 'administración']) ?? false;
     }
 
+    public function mount(): void
+    {
+        /** ⛔️ Bloquear acceso directo por URL */
+        $user = Filament::auth()->user();
+        if (!$user?->hasAnyRole(['superadmin', 'administración'])) {
+            abort(403);
+        }
+
+        $this->form->fill();
+    }
     public function form(Form $form): Form
     {
         return $form

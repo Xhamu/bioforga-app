@@ -1,8 +1,8 @@
 <?php
 
-// app/Filament/Pages/EnviarMensajeARol.php
 namespace App\Filament\Pages;
 
+use Filament\Facades\Filament;
 use Filament\Forms;
 use Filament\Pages\Page;
 use Spatie\Permission\Models\Role;
@@ -17,10 +17,28 @@ class EnviarMensajeARol extends Page implements Forms\Contracts\HasForms
 
     protected static ?string $navigationIcon = 'heroicon-o-megaphone';
     protected static ?string $navigationLabel = 'Mensaje a Rol';
+    protected static ?string $navigationGroup = 'Mensajería';
+    protected static ?int $navigationSort = 4;
     protected static string $view = 'filament.pages.enviar-mensaje-a-rol';
 
     public ?int $role_id = null;
     public ?string $body = null;
+
+    /** 🔒 Ocultar del menú si no tiene rol permitido */
+    public static function shouldRegisterNavigation(): bool
+    {
+        $user = Filament::auth()->user();
+        return $user?->hasAnyRole(['superadmin', 'administración']) ?? false;
+    }
+
+    /** 🔒 Bloquear acceso directo por URL */
+    public function mount(): void
+    {
+        $user = Filament::auth()->user();
+        if (!$user?->hasAnyRole(['superadmin', 'administración'])) {
+            abort(403);
+        }
+    }
 
     protected function recipientsQuery(?int $roleId)
     {

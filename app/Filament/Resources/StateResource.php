@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\StateResource\Pages;
 use App\Models\State;
+use Filament\Facades\Filament;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -19,13 +20,19 @@ class StateResource extends Resource
 {
     protected static ?string $model = State::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-adjustments-horizontal';
+    protected static ?string $navigationIcon = 'heroicon-o-folder-open';
     protected static ?string $navigationGroup = 'Maestros';
     protected static ?string $pluralModelLabel = 'Estados';
     protected static ?string $modelLabel = 'Estado';
     protected static ?string $slug = 'estados';
     protected static ?int $navigationSort = 50;
 
+    /** 🔒 Ocultar del menú si no tiene rol permitido */
+    public static function shouldRegisterNavigation(): bool
+    {
+        $user = Filament::auth()->user();
+        return $user?->hasAnyRole(['superadmin', 'administración']) ?? false;
+    }
 
     public static function form(Form $form): Form
     {
