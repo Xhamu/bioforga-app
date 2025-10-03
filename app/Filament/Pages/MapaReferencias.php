@@ -130,7 +130,7 @@ class MapaReferencias extends Page implements HasForms
                     'lat' => $lat,
                     'lng' => $lng,
                     'color' => '#3B82F6', // azul
-                    'url' => \App\Filament\Resources\ReferenciaResource::getUrl('edit', ['record' => $r]),
+                    'url' => ReferenciaResource::getUrl('edit', ['record' => $r]),
                 ];
             });
 

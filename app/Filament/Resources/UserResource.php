@@ -8,6 +8,7 @@ use App\Models\Maquina;
 use App\Models\Referencia;
 use App\Models\User;
 use App\Models\Vehiculo;
+use App\Services\ChatService;
 use Filament\Forms;
 use Filament\Forms\Components\Builder;
 use Filament\Forms\Components\Checkbox;
@@ -450,6 +451,20 @@ class UserResource extends Resource
                                 ])
                                 ->log('impersonation');
                         }),
+
+                    Action::make('Enviar mensaje')
+                        ->form([
+                            Forms\Components\Textarea::make('body')->label('Mensaje')->required(),
+                        ])
+                        ->action(function (array $data, User $record) {
+                            $service = app(ChatService::class);
+                            $conv = $service->startDirect(auth()->user(), $record);
+                            $service->sendMessage($conv, auth()->user(), $data['body']);
+                            Notification::make()
+                                ->title('Mensaje enviado')
+                                ->success()->send();
+                        })
+                        ->modalHeading(fn(User $record) => 'Mensaje a ' . $record->name),
 
                     Tables\Actions\EditAction::make(),
 

@@ -6,6 +6,7 @@ use App\Filament\Pages\Auth\Register;
 use App\Filament\Resources\Auth\Login\Login;
 use App\Filament\Widgets\AccountWidget;
 use App\Filament\Widgets\EstadoUsuarioWidget;
+use App\Filament\Widgets\InboxWidget;
 use App\Filament\Widgets\PartesTrabajoActivos;
 use App\Filament\Widgets\ResumenPartesActivos;
 use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
@@ -110,6 +111,7 @@ class AdminPanelProvider extends PanelProvider
                 PartesTrabajoActivos::class,
                 ResumenPartesActivos::class,
                 EstadoUsuarioWidget::class,
+                InboxWidget::class,
             ])
             ->middleware([
                 EncryptCookies::class,
