@@ -174,7 +174,7 @@ class MapaReferencias extends Page implements HasForms
                 return [
                     'id' => 'ref-' . $r->id,
                     'type' => 'referencia',
-                    'titulo' => $r->referencia,
+                    'titulo' => $r->referencia . ' - ' . $r->monte_parcela . ' (' . $r->ayuntamiento . ')',
                     'lat' => $lat,
                     'lng' => $lng,
                     'color' => '#3B82F6',
