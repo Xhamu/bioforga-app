@@ -110,7 +110,6 @@ class AdminPanelProvider extends PanelProvider
                 AccountWidget::class,
                 PartesTrabajoActivos::class,
                 ResumenPartesActivos::class,
-                EstadoUsuarioWidget::class,
                 InboxWidget::class,
             ])
             ->middleware([

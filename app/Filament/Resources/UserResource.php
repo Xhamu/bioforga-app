@@ -21,6 +21,7 @@ use Filament\Resources\Resource;
 use Filament\Support\Enums\FontWeight;
 use Filament\Tables;
 use Filament\Tables\Actions\Action;
+use Filament\Tables\Actions\ActionGroup;
 use Filament\Tables\Columns\BadgeColumn;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\Layout\Grid;
@@ -371,34 +372,66 @@ class UserResource extends Resource
                 ->defaultSort('created_at', 'desc');
         } else {
             return $table
+                ->modifyQueryUsing(
+                    fn(\Illuminate\Database\Eloquent\Builder $query) =>
+                    $query->with(['activeStatus.state', 'proveedor'])
+                )
                 ->defaultGroup('proveedor.razon_social')
                 ->columns([
                     TextColumn::make('nombre_apellidos')
                         ->label('Nombre')
                         ->weight(FontWeight::Bold)
+                        ->description(fn(User $record) => 'NIF: ' . $record->nif, position: 'below')
+                        ->icon('heroicon-m-user')
                         ->searchable(query: function ($query, $search) {
-                            $query->where('name', 'like', "%{$search}%")
-                                ->orWhere('apellidos', 'like', "%{$search}%");
+                            $query->where(
+                                fn($q) => $q
+                                    ->where('name', 'like', "%{$search}%")
+                                    ->orWhere('apellidos', 'like', "%{$search}%")
+                                    ->orWhere('email', 'like', "%{$search}%")
+                            );
                         }),
 
-                    TextColumn::make('nif')
-                        ->label('NIF')
-                        ->searchable()
-                        ->icon('heroicon-m-identification'),
+                    TextColumn::make('email')
+                        ->label('Email')
+                        ->icon('heroicon-m-envelope'),
 
                     TextColumn::make('telefono')
                         ->label('Teléfono')
-                        ->searchable()
                         ->icon('heroicon-m-phone'),
 
-                    BadgeColumn::make('is_blocked')
+                    BadgeColumn::make('estado_actual')
                         ->label('Estado')
+                        ->getStateUsing(fn(User $record) => $record->activeStatus?->state?->name ?? 'Sin estado')
+                        ->icon(fn(User $record) => $record->activeStatus?->state?->icon)
+                        ->color(fn(User $record) => $record->activeStatus?->state?->color ?? 'gray')
+                        ->tooltip(function (User $record) {
+                            if (!$record->activeStatus)
+                                return null;
+                            $started = $record->activeStatus->started_at?->timezone('Europe/Madrid');
+                            if (!$started)
+                                return null;
+                            $diff = now()->diff($started);
+                            $h = str_pad($diff->h + $diff->d * 24, 2, '0', STR_PAD_LEFT);
+                            $m = str_pad($diff->i, 2, '0', STR_PAD_LEFT);
+                            $s = str_pad($diff->s, 2, '0', STR_PAD_LEFT);
+                            return 'Desde ' . $started->format('d/m/Y H:i') . " ({$h}h {$m}min)";
+                        })
+                        ->sortable(false)
+                        ->searchable(false)
+                        ->alignCenter(),
+
+                    BadgeColumn::make('is_blocked')
+                        ->label('Estado de acceso')
                         ->formatStateUsing(fn($state) => $state == 1 ? 'Bloqueado' : 'Activo')
                         ->colors([
                             'danger' => fn($state) => $state == 1,
                             'success' => fn($state) => $state == 0,
-                        ]),
+                        ])
+                        ->tooltip(fn($state) => $state == 1 ? 'Usuario bloqueado' : 'Usuario activo')
+                        ->alignCenter(),
                 ])
+                ->striped()
                 ->persistFiltersInSession()
                 ->filters(
                     [
@@ -418,10 +451,18 @@ class UserResource extends Resource
                             )
                             ->multiple()
                             ->preload(),
+
+                        Tables\Filters\SelectFilter::make('is_blocked')
+                            ->label('Estado de acceso')
+                            ->searchable()
+                            ->options([
+                                '0' => 'Activo',
+                                '1' => 'Bloqueado',
+                            ]),
                     ],
                     layout: FiltersLayout::AboveContentCollapsible
                 )
-                ->filtersFormColumns(2)
+                ->filtersFormColumns(3)
                 ->headerActions([
                     Action::make('exportar_partes_trabajo')
                         ->label('Exportar partes de trabajo')
@@ -453,8 +494,13 @@ class UserResource extends Resource
                         }),
 
                     Action::make('Enviar mensaje')
+                        ->label('Mensaje')
+                        ->icon('heroicon-o-paper-airplane')
                         ->form([
-                            Forms\Components\Textarea::make('body')->label('Mensaje')->required(),
+                            Forms\Components\Textarea::make('body')
+                                ->label('Mensaje')
+                                ->required()
+                                ->rows(4),
                         ])
                         ->action(function (array $data, User $record) {
                             $service = app(ChatService::class);
@@ -462,67 +508,72 @@ class UserResource extends Resource
                             $service->sendMessage($conv, auth()->user(), $data['body']);
                             Notification::make()
                                 ->title('Mensaje enviado')
-                                ->success()->send();
+                                ->success()
+                                ->send();
                         })
-                        ->modalHeading(fn(User $record) => 'Mensaje a ' . $record->name),
+                        ->modalHeading(fn(User $record) => 'Mensaje a ' . ($record->nombre_apellidos ?? $record->name)),
 
-                    Tables\Actions\EditAction::make(),
+                    ActionGroup::make([
+                        Tables\Actions\EditAction::make(),
 
-                    Tables\Actions\DeleteAction::make()
-                        ->before(function ($record, $action) {
-                            // Máquinas vinculadas
-                            $maquinas = Maquina::where('operario_id', $record->id)->get();
+                        Tables\Actions\DeleteAction::make()
+                            ->before(function ($record, $action) {
+                                // Máquinas vinculadas
+                                $maquinas = Maquina::where('operario_id', $record->id)->get();
 
-                            if ($maquinas->isNotEmpty()) {
-                                $listaMaquinas = $maquinas
-                                    ->map(fn($m) => "<li><strong>{$m->marca} {$m->modelo}</strong></li>")
-                                    ->implode('');
+                                if ($maquinas->isNotEmpty()) {
+                                    $listaMaquinas = $maquinas
+                                        ->map(fn($m) => "<li><strong>{$m->marca} {$m->modelo}</strong></li>")
+                                        ->implode('');
 
-                                Notification::make()
-                                    ->title('No se puede eliminar')
-                                    ->danger()
-                                    ->icon('heroicon-o-exclamation-circle')
-                                    ->body(new HtmlString(
-                                        "Este usuario está asignado como operario en las siguientes máquinas:<br><ul>{$listaMaquinas}</ul>No se puede eliminar mientras tenga estas vinculaciones."
-                                    ))
-                                    ->duration(10000)
-                                    ->send();
+                                    Notification::make()
+                                        ->title('No se puede eliminar')
+                                        ->danger()
+                                        ->icon('heroicon-o-exclamation-circle')
+                                        ->body(new HtmlString(
+                                            "Este usuario está asignado como operario en las siguientes máquinas:<br><ul>{$listaMaquinas}</ul>No se puede eliminar mientras tenga estas vinculaciones."
+                                        ))
+                                        ->duration(10000)
+                                        ->send();
 
-                                $action->cancel();
-                                return;
-                            }
+                                    $action->cancel();
+                                    return;
+                                }
 
-                            // Vehículos vinculados
-                            $vehiculos = Vehiculo::whereJsonContains('conductor_habitual', (string) $record->id)->get();
+                                // Vehículos vinculados
+                                $vehiculos = Vehiculo::whereJsonContains('conductor_habitual', (string) $record->id)->get();
 
-                            if ($vehiculos->isNotEmpty()) {
-                                $listaVehiculos = $vehiculos
-                                    ->map(fn($v) => "<li><strong>{$v->marca} {$v->modelo} ({$v->matricula})</strong></li>")
-                                    ->implode('');
+                                if ($vehiculos->isNotEmpty()) {
+                                    $listaVehiculos = $vehiculos
+                                        ->map(fn($v) => "<li><strong>{$v->marca} {$v->modelo} ({$v->matricula})</strong></li>")
+                                        ->implode('');
 
-                                Notification::make()
-                                    ->title('No se puede eliminar')
-                                    ->icon('heroicon-o-exclamation-circle')
-                                    ->danger()
-                                    ->body(new HtmlString(
-                                        "Este usuario figura como conductor habitual en los siguientes vehículos:<br><ul>{$listaVehiculos}</ul>No se puede eliminar mientras esté asignado."
-                                    ))
-                                    ->duration(10000)
-                                    ->send();
+                                    Notification::make()
+                                        ->title('No se puede eliminar')
+                                        ->icon('heroicon-o-exclamation-circle')
+                                        ->danger()
+                                        ->body(new HtmlString(
+                                            "Este usuario figura como conductor habitual en los siguientes vehículos:<br><ul>{$listaVehiculos}</ul>No se puede eliminar mientras esté asignado."
+                                        ))
+                                        ->duration(10000)
+                                        ->send();
 
-                                $action->cancel();
-                            }
-                        })
-                        ->requiresConfirmation()
-                        ->modalHeading('¿Estás seguro de que quieres eliminar este usuario?')
-                        ->modalDescription('Esta acción no se puede deshacer. Asegúrate de que el usuario no tenga datos relacionados.'),
+                                    $action->cancel();
+                                }
+                            })
+                            ->requiresConfirmation()
+                            ->modalHeading('¿Estás seguro de que quieres eliminar este usuario?')
+                            ->modalDescription('Esta acción no se puede deshacer. Asegúrate de que el usuario no tenga datos relacionados.'),
 
-                    Action::make('activities')
-                        ->label('Actividad')
-                        ->icon('heroicon-o-clock')
-                        ->url(fn($record) => static::getUrl('activities', ['record' => $record]))
-                        ->openUrlInNewTab()
-                        ->visible(fn() => auth()->user()?->hasRole('superadmin')),
+                        Action::make('activities')
+                            ->label('Actividad')
+                            ->icon('heroicon-o-clock')
+                            ->url(fn($record) => static::getUrl('activities', ['record' => $record]))
+                            ->openUrlInNewTab()
+                            ->visible(fn() => auth()->user()?->hasRole('superadmin')),
+                    ])
+                        ->label('Acciones')               // Texto del botón del grupo
+                        ->icon('heroicon-m-ellipsis-vertical'), // Icono del botón del grupo
                 ])
                 ->bulkActions([
                     Tables\Actions\BulkActionGroup::make([
