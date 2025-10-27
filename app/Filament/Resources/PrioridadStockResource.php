@@ -26,6 +26,14 @@ class PrioridadStockResource extends Resource
     protected static ?string $pluralModelLabel = 'Prioridades de stock';
     protected static ?int $navigationSort = 2;
 
+    public static function shouldRegisterNavigation(): bool
+    {
+        $user = auth()->user();
+
+        return $user &&
+            in_array($user->role, ['superadmin', 'administración', 'supervisión']);
+    }
+
     // Helpers de mapeo (coinciden con StockCalculator)
     private static function mapCert(?string $raw): string
     {
