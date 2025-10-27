@@ -6,12 +6,16 @@ use App\Filament\Resources\PrioridadStockResource\Pages;
 use App\Models\AlmacenIntermedio;
 use App\Models\PrioridadStock;
 use App\Services\StockCalculator;
+use Filament\Facades\Filament;
 use Filament\Forms;
 use Filament\Forms\Get;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Filament\Forms\Form;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\HtmlString;
 use Illuminate\Validation\Rule;
 
@@ -26,13 +30,46 @@ class PrioridadStockResource extends Resource
     protected static ?string $pluralModelLabel = 'Prioridades de stock';
     protected static ?int $navigationSort = 2;
 
+    protected static array $rolesPermitidos = ['superadmin', 'administración', 'supervisión'];
+
+    protected static function usuarioPermitido(): bool
+    {
+        $user = Filament::auth()->user();
+        return $user?->hasAnyRole(static::$rolesPermitidos) ?? false;
+    }
+
+    /** 1) Ocultar del menú de navegación */
     public static function shouldRegisterNavigation(): bool
     {
-        $user = auth()->user();
-
-        return $user &&
-            in_array($user->role, ['superadmin', 'administración', 'supervisión']);
+        return static::usuarioPermitido();
     }
+
+    /** 2) Autorización de páginas/acciones del recurso */
+    public static function canViewAny(): bool
+    {
+        return static::usuarioPermitido();
+    }
+
+    public static function canCreate(): bool
+    {
+        return static::usuarioPermitido();
+    }
+
+    public static function canEdit(Model $record): bool
+    {
+        return static::usuarioPermitido();
+    }
+
+    public static function canDelete(Model $record): bool
+    {
+        return static::usuarioPermitido();
+    }
+
+    public static function canDeleteAny(): bool
+    {
+        return static::usuarioPermitido();
+    }
+
 
     // Helpers de mapeo (coinciden con StockCalculator)
     private static function mapCert(?string $raw): string
