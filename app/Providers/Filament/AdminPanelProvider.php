@@ -6,7 +6,6 @@ use App\Filament\Pages\Auth\Register;
 use App\Filament\Resources\Auth\Login\Login;
 use App\Filament\Widgets\AccountWidget;
 use App\Filament\Widgets\EstadoUsuarioWidget;
-use App\Filament\Widgets\InboxWidget;
 use App\Filament\Widgets\PartesTrabajoActivos;
 use App\Filament\Widgets\ResumenPartesActivos;
 use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
@@ -18,15 +17,12 @@ use Filament\Pages;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
-use Filament\Widgets;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
-use Monzer\FilamentChatifyIntegration\ChatifyPlugin;
-use Phpsa\FilamentAuthentication\Widgets\LatestUsersWidget;
 
 class AdminPanelProvider extends PanelProvider
 {
@@ -110,8 +106,6 @@ class AdminPanelProvider extends PanelProvider
                 AccountWidget::class,
                 PartesTrabajoActivos::class,
                 ResumenPartesActivos::class,
-                EstadoUsuarioWidget::class,
-                InboxWidget::class,
             ])
             ->middleware([
                 EncryptCookies::class,

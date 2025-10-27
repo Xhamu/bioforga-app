@@ -5,11 +5,15 @@ namespace App\Livewire;
 use App\Models\Conversation;
 use App\Services\ChatService;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 
 class ChatPanel extends Component
 {
+    use WithFileUploads;
+
     public ?int $conversationId = null;
     public string $message = '';
+    public $photo = null; // TemporaryUploadedFile
 
     protected $listeners = ['open-chat-panel' => 'open'];
 
@@ -17,7 +21,6 @@ class ChatPanel extends Component
     {
         $this->conversationId = $conversationId;
 
-        // 🧭 Si no se seleccionó conversación, abre la más reciente del usuario
         if (!$this->conversationId) {
             $this->conversationId = Conversation::query()
                 ->join('conversation_participants as cp', 'cp.conversation_id', '=', 'conversations.id')
@@ -36,16 +39,27 @@ class ChatPanel extends Component
 
     public function send(ChatService $service)
     {
-        $this->validate(['message' => 'required|string|min:1']);
+        abort_unless(auth()->user()?->hasAnyRole(['superadmin', 'administración']), 403);
+
+        $this->validate([
+            'message' => 'required|string|min:1',
+            'photo' => 'nullable|image|max:4096', // 4MB
+        ]);
 
         $conv = Conversation::with('participants')->findOrFail($this->conversationId);
-
         abort_unless($conv->participants->contains('id', auth()->id()), 403);
 
-        $service->sendMessage($conv, auth()->user(), trim($this->message));
+        $attachments = [];
+        if ($this->photo) {
+            // Guarda en disco "public" dentro de /chat
+            $path = $this->photo->store('chat', 'public');
+            $attachments[] = $path;
+        }
+
+        $service->sendMessage($conv, auth()->user(), trim($this->message), $attachments ?: null);
         $service->markAsRead($conv, auth()->user());
 
-        $this->reset('message');
+        $this->reset('message', 'photo');
 
         $this->dispatch('chat:scroll-bottom');
         $this->dispatch('$refresh');

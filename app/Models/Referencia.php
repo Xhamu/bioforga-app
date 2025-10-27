@@ -3,6 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -53,6 +54,25 @@ class Referencia extends Model
         'tipo_cantidad',
         'trabajo_lluvia'
     ];
+
+    /**
+     * The attributes that should be hidden for serialization.
+     *
+     * @var list<string>
+     */
+    protected $hidden = [];
+
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [];
+    }
+
+    protected $table = 'referencias';
 
     public function getActivitylogOptions(): LogOptions
     {
@@ -110,22 +130,11 @@ class Referencia extends Model
             ?? 'Sin interviniente';
     }
 
-    /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var list<string>
-     */
-    protected $hidden = [];
-
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
-    protected function casts(): array
+    protected function trabajoLluvia(): Attribute
     {
-        return [];
+        return Attribute::make(
+            get: fn($value) => $value === 'si',
+            set: fn($value) => $value ? 'si' : 'no',
+        );
     }
-
-    protected $table = 'referencias';
 }

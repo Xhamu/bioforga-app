@@ -15,5 +15,7 @@ class DatabaseSeeder extends Seeder
         // Nuevos
         $this->call(PoliciesShieldStyleSeeder::class);
         $this->call(UsersSeeder::class);
+
+        $this->call(PrioridadesStockSeeder::class);
     }
 }

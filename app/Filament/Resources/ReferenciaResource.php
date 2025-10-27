@@ -100,7 +100,7 @@ class ReferenciaResource extends Resource
             // Iniciales cliente (o NO)
             $inic = 'NO';
             if ($clienteId = $get('cliente_id')) {
-                $razon = optional(\App\Models\Cliente::find($clienteId))->razon_social;
+                $razon = optional(Cliente::find($clienteId))->razon_social;
                 if ($razon) {
                     $slug = strtoupper(preg_replace('/[^A-Z]/i', '', $razon));
                     $inic = substr($slug, 0, 2) ?: 'NO';
@@ -130,7 +130,7 @@ class ReferenciaResource extends Resource
             // 1) intenta con el contador actual
             if ($contadorActual !== null) {
                 $try = $prefix . str_pad((string) $contadorActual, 2, '0', STR_PAD_LEFT);
-                $exists = \App\Models\Referencia::where('referencia', $try)
+                $exists = Referencia::where('referencia', $try)
                     ->when($id, fn($q) => $q->where('id', '<>', $id))
                     ->exists();
                 if (!$exists) {
@@ -145,7 +145,7 @@ class ReferenciaResource extends Resource
                 $contador = str_pad((string) $i, 2, '0', STR_PAD_LEFT);
                 $ref = $prefix . $contador;
 
-                $exists = \App\Models\Referencia::where('referencia', $ref)
+                $exists = Referencia::where('referencia', $ref)
                     ->when($id, fn($q) => $q->where('id', '<>', $id))
                     ->exists();
 
@@ -171,7 +171,7 @@ class ReferenciaResource extends Resource
                     ->required()
                     ->reactive()
                     ->columnSpanFull()
-                    ->afterStateHydrated(function (callable $set, $state, ?\App\Models\Referencia $record) {
+                    ->afterStateHydrated(function (callable $set, $state, ?Referencia $record) {
                         $ref = (string) ($state ?: ($record->referencia ?? ''));
                         if (preg_match('/(\d{6})/', $ref, $m)) {
                             $set('ref_fecha_fija', $m[1]); // ej: 110725
@@ -361,7 +361,8 @@ class ReferenciaResource extends Resource
                             ->offIcon('heroicon-o-x-mark')
                             ->onColor('success')
                             ->offColor('danger')
-                            ->default(false),
+                            ->default(false)
+                            ->dehydrateStateUsing(fn(bool $state) => $state ? 'si' : 'no'),
                     ])
                     ->visible(fn($get) => !empty($get('referencia'))),
 
@@ -577,7 +578,7 @@ class ReferenciaResource extends Resource
                             ->placeholder('Seleccionar usuario')
                             ->options(
                                 User::whereDoesntHave('roles', fn($q) => $q->where('name', 'superadmin'))
-                                    ->select('id', \DB::raw("CONCAT(name, ' ', apellidos) as full_name"))
+                                    ->select('id', DB::raw("CONCAT(name, ' ', apellidos) as full_name"))
                                     ->orderBy('name')
                                     ->pluck('full_name', 'id')
                                     ->toArray()
@@ -669,7 +670,7 @@ class ReferenciaResource extends Resource
                                     ->preload()
                                     ->options(function (Get $get) {
                                         if ($get('tipo') === 'proveedor') {
-                                            return \App\Models\Proveedor::query()
+                                            return Proveedor::query()
                                                 ->where(function ($q) {
                                                     $q->whereNull('tipo_servicio') // permitir nulos
                                                         ->orWhereNotIn(
@@ -683,7 +684,7 @@ class ReferenciaResource extends Resource
                                         }
 
                                         if ($get('tipo') === 'cliente') {
-                                            return \App\Models\Cliente::query()
+                                            return Cliente::query()
                                                 ->orderBy('razon_social')
                                                 ->pluck('razon_social', 'id')
                                                 ->toArray();
@@ -709,8 +710,8 @@ class ReferenciaResource extends Resource
                                 }
 
                                 $etiqueta = match ($data['tipo']) {
-                                    'proveedor' => optional(\App\Models\Proveedor::find($data['id']))?->razon_social,
-                                    'cliente' => optional(\App\Models\Cliente::find($data['id']))?->razon_social,
+                                    'proveedor' => optional(Proveedor::find($data['id']))?->razon_social,
+                                    'cliente' => optional(Cliente::find($data['id']))?->razon_social,
                                     default => null,
                                 };
 
@@ -735,22 +736,23 @@ class ReferenciaResource extends Resource
                             })
                             ->placeholder('Todos'),
 
-                        SelectFilter::make('provincia_id')
+                        SelectFilter::make('provincia')
                             ->label('Provincia')
                             ->multiple()
                             ->searchable()
                             ->placeholder('Todas')
                             ->options(
                                 fn() =>
-                                Provincia::query()
-                                    ->whereNull('deleted_at') // por SoftDeletes
-                                    ->orderBy('nombre')
-                                    ->pluck('nombre', 'id')
+                                Referencia::query()
+                                    ->whereNotNull('provincia')
+                                    ->distinct()
+                                    ->orderBy('provincia')
+                                    ->pluck('provincia', 'provincia')
                                     ->toArray()
                             )
                             ->query(function ($query, array $data) {
                                 if (!empty($data['values'])) {
-                                    $query->whereIn('provincia_id', $data['values']);
+                                    $query->whereIn('provincia', $data['values']);
                                 }
                                 return $query;
                             })
@@ -758,35 +760,33 @@ class ReferenciaResource extends Resource
                                 if (empty($data['values']))
                                     return null;
                                 $n = count($data['values']);
-                                if ($n === 1) {
-                                    $nombre = Provincia::withTrashed()->find($data['values'][0])?->nombre;
-                                    return $nombre ? "Provincia: {$nombre}" : '1 provincia';
-                                }
-                                return "{$n} provincias";
+                                return $n === 1 ? "Provincia: {$data['values'][0]}" : "{$n} provincias";
                             }),
 
-                        SelectFilter::make('poblacion_id')
+                        SelectFilter::make('ayuntamiento')
                             ->label('Municipio')
                             ->multiple()
                             ->searchable()
                             ->placeholder('Todos')
                             ->options(function () {
-                                // lee lo seleccionado en el filtro de provincia
-                                $provinciasSeleccionadas = request()->input('tableFilters.provincia_id.values', []);
+                                // Provincias seleccionadas en el otro filtro
+                                $provSel = request()->input('tableFilters.provincia.values', []);
 
-                                $q = Poblacion::query()
-                                    ->whereNull('deleted_at') // por SoftDeletes
-                                    ->orderBy('nombre');
+                                $q = Referencia::query()
+                                    ->whereNotNull('ayuntamiento');
 
-                                if (!empty($provinciasSeleccionadas)) {
-                                    $q->whereIn('provincia_id', $provinciasSeleccionadas);
+                                if (!empty($provSel)) {
+                                    $q->whereIn('provincia', $provSel);
                                 }
 
-                                return $q->pluck('nombre', 'id')->toArray();
+                                return $q->distinct()
+                                    ->orderBy('ayuntamiento')
+                                    ->pluck('ayuntamiento', 'ayuntamiento')
+                                    ->toArray();
                             })
                             ->query(function ($query, array $data) {
                                 if (!empty($data['values'])) {
-                                    $query->whereIn('poblacion_id', $data['values']);
+                                    $query->whereIn('ayuntamiento', $data['values']);
                                 }
                                 return $query;
                             })
@@ -794,7 +794,7 @@ class ReferenciaResource extends Resource
                                 if (empty($data['values']))
                                     return null;
                                 $n = count($data['values']);
-                                return $n === 1 ? '1 municipio' : "{$n} municipios";
+                                return $n === 1 ? "Municipio: {$data['values'][0]}" : "{$n} municipios";
                             }),
 
                         SelectFilter::make('trabajo_lluvia')
@@ -1133,7 +1133,7 @@ class ReferenciaResource extends Resource
                                     ->preload()
                                     ->options(function (Get $get) {
                                         if ($get('tipo') === 'proveedor') {
-                                            return \App\Models\Proveedor::query()
+                                            return Proveedor::query()
                                                 ->where(function ($q) {
                                                     $q->whereNull('tipo_servicio') // permitir nulos
                                                         ->orWhereNotIn(
@@ -1147,7 +1147,7 @@ class ReferenciaResource extends Resource
                                         }
 
                                         if ($get('tipo') === 'cliente') {
-                                            return \App\Models\Cliente::query()
+                                            return Cliente::query()
                                                 ->orderBy('razon_social')
                                                 ->pluck('razon_social', 'id')
                                                 ->toArray();
@@ -1173,8 +1173,8 @@ class ReferenciaResource extends Resource
                                 }
 
                                 $etiqueta = match ($data['tipo']) {
-                                    'proveedor' => optional(\App\Models\Proveedor::find($data['id']))?->razon_social,
-                                    'cliente' => optional(\App\Models\Cliente::find($data['id']))?->razon_social,
+                                    'proveedor' => optional(Proveedor::find($data['id']))?->razon_social,
+                                    'cliente' => optional(Cliente::find($data['id']))?->razon_social,
                                     default => null,
                                 };
 
@@ -1831,7 +1831,8 @@ class ReferenciaResource extends Resource
                         ->offIcon('heroicon-o-x-mark')
                         ->onColor('success')
                         ->offColor('danger')
-                        ->default(false),
+                        ->default(false)
+                        ->dehydrateStateUsing(fn(bool $state) => $state ? 'si' : 'no'),
                 ])
                 ->visible(fn($get) => !empty($get('referencia'))),
 

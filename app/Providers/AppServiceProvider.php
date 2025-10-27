@@ -2,7 +2,13 @@
 
 namespace App\Providers;
 
+use App\Models\ParteTrabajoSuministroTransporte;
+use App\Observers\ParteTrabajoSuministroTransporteObserver;
 use Illuminate\Support\ServiceProvider;
+use App\Models\CargaTransporte;
+use App\Models\PrioridadStock;
+use App\Observers\CargaTransporteObserver;
+use App\Observers\PrioridadStockObserver;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -19,6 +25,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        CargaTransporte::observe(CargaTransporteObserver::class);
+        PrioridadStock::observe(PrioridadStockObserver::class);
     }
 }
