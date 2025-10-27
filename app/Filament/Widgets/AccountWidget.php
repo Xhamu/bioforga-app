@@ -4,14 +4,17 @@ namespace App\Filament\Widgets;
 
 use App\Models\State;
 use App\Models\UserStatus;
+use Filament\Actions;
+use Filament\Actions\Concerns\InteractsWithActions;
 use Filament\Notifications\Notification;
 use Filament\Widgets\Widget;
 use Illuminate\Support\Facades\Auth;
 
 class AccountWidget extends Widget
 {
-    protected static string $view = 'filament.widgets.account-widget';
+    use InteractsWithActions;
 
+    protected static string $view = 'filament.widgets.account-widget';
     protected int|string|array $columnSpan = 'full';
 
     // --- Estados ---
@@ -84,8 +87,6 @@ class AccountWidget extends Widget
 
         Notification::make()->title("{$state->name} iniciado")->success()->send();
         $this->refreshData();
-
-        // El modal se cierra desde el Blade con close-modal, no hace falta tocar nada aquí.
     }
 
     public function stop(): void
@@ -101,6 +102,61 @@ class AccountWidget extends Widget
 
         Notification::make()->title('Estado finalizado')->success()->send();
         $this->refreshData();
+    }
+
+    /** Cuenta de no leídos para la badget del botón */
+    public function getUnreadCount(): int
+    {
+        $userId = Auth::id();
+
+        return (int) \DB::table('conversations')
+            ->join('conversation_participants as cp', 'cp.conversation_id', '=', 'conversations.id')
+            ->where('cp.user_id', $userId)
+            ->selectSub(function ($q) use ($userId) {
+                $q->from('messages')
+                    ->selectRaw('COUNT(*)')
+                    ->whereColumn('messages.conversation_id', 'conversations.id')
+                    ->where('messages.user_id', '!=', $userId)
+                    ->whereRaw(
+                        'messages.created_at > COALESCE((
+                            SELECT cp2.last_read_at
+                            FROM conversation_participants cp2
+                            WHERE cp2.conversation_id = conversations.id
+                              AND cp2.user_id = ?
+                        ), "1970-01-01 00:00:00")',
+                        [$userId]
+                    );
+            }, 'unread_count')
+            ->pluck('unread_count')
+            ->sum();
+    }
+
+    public function markAsRead(int $conversationId): void
+    {
+        if ($conv = \App\Models\Conversation::find($conversationId)) {
+            app(\App\Services\ChatService::class)->markAsRead($conv, auth()->user());
+        }
+    }
+
+    /** Enviar mensaje rápido desde el modal */
+    public function sendMessage(int $conversationId, string $body): void
+    {
+        $body = trim($body);
+        if ($body === '')
+            return;
+
+        $conv = \App\Models\Conversation::find($conversationId);
+        if (!$conv)
+            return;
+
+        \App\Models\Message::create([
+            'conversation_id' => $conv->id,
+            'user_id' => auth()->id(),
+            'body' => $body,
+        ]);
+
+        // Empuja updated_at y (opcional) marcar propio como leído
+        $conv->touch();
     }
 
     protected function getViewData(): array

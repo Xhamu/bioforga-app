@@ -16,11 +16,15 @@ class CargaTransporte extends Model
         'fecha_hora_fin_carga',
         'gps_fin_carga',
         'cantidad',
+        'origen_detalle',
+        'asignacion_cert_esp'
     ];
 
     protected $casts = [
         'fecha_hora_inicio_carga' => 'datetime',
         'fecha_hora_fin_carga' => 'datetime',
+        'origen_detalle' => 'array',
+        'asignacion_cert_esp' => 'array',
     ];
 
     public function getReferenciaCompletaAttribute(): ?string

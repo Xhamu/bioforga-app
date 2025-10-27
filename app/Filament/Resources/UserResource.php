@@ -9,6 +9,7 @@ use App\Models\Referencia;
 use App\Models\User;
 use App\Models\Vehiculo;
 use App\Services\ChatService;
+use Carbon\Carbon;
 use Filament\Forms;
 use Filament\Forms\Components\Builder;
 use Filament\Forms\Components\Checkbox;
@@ -39,6 +40,7 @@ use Jenssegers\Agent\Agent;
 use Filament\Forms\Components\Tabs;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Section;
+use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 
 class UserResource extends Resource
 {
@@ -211,7 +213,104 @@ class UserResource extends Resource
                             return "[{$camion->matricula_cabeza}] {$camion->marca} {$camion->modelo}";
                         })
                         ->columnSpanFull(),
-                ])
+                ]),
+
+                Tabs\Tab::make('Historial de estados')->schema([
+                    Forms\Components\Section::make()
+                        ->columnSpanFull()
+                        ->schema([
+                            Forms\Components\Placeholder::make('tabla_historial_estados')
+                                ->label('')
+                                ->content(function ($record) {
+                                    /** @var \App\Models\User|null $record */
+                                    if (!$record) {
+                                        return new HtmlString(
+                                            '<p class="text-gray-500">No hay usuario cargado.</p>'
+                                        );
+                                    }
+
+                                    $tz = 'Europe/Madrid';
+
+                                    $items = $record->statuses()
+                                        ->with('state')
+                                        ->orderByDesc('started_at')
+                                        ->orderByDesc('id')
+                                        ->get();
+
+                                    if ($items->isEmpty()) {
+                                        return new HtmlString(
+                                            '<p class="text-gray-500">Sin historial de estados.</p>'
+                                        );
+                                    }
+
+                                    $fmtDate = function ($dt) use ($tz) {
+                                        return $dt ? $dt->copy()->timezone($tz)->format('d/m/Y H:i') : '—';
+                                    };
+
+                                    $fmtDur = function ($start, $end) use ($tz) {
+                                        if (!$start)
+                                            return '—';
+                                        $start = $start->copy()->timezone($tz);
+                                        $end = ($end ?? Carbon::now($tz))->copy()->timezone($tz);
+                                        $secs = $start->diffInSeconds($end); // siempre positivo
+                                        $d = intdiv($secs, 86400);
+                                        $secs %= 86400;
+                                        $h = intdiv($secs, 3600);
+                                        $m = intdiv($secs % 3600, 60);
+                                        return $d > 0
+                                            ? sprintf('%dd %02dh %02dm', $d, $h, $m)
+                                            : sprintf('%02dh %02dm', $h, $m);
+                                    };
+
+                                    $rowsHtml = '';
+                                    foreach ($items as $it) {
+                                        /** @var \App\Models\UserStatus $it */
+                                        $estado = e($it->state?->name ?? '—');
+                                        $ini = $fmtDate($it->started_at);
+                                        $fin = $fmtDate($it->ended_at);
+                                        $dur = $fmtDur($it->started_at, $it->ended_at);
+                                        $activo = $it->ended_at ? 'Finalizado' : 'Activo';
+
+                                        // ✅ calcula la clase fuera del heredoc
+                                        $statusClass = $it->ended_at ? 'bg-gray-100 text-gray-800' : 'bg-emerald-100 text-emerald-800';
+
+                                        $rowsHtml .= <<<HTML
+                                        <tr class="border-b last:border-0">
+                                          <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{$estado}</td>
+                                          <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-700">{$ini}</td>
+                                          <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-700">{$fin}</td>
+                                          <td class="px-3 py-2 whitespace-nowrap text-sm tabular-nums text-gray-900">{$dur}</td>
+                                          <td class="px-3 py-2 whitespace-nowrap text-xs">
+                                            <span class="inline-flex items-center rounded-md px-2 py-1 font-medium {$statusClass}">
+                                              {$activo}
+                                            </span>
+                                          </td>
+                                        </tr>
+                                        HTML;
+                                    }
+
+
+                                    $table = <<<HTML
+                                    <div class="overflow-x-auto">
+                                      <table class="min-w-full border-separate border-spacing-0 rounded-lg overflow-hidden">
+                                        <thead>
+                                          <tr class="bg-gray-50 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
+                                            <th class="px-3 py-2">Estado</th>
+                                            <th class="px-3 py-2">Inicio</th>
+                                            <th class="px-3 py-2">Fin</th>
+                                            <th class="px-3 py-2">Duración</th>
+                                            <th class="px-3 py-2">Situación</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody class="bg-white">{$rowsHtml}</tbody>
+                                      </table>
+                                    </div>
+                                    HTML;
+
+                                    return new HtmlString($table);
+                                })
+                        ])
+                ]),
 
             ])
                 ->columnSpanFull(),

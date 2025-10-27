@@ -11,6 +11,7 @@ use App\Models\ParteTrabajoSuministroTransporte;
 use App\Models\Poblacion;
 use App\Models\Provincia;
 use App\Models\Referencia;
+use App\Services\AsignacionStockService;
 use Arr;
 use Awcodes\TableRepeater\Components\TableRepeater;
 use Awcodes\TableRepeater\Header;
@@ -52,6 +53,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Filament\Forms\Get;
 use Filament\Forms\Set;
+use Illuminate\Support\HtmlString;
 
 class ParteTrabajoSuministroTransporteResource extends Resource
 {
@@ -94,8 +96,7 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                     } else {
                                         $query->whereHas(
                                             'roles',
-                                            fn($q) =>
-                                            $q->whereIn('name', ['administración', 'administrador', 'transportista'])
+                                            fn($q) => $q->whereIn('name', ['administración', 'administrador', 'transportista'])
                                         );
                                     }
                                 }
@@ -114,22 +115,20 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                             ->afterStateUpdated(function (Set $set, $state) {
                                 // Reset dependientes
                                 $set('camion_id', null);
-                                $set('referencia_select', null); // si de verdad existe ese campo en este form
-                    
-                                if (!$state) {
+                                $set('referencia_select', null);
+
+                                if (!$state)
                                     return;
-                                }
 
                                 // Auto-seleccionar camión si solo hay 1
                                 $user = \App\Models\User::find($state);
-
                                 if (!$user)
                                     return;
 
                                 $camiones = $user->proveedor_id
                                     ? Camion::where('proveedor_id', $user->proveedor_id)->pluck('id')
-                                    : $user->camiones()->pluck('camiones.id'); // asegúrate del alias de la PK en la relación
-                    
+                                    : $user->camiones()->pluck('camiones.id');
+
                                 if ($camiones->count() === 1) {
                                     $set('camion_id', $camiones->first());
                                 }
@@ -141,19 +140,17 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                             ->placeholder('- Selecciona primero un usuario -')
                             ->options(function (Get $get) {
                                 $usuarioId = $get('usuario_id');
-                                if (!$usuarioId) {
+                                if (!$usuarioId)
                                     return [];
-                                }
 
                                 $usuario = \App\Models\User::find($usuarioId);
 
                                 $camiones = $usuario?->proveedor_id
-                                    ? \App\Models\Camion::where('proveedor_id', $usuario->proveedor_id)->get()
+                                    ? Camion::where('proveedor_id', $usuario->proveedor_id)->get()
                                     : $usuario?->camiones()->get();
 
-                                if (!$camiones || $camiones->isEmpty()) {
+                                if (!$camiones || $camiones->isEmpty())
                                     return [];
-                                }
 
                                 return $camiones->mapWithKeys(fn($camion) => [
                                     $camion->id => '[' . $camion->matricula_cabeza . '] ' . $camion->marca . ' ' . $camion->modelo,
@@ -167,9 +164,9 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                 $usuario = \App\Models\User::find($usuarioId);
 
                                 $ids = $usuario?->proveedor_id
-                                    ? \App\Models\Camion::where('proveedor_id', $usuario->proveedor_id)->pluck('id')
-                                    : $usuario?->camiones()->pluck('camiones.id'); // ajusta el nombre de columna si es necesario
-                    
+                                    ? Camion::where('proveedor_id', $usuario->proveedor_id)->pluck('id')
+                                    : $usuario?->camiones()->pluck('camiones.id');
+
                                 return ($ids && $ids->count() === 1) ? $ids->first() : null;
                             })
                             ->searchable()
@@ -179,6 +176,164 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                             ->validationMessages([
                                 'required' => 'El :attribute es obligatorio.',
                             ]),
+
+                        // ── INFO: PREVIEW ASIGNACIÓN ─────────────
+                        Placeholder::make('preview_asignacion_actual')
+                            ->label('Propuesta de carga')
+                            ->content(function (callable $get, $record) {
+                                /** @var \App\Models\ParteTrabajoSuministroTransporte $record */
+                                if (!$record) {
+                                    return new HtmlString(
+                                        '<p class="text-gray-500">No hay información de parte seleccionada.</p>'
+                                    );
+                                }
+
+                                $ultima = $record->cargas()->latest()->first();
+
+                                // Debe ser una carga desde ALMACÉN
+                                if (!$ultima || !$ultima->almacen_id || $ultima->referencia_id) {
+                                    return new HtmlString(
+                                        '<p class="text-gray-500">No hay carga desde almacén en curso.</p>'
+                                    );
+                                }
+
+                                $fmt = fn($n) => number_format((float) $n, 2, ',', '.');
+
+                                // 1) Si hay SNAPSHOT, lo mostramos SIEMPRE (verdad fuente)
+                                // 1) Si hay SNAPSHOT, lo mostramos SIEMPRE (verdad fuente)
+                                $snap = $ultima->asignacion_cert_esp;
+                                if (!empty($snap) && is_array($snap)) {
+                                    $fmt = fn($n) => number_format((float) $n, 2, ',', '.');
+
+                                    // ← NUEVO: cargar meta de referencias en 1 query (para ayuntamiento y monte_parcela)
+                                    $refIds = collect($snap)
+                                        ->flatMap(fn($a) => collect($a['refs'] ?? [])->pluck('referencia_id'))
+                                        ->filter()
+                                        ->unique()
+                                        ->values();
+
+                                    $refMeta = \App\Models\Referencia::query()
+                                        ->whereIn('id', $refIds)
+                                        ->get(['id', 'referencia', 'ayuntamiento', 'monte_parcela'])
+                                        ->keyBy('id');
+
+                                    $rows = '';
+                                    foreach ($snap as $a) {
+                                        $cantidad = $fmt($a['cantidad'] ?? 0);
+                                        $cert = e((string) ($a['certificacion'] ?? ''));
+                                        $esp = e((string) ($a['especie'] ?? ''));
+
+                                        // Sublista por referencias si existe
+                                        $refsHtml = '';
+                                        if (!empty($a['refs']) && is_array($a['refs'])) {
+                                            $refLines = '';
+                                            foreach ($a['refs'] as $r) {
+                                                $rid = (int) ($r['referencia_id'] ?? 0);
+                                                $info = $rid ? ($refMeta[$rid] ?? null) : null;
+
+                                                // Etiqueta: REFERENCIA — AYUNTAMIENTO — MONTE_PARCELA
+                                                $labelReferencia = $info?->referencia ?? (string) ($r['referencia'] ?? 'REF');
+                                                $labelAyuntamiento = $info?->ayuntamiento ?? '—';
+                                                $labelParcela = $info?->monte_parcela ?? '—';
+
+                                                $refLines .= sprintf(
+                                                    '<li class="flex justify-between text-xs text-gray-700">
+                        <span class="truncate max-w-[65%%]">%s — %s (%s)</span>
+                        <span class="tabular-nums">%s m³</span>
+                     </li>',
+                                                    e($labelReferencia),
+                                                    e($labelParcela),
+                                                    e($labelAyuntamiento),
+                                                    $fmt($r['cantidad'] ?? 0)
+                                                );
+                                            }
+                                            if ($refLines !== '') {
+                                                $refsHtml = '<ul class="pl-6 mt-1 space-y-0.5">' . $refLines . '</ul>';
+                                            }
+                                        }
+
+                                        $rows .= sprintf(
+                                            '<li class="flex flex-col gap-1">
+                <div class="flex items-start gap-2">
+                    <span class="inline-flex min-w-[88px] justify-center rounded-md bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-800">%s m³</span>
+                    <span class="text-sm text-gray-900">%s — %s</span>
+                </div>
+                %s
+            </li>',
+                                            $cantidad,
+                                            $cert,
+                                            $esp,
+                                            $refsHtml
+                                        );
+                                    }
+
+
+                                    $html = <<<HTML
+        <div class="space-y-2">
+            <ul class="list-disc pl-5 space-y-2">
+                {$rows}
+            </ul>
+        </div>
+    HTML;
+
+                                    return new \Illuminate\Support\HtmlString($html);
+                                }
+
+                                // 2) Fallback: si no hay snapshot (casos antiguos), calcular preview en vivo
+                                $almacen = $ultima->almacen;
+                                $cantidad = (float) ($ultima->cantidad ?? 0);
+
+                                if (!$almacen || $cantidad <= 0) {
+                                    return new HtmlString(
+                                        '<p class="text-gray-500">No se puede mostrar la propuesta de carga.</p>'
+                                    );
+                                }
+
+                                $res = app(AsignacionStockService::class)->preview($almacen, $cantidad);
+                                if (empty($res['asignaciones'])) {
+                                    return new HtmlString(
+                                        '<p class="text-amber-600">No hay stock disponible para esta cantidad.</p>'
+                                    );
+                                }
+
+                                $rows = '';
+                                foreach ($res['asignaciones'] as $a) {
+                                    $rows .= sprintf(
+                                        '<li class="flex items-start gap-2">
+                                            <span class="inline-flex min-w-[88px] justify-center rounded-md bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-800">%s m³</span>
+                                            <span class="text-sm text-gray-900">%s — %s</span>
+                                        </li>',
+                                        $fmt($a['cantidad']),
+                                        e($a['certificacion']),
+                                        e($a['especie'])
+                                    );
+                                }
+
+                                $footer = '';
+                                if (!empty($res['restante']) && $res['restante'] > 0) {
+                                    $footer = '<p class="mt-2 text-sm text-amber-600">Faltan <strong>' . $fmt($res['restante']) . ' m³</strong> por falta de stock.</p>';
+                                }
+
+                                $html = <<<HTML
+                                    <div class="space-y-2">
+                                        <ul class="list-disc pl-5 space-y-1">
+                                            {$rows}
+                                        </ul>
+                                        {$footer}
+                                    </div>
+                                HTML;
+
+                                return new HtmlString($html);
+                            })
+                            ->visible(function ($get, $record) {
+                                if (!$record)
+                                    return false;
+                                $ultima = $record->cargas()->latest()->first();
+                                // Mostrar si es una carga desde almacén; el contenido ya decide si usa snapshot o preview:
+                                return (bool) ($ultima && $ultima->almacen_id && !$ultima->referencia_id);
+                            })
+                            ->columnSpanFull()
+
                     ])
                     ->columns([
                         'default' => 1,
@@ -277,6 +432,78 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                                 ->required()
                                                 ->visible(fn(callable $get) => $get('eleccion') === 'almacen'),
 
+                                            TextInput::make('cantidad_m3')
+                                                ->label('Cantidad a cargar (m³)')
+                                                ->numeric()
+                                                ->minValue(0.01)
+                                                ->step('0.01')
+                                                ->required()
+                                                ->visible(fn(callable $get) => $get('eleccion') === 'almacen')
+                                                ->reactive(),
+
+                                            Placeholder::make('preview_asignacion')
+                                                ->label('Propuesta de carga')
+                                                ->content(function (callable $get) {
+                                                    if ($get('eleccion') !== 'almacen') {
+                                                        return null;
+                                                    }
+
+                                                    $almacenId = $get('almacen_id');
+                                                    $cantidad = (float) ($get('cantidad_m3') ?? 0);
+
+                                                    if (!$almacenId || $cantidad <= 0) {
+                                                        return new HtmlString('<p class="text-gray-500">Selecciona almacén e indica cantidad para ver la propuesta.</p>');
+                                                    }
+
+                                                    $almacen = AlmacenIntermedio::find($almacenId);
+                                                    if (!$almacen) {
+                                                        return new HtmlString('<p class="text-red-600">Almacén no válido.</p>');
+                                                    }
+
+                                                    $res = app(AsignacionStockService::class)->preview($almacen, $cantidad);
+
+                                                    if (empty($res['asignaciones'])) {
+                                                        return new HtmlString('<p class="text-amber-600">No hay stock disponible para esta cantidad.</p>');
+                                                    }
+
+                                                    $fmt = fn($n) => number_format((float) $n, 2, ',', '.');
+
+                                                    $rows = '';
+                                                    foreach ($res['asignaciones'] as $a) {
+                                                        $rows .= sprintf(
+                                                            '<li class="flex items-start gap-2">
+                                                                       <span class="inline-flex min-w-[88px] justify-center rounded-md bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-800">%s m³</span>
+                                                                       <span class="text-sm text-gray-900">%s — %s</span>
+                                                                    </li>',
+                                                            $fmt($a['cantidad']),
+                                                            e($a['certificacion']),
+                                                            e($a['especie'])
+                                                        );
+                                                    }
+
+                                                    $footer = '';
+                                                    if (!empty($res['restante']) && $res['restante'] > 0) {
+                                                        $footer = '<p class="mt-2 text-sm text-amber-600">Faltan <strong>' . $fmt($res['restante']) . ' m³</strong> por falta de stock.</p>';
+                                                    } else {
+                                                        $footer = '<p class="mt-2 text-sm text-emerald-600"></p>';
+                                                    }
+
+                                                    $html = <<<HTML
+                                                        <div class="space-y-2">
+                                                            <ul class="list-disc pl-5 space-y-1">
+                                                                {$rows}
+                                                            </ul>
+                                                            {$footer}
+                                                        </div>
+                                                    HTML;
+
+                                                    return new HtmlString($html);
+                                                })
+                                                ->visible(fn(callable $get) => $get('eleccion') === 'almacen')
+                                                ->hintColor('primary')
+                                                ->columnSpanFull()
+                                                ->hiddenLabel(),
+
                                             Select::make('referencia_select')
                                                 ->label('Referencia')
                                                 ->options(function () use ($record) {
@@ -321,12 +548,60 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                         ])
                                         ->action(function (array $data, $record) {
                                             if ($data['eleccion'] === 'almacen') {
+                                                $almacen = AlmacenIntermedio::findOrFail($data['almacen_id']);
+                                                $cantidad = (float) ($data['cantidad_m3'] ?? 0);
+
+                                                // 1) Propuesta con prioridades actuales
+                                                $preview = app(AsignacionStockService::class)->preview($almacen, $cantidad);
+
+                                                /** @var \App\Services\StockCalculator $calc */
+                                                $calc = app(\App\Services\StockCalculator::class);
+
+                                                // 2) Para cada CERT|ESP reparte por referencias (FIFO dentro de la clave)
+                                                $detalle = collect($preview['asignaciones'])
+                                                    ->filter(fn($a) => ($a['cantidad'] ?? 0) > 0)
+                                                    ->map(function ($a) use ($calc, $almacen) {
+                                                    $cert = strtoupper(trim($a['certificacion'] ?? ''));
+                                                    $esp = strtoupper(trim($a['especie'] ?? ''));
+                                                    $rest = (float) ($a['cantidad'] ?? 0);
+
+                                                    $dispRefs = $calc->disponiblePorReferencia($almacen, $cert, $esp);
+
+                                                    $refs = [];
+                                                    foreach ($dispRefs as $r) {
+                                                        if ($rest <= 0)
+                                                            break;
+                                                        $usa = min((float) $r['m3_disponible'], $rest);
+                                                        if ($usa > 0) {
+                                                            $refs[] = [
+                                                                'referencia_id' => (int) $r['referencia_id'],
+                                                                'referencia' => (string) $r['referencia'],
+                                                                'cantidad' => round($usa, 4),
+                                                            ];
+                                                            $rest -= $usa;
+                                                        }
+                                                    }
+
+                                                    return [
+                                                        'certificacion' => $cert,
+                                                        'especie' => $esp,
+                                                        'cantidad' => round((float) $a['cantidad'], 4),
+                                                        'refs' => $refs, // ← desglose por referencia
+                                                    ];
+                                                })
+                                                    ->values()
+                                                    ->all();
+
+                                                // 3) Crea la carga guardando el snapshot
                                                 $record->cargas()->create([
                                                     'almacen_id' => $data['almacen_id'],
                                                     'fecha_hora_inicio_carga' => now(),
                                                     'gps_inicio_carga' => $data['gps_inicio_carga'] ?? '0.0000, 0.0000',
+                                                    'cantidad' => $cantidad,
+                                                    'asignacion_cert_esp' => $detalle, // <<<<<<<<<<<<<<<<<<<<<< AQUI
                                                 ]);
                                             } else {
+                                                // ... tu rama referencia tal cual
                                                 $record->cargas()->create([
                                                     'referencia_id' => $data['referencia_select'],
                                                     'fecha_hora_inicio_carga' => now(),
@@ -334,13 +609,10 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                                 ]);
                                             }
 
-                                            Notification::make()
-                                                ->success()
-                                                ->title('Carga iniciada correctamente')
-                                                ->send();
-
-                                            return redirect(request()->header('Referer')); // Recargar página
+                                            Notification::make()->success()->title('Carga iniciada correctamente')->send();
+                                            return redirect(request()->header('Referer'));
                                         })
+
                                         ->color('success');
                                 }
 
@@ -352,22 +624,101 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                         ->modalHeading('Finalizar carga en curso')
                                         ->modalSubmitActionLabel('Finalizar')
                                         ->modalWidth('xl')
-                                        ->extraAttributes(['class' => 'w-full']) // Hace que el botón ocupe todo el ancho disponible
-                                        ->form([
-                                            TextInput::make('cantidad')
-                                                ->label('Cantidad (m³)')
-                                                ->required()
-                                                ->step(0.01)
-                                                ->dehydrateStateUsing(fn($state) => str_replace(',', '.', $state)),
+                                        ->extraAttributes(['class' => 'w-full'])
+                                        ->form(function ($record) {
+                                            $ultima = $record?->cargas()->latest()->first();
 
-                                            TextInput::make('gps_fin_carga')
+                                            if (!$ultima) {
+                                                return [
+                                                    Placeholder::make('sin_carga')
+                                                        ->label('')
+                                                        ->content('No hay ninguna carga en curso.'),
+                                                ];
+                                            }
+
+                                            $esAlmacen = $ultima->almacen_id && !$ultima->referencia_id;
+
+                                            $form = [];
+
+                                            if (!$esAlmacen) {
+                                                // Carga por REFERENCIA → pedir cantidad
+                                                $form[] = TextInput::make('cantidad')
+                                                    ->label('Cantidad (m³)')
+                                                    ->required()
+                                                    ->step(0.01)
+                                                    ->dehydrateStateUsing(fn($state) => str_replace(',', '.', $state));
+                                            } else {
+                                                // Carga por ALMACÉN → mostrar cantidad y preview_asignacion
+                                                $form[] = Placeholder::make('cantidad_info')
+                                                    ->label('Cantidad (m³)')
+                                                    ->content(function () use ($ultima) {
+                                                    $m3 = (float) ($ultima->cantidad ?? 0);
+                                                    return $m3 > 0 ? number_format($m3, 2, ',', '.') . ' m³' : '—';
+                                                })
+                                                    ->columnSpanFull();
+
+                                                $form[] = Placeholder::make('preview_asignacion')
+                                                    ->label('Propuesta de carga')
+                                                    ->content(function () use ($ultima) {
+                                                        $fmt = fn($n) => number_format((float) $n, 2, ',', '.');
+
+                                                        // 1) Preferir snapshot guardado
+                                                        $snap = $ultima->asignacion_cert_esp ?? [];
+                                                        if (is_array($snap) && !empty($snap)) {
+                                                            $rows = collect($snap)->map(function ($a) use ($fmt) {
+                                                                return sprintf(
+                                                                    '<li class="flex items-start gap-2">
+                                                                        <span class="inline-flex min-w-[88px] justify-center rounded-md bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-800">%s m³</span>
+                                                                        <span class="text-sm text-gray-900">%s — %s</span>
+                                                                    </li>',
+                                                                    $fmt($a['cantidad'] ?? 0),
+                                                                    e($a['certificacion'] ?? ''),
+                                                                    e($a['especie'] ?? '')
+                                                                );
+                                                            })->implode('');
+                                                            return new \Illuminate\Support\HtmlString('<ul class="list-disc pl-5 space-y-1">' . $rows . '</ul>');
+                                                        }
+
+                                                        // 2) Fallback: calcular propuesta en vivo (solo para cargas antiguas sin snapshot)
+                                                        $almacen = $ultima?->almacen;
+                                                        $cantidad = (float) ($ultima?->cantidad ?? 0);
+                                                        if (!$almacen || $cantidad <= 0) {
+                                                            return new \Illuminate\Support\HtmlString('<p class="text-gray-500">No se puede mostrar la propuesta de carga.</p>');
+                                                        }
+
+                                                        $res = app(\App\Services\AsignacionStockService::class)->preview($almacen, $cantidad);
+                                                        if (empty($res['asignaciones'])) {
+                                                            return new \Illuminate\Support\HtmlString('<p class="text-amber-600">No hay stock disponible para esta cantidad.</p>');
+                                                        }
+
+                                                        $rows = '';
+                                                        foreach ($res['asignaciones'] as $a) {
+                                                            $rows .= sprintf(
+                                                                '<li class="flex items-start gap-2">
+                                                                    <span class="inline-flex min-w-[88px] justify-center rounded-md bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-800">%s m³</span>
+                                                                    <span class="text-sm text-gray-900">%s — %s</span>
+                                                                </li>',
+                                                                $fmt($a['cantidad']),
+                                                                e($a['certificacion']),
+                                                                e($a['especie'])
+                                                            );
+                                                        }
+                                                        return new \Illuminate\Support\HtmlString('<ul class="list-disc pl-5 space-y-1">' . $rows . '</ul>');
+                                                    })
+                                                    ->hintColor('primary')
+                                                    ->columnSpanFull()
+                                                    ->hiddenLabel();
+                                            }
+
+                                            $form[] = TextInput::make('gps_fin_carga')
                                                 ->label('GPS')
                                                 ->required()
-                                                ->readOnly(fn() => !Auth::user()?->hasAnyRole(['administración', 'superadmin'])),
+                                                ->readOnly(fn() => !Auth::user()?->hasAnyRole(['administración', 'superadmin']));
 
-                                            View::make('livewire.location-fin-carga')->columnSpanFull(),
+                                            $form[] = View::make('livewire.location-fin-carga')->columnSpanFull();
 
-                                        ])
+                                            return $form;
+                                        })
                                         ->action(function (array $data, $record) {
                                             $ultimaCarga = $record->cargas()->latest()->first();
 
@@ -379,10 +730,25 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                                 return;
                                             }
 
+                                            $esAlmacen = $ultimaCarga->almacen_id && !$ultimaCarga->referencia_id;
+
+                                            $cantidadFinal = $esAlmacen
+                                                ? (float) ($ultimaCarga->cantidad ?? 0)
+                                                : (float) ($data['cantidad'] ?? 0);
+
+                                            if (!$esAlmacen && $cantidadFinal <= 0) {
+                                                Notification::make()
+                                                    ->danger()
+                                                    ->title('Cantidad inválida')
+                                                    ->body('Debes indicar una cantidad mayor que 0.')
+                                                    ->send();
+                                                return;
+                                            }
+
                                             $ultimaCarga->update([
                                                 'fecha_hora_fin_carga' => now(),
                                                 'gps_fin_carga' => $data['gps_fin_carga'] ?? '0.0000, 0.0000',
-                                                'cantidad' => $data['cantidad'],
+                                                'cantidad' => $cantidadFinal,
                                             ]);
 
                                             $record->update([
@@ -394,7 +760,7 @@ class ParteTrabajoSuministroTransporteResource extends Resource
                                                 ->title('Carga finalizada correctamente')
                                                 ->send();
 
-                                            return redirect(request()->header('Referer')); // Recargar página
+                                            return redirect(request()->header('Referer'));
                                         })
                                         ->color('danger');
                                 }
@@ -557,7 +923,7 @@ class ParteTrabajoSuministroTransporteResource extends Resource
 
                         Placeholder::make('gps_descarga_mostrar')
                             ->label('GPS descarga')
-                            ->content(fn($record) => new \Illuminate\Support\HtmlString($record->gps_descarga_mostrar)),
+                            ->content(fn($record) => new HtmlString($record->gps_descarga_mostrar)),
 
                         Select::make('destino_tipo')
                             ->label('Destino')
@@ -730,15 +1096,7 @@ class ParteTrabajoSuministroTransporteResource extends Resource
 
                 TextColumn::make('usuario_proveedor_camion')
                     ->label('Usuario / Proveedor / Camión')
-                    ->html()
-                    ->tooltip(function ($record) {
-                        $usuario = ($record->usuario?->name ?? '') . ' ' . ($record->usuario?->apellidos ?? '');
-                        $proveedor = $record->usuario?->proveedor?->razon_social ?? '';
-                        $marca = $record->camion?->marca ?? '';
-                        $modelo = $record->camion?->modelo ?? '';
-                        $matricula = $record->camion?->matricula_cabeza ?? '';
-                        return "$usuario\n$proveedor\n[$matricula] - $marca $modelo";
-                    }),
+                    ->html(),
 
                 TextColumn::make('cargas_totales')
                     ->label('Cargas')

@@ -76,4 +76,10 @@ class AlmacenIntermedio extends Authenticatable
     }
 
     protected $table = 'almacenes_intermedios';
+
+    public function prioridades()
+    {
+        return $this->hasMany(\App\Models\PrioridadStock::class, 'almacen_intermedio_id');
+    }
+
 }
