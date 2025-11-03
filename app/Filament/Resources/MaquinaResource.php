@@ -82,6 +82,36 @@ class MaquinaResource extends Resource
                     ])
                     ->columnSpan(['default' => 2, 'lg' => 1]),
 
+                Select::make('tipo_horas')
+                    ->label(__('Tipo de horas'))
+                    ->required()
+                    ->searchable()
+                    ->multiple()
+                    ->options([
+                        'horas_encendido' => 'Horas de encendido',
+                        'horas_rotor' => 'Horas de rotor',
+                        'horas_trabajo' => 'Horas de trabajo',
+                    ])
+                    ->validationMessages([
+                        'required' => 'El :attribute es obligatorio.',
+                    ])
+                    ->columnSpan(['default' => 2, 'lg' => 1]),
+
+                Select::make('tipo_consumo')
+                    ->label(__('Tipo de consumo'))
+                    ->required()
+                    ->searchable()
+                    ->multiple()
+                    ->options([
+                        'consumo_gasoil' => 'Gasoil',
+                        'consumo_cuchillas' => 'Muelas',
+                        'consumo_muelas' => 'Cuchillas',
+                    ])
+                    ->validationMessages([
+                        'required' => 'El :attribute es obligatorio.',
+                    ])
+                    ->columnSpan(['default' => 2, 'lg' => 1]),
+
                 Select::make('operarios')
                     ->label(__('Operarios'))
                     ->relationship(
