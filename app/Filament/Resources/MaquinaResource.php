@@ -84,7 +84,7 @@ class MaquinaResource extends Resource
 
                 Select::make('tipo_horas')
                     ->label(__('Tipo de horas'))
-                    ->required()
+                    //->required()
                     ->searchable()
                     ->multiple()
                     ->options([
@@ -99,13 +99,13 @@ class MaquinaResource extends Resource
 
                 Select::make('tipo_consumo')
                     ->label(__('Tipo de consumo'))
-                    ->required()
+                    //->required()
                     ->searchable()
                     ->multiple()
                     ->options([
-                        'consumo_gasoil' => 'Gasoil',
-                        'consumo_cuchillas' => 'Muelas',
-                        'consumo_muelas' => 'Cuchillas',
+                        'gasoil' => 'Gasoil',
+                        'cuchilla' => 'Muelas',
+                        'muela' => 'Cuchillas',
                     ])
                     ->validationMessages([
                         'required' => 'El :attribute es obligatorio.',
