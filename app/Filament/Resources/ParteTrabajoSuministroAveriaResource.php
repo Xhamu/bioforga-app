@@ -338,14 +338,13 @@ class ParteTrabajoSuministroAveriaResource extends Resource
                             }),
                     ])
                     ->columns(2)
-                    ->visible(function ($record) {
-                        if (!$record)
-                            return false;
-
-                        return (
-                            $record->fecha_hora_inicio_averia && !$record->fecha_hora_fin_averia
-                        );
-                    }),
+                    ->visible(
+                        fn($record) =>
+                        $record &&
+                        $record->exists &&
+                        $record->fecha_hora_fin_averia &&
+                        Filament::auth()->user()?->hasAnyRole(['superadmin', 'administración'])
+                    ),
 
                 Section::make('Observaciones')
                     ->schema([
