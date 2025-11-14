@@ -118,7 +118,7 @@
                 $calc = app(\App\Services\StockCalculator::class);
                 $agg = $calc->calcular($almacen);
 
-                // --- Detalle por combinación CERT|ESP (igual que PrioridadStock) ---
+                // --- Detalle por combinación CERT|ESP (igual que ahora) ---
                 $keys = collect(array_keys($agg['entradas'] ?? []))
                     ->merge(array_keys($agg['salidas'] ?? []))
                     ->merge(array_keys($agg['ajustes'] ?? []))
@@ -138,32 +138,18 @@
                     ];
                 });
 
-                // --- GLOBAL: tener en cuenta también salidas SIN asignacion_cert_esp ---
+                // --- RESUMEN GLOBAL coherente con PrioridadStock ---
                 $totalEntradas = (float) collect($agg['entradas'] ?? [])->sum();
-                $salidasConSnapshot = (float) collect($agg['salidas'] ?? [])->sum();
+                $totalSalidas = (float) collect($agg['salidas'] ?? [])->sum();
                 $totalAjustes = (float) collect($agg['ajustes'] ?? [])->sum();
-
-                // Salidas históricas: desde este almacén, sin referencia, sin snapshot
-                $salidasSinSnapshot = (float) \DB::table('carga_transportes as ct')
-                    ->whereNull('ct.deleted_at')
-                    ->where('ct.almacen_id', $almacen->id)
-                    ->whereNull('ct.referencia_id')
-                    ->whereNull('ct.asignacion_cert_esp')
-                    ->sum('ct.cantidad');
-
-                $salidasTotales = $salidasConSnapshot + $salidasSinSnapshot;
-
-                // Stock teórico global incluyendo TODO (entradas - salidasTotales + ajustes)
-                $stockTeoricoGlobal = $totalEntradas - $salidasTotales + $totalAjustes;
+                $totalDisp = (float) collect($agg['disponible'] ?? [])->sum();
 
                 $globalStock = (object) [
                     'entradas' => $totalEntradas,
-                    'salidas_con_snapshot' => $salidasConSnapshot,
-                    'salidas_sin_snapshot' => $salidasSinSnapshot,
-                    'salidas_totales' => $salidasTotales,
+                    'salidas_totales' => $totalSalidas,
                     'ajustes' => $totalAjustes,
-                    'disponible_prioridad' => (float) collect($agg['disponible'] ?? [])->sum(),
-                    'stock_teorico' => $stockTeoricoGlobal,
+                    'disponible' => $totalDisp,
+                    'stock_teorico' => $totalEntradas - $totalSalidas + $totalAjustes,
                 ];
             }
         }
@@ -212,17 +198,16 @@
         <div class="mb-4 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900 space-y-1">
             <p><strong>Resumen global (almacén completo):</strong></p>
             <p>Entradas totales: {{ $fmtNum($globalStock->entradas) }} m³</p>
-            <p>Salidas con snapshot (usadas en PrioridadStock): {{ $fmtNum($globalStock->salidas_con_snapshot) }} m³</p>
-            <p>Salidas sin snapshot (históricas): {{ $fmtNum($globalStock->salidas_sin_snapshot) }} m³</p>
             <p>Salidas totales: {{ $fmtNum($globalStock->salidas_totales) }} m³</p>
             <p>Ajustes: {{ $fmtNum($globalStock->ajustes) }} m³</p>
-            <p>Disponible según PrioridadStock: {{ $fmtNum($globalStock->disponible_prioridad) }} m³</p>
+            <p>Disponible (suma de todas las combinaciones): {{ $fmtNum($globalStock->disponible) }} m³</p>
             <p class="font-semibold">
-                Stock teórico incluyendo salidas sin snapshot:
+                Stock teórico = Entradas - Salidas + Ajustes:
                 {{ $fmtNum($globalStock->stock_teorico) }} m³
             </p>
         </div>
     @endif
+
 
     {{-- ================= ENTRADAS ================= --}}
     <h3 class="mt-2 mb-2 text-sm font-semibold text-gray-700">Entradas (a este almacén)</h3>
