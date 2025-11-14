@@ -40,21 +40,36 @@
                 // === ESPECIE desde referencia o snapshot ===
                 $especies = collect();
 
+                // 1) Desde referencias vinculadas (producto_especie)
                 $especiesRef = $cargas->pluck('referencia.producto_especie')->filter();
                 if ($especiesRef->isNotEmpty()) {
                     $especies = $especiesRef->map(fn($e) => $mapEspLabel($e))->unique()->values();
                 } else {
+                    // 2) Si no hay referencia: leer desde asignacion_cert_esp (string o array)
                     $esSnap = collect();
+
                     foreach ($cargas as $c) {
-                        if (!$c->asignacion_cert_esp) {
+                        $snap = $c->asignacion_cert_esp;
+
+                        if (empty($snap)) {
                             continue;
                         }
-                        foreach (json_decode($c->asignacion_cert_esp, true) ?: [] as $a) {
+
+                        if (is_string($snap)) {
+                            $arr = json_decode($snap, true) ?: [];
+                        } elseif (is_array($snap)) {
+                            $arr = $snap;
+                        } else {
+                            $arr = [];
+                        }
+
+                        foreach ($arr as $a) {
                             if (!empty($a['especie'])) {
                                 $esSnap->push($a['especie']);
                             }
                         }
                     }
+
                     if ($esSnap->isNotEmpty()) {
                         $especies = $esSnap->map(fn($e) => $mapEspLabel($e))->unique()->values();
                     }
