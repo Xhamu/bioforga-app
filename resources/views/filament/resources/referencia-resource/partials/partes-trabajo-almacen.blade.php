@@ -3,6 +3,7 @@
 
         $entradas = $salidas = collect();
         $resumenStock = collect();
+        $globalStock = null;
 
         // Helper especie
         $mapEspLabel = function (?string $raw): string {
@@ -86,7 +87,7 @@
                 ];
             };
 
-            // === ENTRADAS ===
+            // === ENTRADAS === (descarga desde referencia → este almacén, sin cliente)
             $entradas = \App\Models\CargaTransporte::with($with)
                 ->whereNull('deleted_at')
                 ->whereHas(
@@ -99,7 +100,7 @@
                 ->map($mapParte)
                 ->values();
 
-            // === SALIDAS ===
+            // === SALIDAS === (desde este almacén → cliente) [criterio visual del informe]
             $salidas = \App\Models\CargaTransporte::with($with)
                 ->whereNull('deleted_at')
                 ->where('almacen_id', $recordId)
@@ -109,13 +110,15 @@
                 ->map($mapParte)
                 ->values();
 
-            // === RESUMEN STOCK ===
+            // === RESUMEN STOCK (igual que PrioridadStock) + GLOBAL FIFO (volumen) ===
             $almacen = \App\Models\AlmacenIntermedio::find($recordId);
 
             if ($almacen) {
+                /** @var \App\Services\StockCalculator $calc */
                 $calc = app(\App\Services\StockCalculator::class);
                 $agg = $calc->calcular($almacen);
 
+                // --- Detalle por combinación CERT|ESP (igual que PrioridadStock) ---
                 $keys = collect(array_keys($agg['entradas'] ?? []))
                     ->merge(array_keys($agg['salidas'] ?? []))
                     ->merge(array_keys($agg['ajustes'] ?? []))
@@ -128,12 +131,40 @@
                     return (object) [
                         'cert' => $cert ?: '—',
                         'esp' => $esp ?: '—',
-                        'entradas' => $agg['entradas'][$key] ?? 0,
-                        'salidas' => $agg['salidas'][$key] ?? 0,
-                        'ajustes' => $agg['ajustes'][$key] ?? 0,
-                        'disponible' => $agg['disponible'][$key] ?? 0,
+                        'entradas' => (float) ($agg['entradas'][$key] ?? 0),
+                        'salidas' => (float) ($agg['salidas'][$key] ?? 0),
+                        'ajustes' => (float) ($agg['ajustes'][$key] ?? 0),
+                        'disponible' => (float) ($agg['disponible'][$key] ?? 0),
                     ];
                 });
+
+                // --- GLOBAL: tener en cuenta también salidas SIN asignacion_cert_esp ---
+                $totalEntradas = (float) collect($agg['entradas'] ?? [])->sum();
+                $salidasConSnapshot = (float) collect($agg['salidas'] ?? [])->sum();
+                $totalAjustes = (float) collect($agg['ajustes'] ?? [])->sum();
+
+                // Salidas históricas: desde este almacén, sin referencia, sin snapshot
+                $salidasSinSnapshot = (float) \DB::table('carga_transportes as ct')
+                    ->whereNull('ct.deleted_at')
+                    ->where('ct.almacen_id', $almacen->id)
+                    ->whereNull('ct.referencia_id')
+                    ->whereNull('ct.asignacion_cert_esp')
+                    ->sum('ct.cantidad');
+
+                $salidasTotales = $salidasConSnapshot + $salidasSinSnapshot;
+
+                // Stock teórico global incluyendo TODO (entradas - salidasTotales + ajustes)
+                $stockTeoricoGlobal = $totalEntradas - $salidasTotales + $totalAjustes;
+
+                $globalStock = (object) [
+                    'entradas' => $totalEntradas,
+                    'salidas_con_snapshot' => $salidasConSnapshot,
+                    'salidas_sin_snapshot' => $salidasSinSnapshot,
+                    'salidas_totales' => $salidasTotales,
+                    'ajustes' => $totalAjustes,
+                    'disponible_prioridad' => (float) collect($agg['disponible'] ?? [])->sum(),
+                    'stock_teorico' => $stockTeoricoGlobal,
+                ];
             }
         }
 
@@ -173,6 +204,23 @@
                     @endforeach
                 </tbody>
             </table>
+        </div>
+    @endif
+
+    {{-- =============== RESUMEN GLOBAL (INCLUYE SALIDAS SIN SNAPSHOT) =============== --}}
+    @if ($globalStock)
+        <div class="mb-4 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900 space-y-1">
+            <p><strong>Resumen global (almacén completo):</strong></p>
+            <p>Entradas totales: {{ $fmtNum($globalStock->entradas) }} m³</p>
+            <p>Salidas con snapshot (usadas en PrioridadStock): {{ $fmtNum($globalStock->salidas_con_snapshot) }} m³</p>
+            <p>Salidas sin snapshot (históricas): {{ $fmtNum($globalStock->salidas_sin_snapshot) }} m³</p>
+            <p>Salidas totales: {{ $fmtNum($globalStock->salidas_totales) }} m³</p>
+            <p>Ajustes: {{ $fmtNum($globalStock->ajustes) }} m³</p>
+            <p>Disponible según PrioridadStock: {{ $fmtNum($globalStock->disponible_prioridad) }} m³</p>
+            <p class="font-semibold">
+                Stock teórico incluyendo salidas sin snapshot:
+                {{ $fmtNum($globalStock->stock_teorico) }} m³
+            </p>
         </div>
     @endif
 
