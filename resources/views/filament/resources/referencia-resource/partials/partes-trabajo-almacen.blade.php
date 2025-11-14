@@ -2,6 +2,20 @@
     @php
 
         $entradas = $salidas = collect();
+        $resumenStock = collect();
+
+        // Helper especie
+        $mapEspLabel = function (?string $raw): string {
+            $raw = strtolower(trim($raw ?? ''));
+            return match ($raw) {
+                'pino' => 'Pino',
+                'eucalipto' => 'Eucalipto',
+                'acacia' => 'Acacia',
+                'frondosa' => 'Frondosa',
+                'otros' => 'Otros',
+                default => $raw ? ucfirst($raw) : '—',
+            };
+        };
 
         if ($recordId) {
             $with = [
@@ -10,10 +24,9 @@
                 'referencia',
             ];
 
-            $mapParte = function ($cargas) {
+            $mapParte = function ($cargas) use ($mapEspLabel) {
                 $parte = $cargas->first()->parteTrabajoSuministroTransporte;
 
-                // Transportista + nombre del proveedor (si tiene)
                 $u = $parte?->usuario;
                 $transportista = trim(($u?->name ?? '') . ' ' . ($u?->apellidos ?? '')) ?: '—';
 
@@ -24,12 +37,28 @@
                     }
                 }
 
-                // Especie (tipo_biomasa puede ser string o array)
-                $especie = $parte?->tipo_biomasa;
-                if (is_array($especie)) {
-                    $especie = collect($especie)->values()->implode(', ');
+                // === ESPECIE desde referencia o snapshot ===
+                $especies = collect();
+
+                $especiesRef = $cargas->pluck('referencia.producto_especie')->filter();
+                if ($especiesRef->isNotEmpty()) {
+                    $especies = $especiesRef->map(fn($e) => $mapEspLabel($e))->unique()->values();
+                } else {
+                    $esSnap = collect();
+                    foreach ($cargas as $c) {
+                        if (!$c->asignacion_cert_esp) {
+                            continue;
+                        }
+                        foreach (json_decode($c->asignacion_cert_esp, true) ?: [] as $a) {
+                            if (!empty($a['especie'])) {
+                                $esSnap->push($a['especie']);
+                            }
+                        }
+                    }
+                    if ($esSnap->isNotEmpty()) {
+                        $especies = $esSnap->map(fn($e) => $mapEspLabel($e))->unique()->values();
+                    }
                 }
-                $especie = $especie ?: '—';
 
                 return (object) [
                     'inicio' => $cargas->min('fecha_hora_inicio_carga'),
@@ -38,46 +67,99 @@
                     'cliente' => $parte?->cliente?->razon_social ?? '—',
                     'referencias' => $cargas->pluck('referencia.referencia')->filter()->unique()->values(),
                     'transportista' => $transportista,
-                    'especie' => $especie,
+                    'especie' => $especies->implode(', ') ?: '—',
                 ];
             };
-            
-            // ===== ENTRADAS: desde referencia -> a ESTE almacén (sin cliente) =====
+
+            // === ENTRADAS ===
             $entradas = \App\Models\CargaTransporte::with($with)
                 ->whereNull('deleted_at')
                 ->whereHas(
                     'parteTrabajoSuministroTransporte',
-                    fn($q) => $q->where('almacen_id', $recordId)->whereNull('cliente_id'), // termina en almacén
+                    fn($q) => $q->where('almacen_id', $recordId)->whereNull('cliente_id'),
                 )
+                ->whereNotNull('referencia_id')
                 ->get()
                 ->groupBy('parte_trabajo_suministro_transporte_id')
-                ->filter(function ($cargas) {
-                    // Empieza en referencia (al menos una con referencia_id) y NO desde almacén
-                    $tieneRef = $cargas->contains(fn($c) => filled($c->referencia_id));
-                    $tieneOrigenAlmacen = $cargas->contains(fn($c) => filled($c->almacen_id));
-                    return $tieneRef && !$tieneOrigenAlmacen;
-                })
                 ->map($mapParte)
                 ->values();
 
-            // ===== SALIDAS: desde ESTE almacén -> a cliente =====
+            // === SALIDAS ===
             $salidas = \App\Models\CargaTransporte::with($with)
                 ->whereNull('deleted_at')
-                ->where('almacen_id', $recordId) // origen: este almacén
-                ->whereHas(
-                    'parteTrabajoSuministroTransporte',
-                    fn($q) => $q->whereNotNull('cliente_id'), // termina en cliente
-                )
+                ->where('almacen_id', $recordId)
+                ->whereHas('parteTrabajoSuministroTransporte', fn($q) => $q->whereNotNull('cliente_id'))
                 ->get()
                 ->groupBy('parte_trabajo_suministro_transporte_id')
                 ->map($mapParte)
                 ->values();
+
+            // === RESUMEN STOCK ===
+            $almacen = \App\Models\AlmacenIntermedio::find($recordId);
+
+            if ($almacen) {
+                $calc = app(\App\Services\StockCalculator::class);
+                $agg = $calc->calcular($almacen);
+
+                $keys = collect(array_keys($agg['entradas'] ?? []))
+                    ->merge(array_keys($agg['salidas'] ?? []))
+                    ->merge(array_keys($agg['ajustes'] ?? []))
+                    ->merge(array_keys($agg['disponible'] ?? []))
+                    ->unique();
+
+                $resumenStock = $keys->map(function ($key) use ($agg) {
+                    [$cert, $esp] = explode('|', $key) + [null, null];
+
+                    return (object) [
+                        'cert' => $cert ?: '—',
+                        'esp' => $esp ?: '—',
+                        'entradas' => $agg['entradas'][$key] ?? 0,
+                        'salidas' => $agg['salidas'][$key] ?? 0,
+                        'ajustes' => $agg['ajustes'][$key] ?? 0,
+                        'disponible' => $agg['disponible'][$key] ?? 0,
+                    ];
+                });
+            }
         }
 
         $fmt = fn($dt) => optional($dt)?->timezone('Europe/Madrid')->format('d/m/Y H:i');
+        $fmtNum = fn($n) => number_format((float) $n, 2, ',', '.');
+
     @endphp
 
     <x-slot name="heading">Suministros Transporte</x-slot>
+
+    {{-- =============== RESUMEN STOCK (POR CERTIFICACIÓN + ESPECIE) =============== --}}
+    @if ($resumenStock->isNotEmpty())
+        <div class="mb-4 overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+            <table class="w-full text-sm">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-4 py-3 text-left font-medium text-gray-700">Certificación</th>
+                        <th class="px-4 py-3 text-left font-medium text-gray-700">Especie</th>
+                        <th class="px-4 py-3 text-right font-medium text-gray-700">Entradas (m³)</th>
+                        <th class="px-4 py-3 text-right font-medium text-gray-700">Salidas (m³)</th>
+                        <th class="px-4 py-3 text-right font-medium text-gray-700">Ajustes (m³)</th>
+                        <th class="px-4 py-3 text-right font-medium text-gray-700">Disponible (m³)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach ($resumenStock as $row)
+                        <tr class="bg-gray-100">
+                            <td class="px-4 py-3 text-gray-800">{{ $row->cert }}</td>
+                            <td class="px-4 py-3 text-gray-800">{{ $row->esp }}</td>
+                            <td class="px-4 py-3 text-right text-gray-800">{{ $fmtNum($row->entradas) }}</td>
+                            <td class="px-4 py-3 text-right text-gray-800">{{ $fmtNum($row->salidas) }}</td>
+                            <td class="px-4 py-3 text-right text-gray-800">{{ $fmtNum($row->ajustes) }}</td>
+                            <td class="px-4 py-3 text-right text-gray-800 font-semibold">
+                                {{ $fmtNum($row->disponible) }}
+                            </td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+    @endif
 
     {{-- ================= ENTRADAS ================= --}}
     <h3 class="mt-2 mb-2 text-sm font-semibold text-gray-700">Entradas (a este almacén)</h3>
@@ -112,7 +194,7 @@
                                 {{ $p->especie }}
                             </td>
                             <td class="px-4 py-3 text-gray-800">
-                                {{ number_format($p->cantidad_total, 2, ',', '.') }}
+                                {{ $fmtNum($p->cantidad_total) }}
                             </td>
                         </tr>
                     @endforeach
@@ -129,7 +211,7 @@
                     <p><span class="font-semibold">Transportista:</span> {{ $p->transportista }}</p>
                     <p><span class="font-semibold">Especie:</span> {{ $p->especie }}</p>
                     <p><span class="font-semibold">Cantidad:</span>
-                        {{ number_format($p->cantidad_total, 2, ',', '.') }} m³</p>
+                        {{ $fmtNum($p->cantidad_total) }} m³</p>
                 </div>
             @endforeach
         </div>
@@ -165,7 +247,7 @@
                                 {{ $p->especie }}
                             </td>
                             <td class="px-4 py-3 text-gray-800">
-                                {{ number_format($p->cantidad_total, 2, ',', '.') }}
+                                {{ $fmtNum($p->cantidad_total) }}
                             </td>
                             <td class="px-4 py-3 text-gray-800">
                                 {{ $p->cliente }}
@@ -184,7 +266,7 @@
                     <p><span class="font-semibold">Transportista:</span> {{ $p->transportista }}</p>
                     <p><span class="font-semibold">Especie:</span> {{ $p->especie }}</p>
                     <p><span class="font-semibold">Cantidad:</span>
-                        {{ number_format($p->cantidad_total, 2, ',', '.') }} m³</p>
+                        {{ $fmtNum($p->cantidad_total) }} m³</p>
                     <p><span class="font-semibold">Destino:</span> {{ $p->cliente }}</p>
                 </div>
             @endforeach
