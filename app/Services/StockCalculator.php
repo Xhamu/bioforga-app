@@ -44,8 +44,9 @@ class StockCalculator
      */
     public function calcular(AlmacenIntermedio $almacen): array
     {
-        // === ENTRADAS: DESCARGAS EN ESTE ALMACÉN DESDE REFERENCIAS ===
-        $entradas = \DB::table('carga_transportes as ct')
+        // === 1) ENTRADAS: todos los camiones descargados en este almacén desde referencia ===
+        // Cada fila = 1 descarga => lote FIFO
+        $entradasRows = DB::table('carga_transportes as ct')
             ->join('parte_trabajo_suministro_transportes as pt', 'pt.id', '=', 'ct.parte_trabajo_suministro_transporte_id')
             ->join('referencias as r', 'r.id', '=', 'ct.referencia_id')
             ->whereNull('ct.deleted_at')
@@ -53,49 +54,111 @@ class StockCalculator
             ->where('pt.almacen_id', $almacen->id)      // se DESCARGÓ en este almacén
             ->whereNull('pt.cliente_id')                // no se descargó en cliente
             ->whereNotNull('ct.referencia_id')          // venía de referencia
-            ->selectRaw('r.tipo_certificacion as cert_raw, r.producto_especie as esp_raw, SUM(ct.cantidad) as total_m3')
-            ->groupBy('r.tipo_certificacion', 'r.producto_especie')
-            ->get();
+            ->orderByRaw('ct.created_at asc, ct.id asc')
+            ->get([
+                'r.tipo_certificacion as cert_raw',
+                'r.producto_especie   as esp_raw',
+                'ct.cantidad',
+                'ct.created_at',
+            ]);
 
         $entradasByKey = [];
-        foreach ($entradas as $row) {
+        $lotesFIFO = []; // cola global FIFO: cada elemento => ['key' => 'CERT|ESP', 'qty' => float]
+
+        foreach ($entradasRows as $row) {
             $certLabel = $this->mapCertToLabel($row->cert_raw);
             $espLabel = $this->mapEspToLabel($row->esp_raw);
             $key = "{$certLabel}|{$espLabel}";
-            $entradasByKey[$key] = ($entradasByKey[$key] ?? 0.0) + (float) $row->total_m3;
+            $qty = (float) $row->cantidad;
+
+            if ($qty <= 0) {
+                continue;
+            }
+
+            $entradasByKey[$key] = ($entradasByKey[$key] ?? 0.0) + $qty;
+
+            $lotesFIFO[] = [
+                'key' => $key,
+                'qty' => $qty,
+            ];
         }
 
-        // === SALIDAS: CARGAS DESDE ESTE ALMACÉN (solo con snapshot) ===
-        $salidasRows = \DB::table('carga_transportes as ct')
+        // === 2) SALIDAS con snapshot (asignacion_cert_esp) ===
+        $salidasSnapshotRows = DB::table('carga_transportes as ct')
             ->whereNull('ct.deleted_at')
             ->where('ct.almacen_id', $almacen->id)      // se CARGÓ en este almacén
             ->whereNull('ct.referencia_id')             // no viene de referencia (es salida)
-            ->whereNotNull('ct.asignacion_cert_esp')    // snapshot guardado => debe restar
-            ->get(['ct.id', 'ct.asignacion_cert_esp', 'ct.cantidad']);
+            ->whereNotNull('ct.asignacion_cert_esp')    // snapshot guardado => ya viene etiquetado
+            ->get(['ct.id', 'ct.asignacion_cert_esp']);
 
-        $salidasByKey = [];
-        foreach ($salidasRows as $s) {
+        $salidasSnapshotByKey = [];
+
+        foreach ($salidasSnapshotRows as $s) {
             $detalle = json_decode($s->asignacion_cert_esp ?? '[]', true);
-            if (!is_array($detalle) || empty($detalle))
+            if (!is_array($detalle) || empty($detalle)) {
                 continue;
+            }
 
             foreach ($detalle as $a) {
                 $cert = strtoupper(trim((string) ($a['certificacion'] ?? '')));
                 $esp = strtoupper(trim((string) ($a['especie'] ?? '')));
                 $q = (float) ($a['cantidad'] ?? 0);
-                if (!$cert || !$esp || $q <= 0)
+
+                if (!$cert || !$esp || $q <= 0) {
                     continue;
+                }
 
                 $key = "{$cert}|{$esp}";
-                $salidasByKey[$key] = ($salidasByKey[$key] ?? 0.0) + $q;
+                $salidasSnapshotByKey[$key] = ($salidasSnapshotByKey[$key] ?? 0.0) + $q;
             }
         }
 
-        // === AJUSTES MANUALES (múltiples) ===
-        // Tabla: ajustes_stock (almacen_intermedio_id, certificacion, especie, delta_m3, ...)
-        $ajustesRows = \DB::table('ajustes_stock')
+        // === 3) SALIDAS SIN snapshot: FIFO sobre la cola global de entradas ===
+        $salidasNoSnapRows = DB::table('carga_transportes as ct')
+            ->whereNull('ct.deleted_at')
+            ->where('ct.almacen_id', $almacen->id)
+            ->whereNull('ct.referencia_id')           // salidas desde almacén
+            ->whereNull('ct.asignacion_cert_esp')     // sin snapshot (históricas)
+            ->orderByRaw('ct.created_at asc, ct.id asc')
+            ->get(['ct.cantidad']);
+
+        $consumoNoSnapByKey = [];
+        $idxLote = 0; // índice en la cola FIFO
+
+        foreach ($salidasNoSnapRows as $s) {
+            $rest = (float) $s->cantidad;
+            if ($rest <= 0) {
+                continue;
+            }
+
+            while ($rest > 0 && $idxLote < count($lotesFIFO)) {
+                if ($lotesFIFO[$idxLote]['qty'] <= 0) {
+                    $idxLote++;
+                    continue;
+                }
+
+                $usa = min($lotesFIFO[$idxLote]['qty'], $rest);
+                $key = $lotesFIFO[$idxLote]['key'];
+
+                $consumoNoSnapByKey[$key] = ($consumoNoSnapByKey[$key] ?? 0.0) + $usa;
+
+                $lotesFIFO[$idxLote]['qty'] -= $usa;
+                $rest -= $usa;
+
+                if ($lotesFIFO[$idxLote]['qty'] <= 1e-6) {
+                    $idxLote++;
+                }
+            }
+
+            // Si rest > 0 y no hay más lotes, significa que se ha "vendido de más" de lo que había.
+            // Ese exceso NO se puede asignar a ninguna CERT|ESP concreta, así que lo ignoramos
+            // a nivel de desglose, pero seguirás viéndolo como stock negativo si miras global.
+        }
+
+        // === 4) AJUSTES MANUALES ===
+        $ajustesRows = DB::table('ajustes_stock')
             ->where('almacen_intermedio_id', $almacen->id)
-            ->select('certificacion', 'especie', \DB::raw('SUM(delta_m3) as total'))
+            ->select('certificacion', 'especie', DB::raw('SUM(delta_m3) as total'))
             ->groupBy('certificacion', 'especie')
             ->get();
 
@@ -105,19 +168,33 @@ class StockCalculator
             $ajustesByKey[$key] = (float) $a->total;
         }
 
-        // === DISPONIBLE = ENTRADAS - SALIDAS + AJUSTES ===
+        // === 5) SALIDAS FINALES (snapshot + FIFO sin snapshot) ===
+        $salidasByKey = [];
+        $allSalidaKeys = array_unique(array_merge(
+            array_keys($salidasSnapshotByKey),
+            array_keys($consumoNoSnapByKey),
+        ));
+
+        foreach ($allSalidaKeys as $key) {
+            $salidasByKey[$key] =
+                (float) ($salidasSnapshotByKey[$key] ?? 0.0) +
+                (float) ($consumoNoSnapByKey[$key] ?? 0.0);
+        }
+
+        // === 6) DISPONIBLE = ENTRADAS - SALIDAS + AJUSTES (por CERT|ESP) ===
         $disponible = [];
-        $keys = array_unique(array_merge(
+        $allKeys = array_unique(array_merge(
             array_keys($entradasByKey),
             array_keys($salidasByKey),
             array_keys($ajustesByKey),
         ));
 
-        foreach ($keys as $key) {
+        foreach ($allKeys as $key) {
             $in = (float) ($entradasByKey[$key] ?? 0.0);
             $out = (float) ($salidasByKey[$key] ?? 0.0);
             $adj = (float) ($ajustesByKey[$key] ?? 0.0);
-            // si quieres permitir negativo, quita max(0.0, ...)
+
+            // Si quieres ver negativos para detectar desajustes, quita el max(0.0, ...)
             $disponible[$key] = max(0.0, $in - $out + $adj);
         }
 
@@ -125,7 +202,7 @@ class StockCalculator
             'entradas' => $entradasByKey,
             'salidas_total' => array_sum($salidasByKey),
             'salidas' => $salidasByKey,
-            'ajustes' => $ajustesByKey,   // <- útil para tooltips/UI
+            'ajustes' => $ajustesByKey,
             'disponible' => $disponible,
         ];
     }
