@@ -44,8 +44,8 @@ class StockCalculator
      */
     public function calcular(AlmacenIntermedio $almacen): array
     {
-        // === 1) ENTRADAS: todos los camiones descargados en este almacén desde referencia ===
-        // Cada fila = 1 descarga => lote FIFO
+        // === 1) ENTRADAS: descargas en este almacén desde referencia ===
+        // Cada fila = un lote FIFO
         $entradasRows = DB::table('carga_transportes as ct')
             ->join('parte_trabajo_suministro_transportes as pt', 'pt.id', '=', 'ct.parte_trabajo_suministro_transporte_id')
             ->join('referencias as r', 'r.id', '=', 'ct.referencia_id')
@@ -63,7 +63,7 @@ class StockCalculator
             ]);
 
         $entradasByKey = [];
-        $lotesFIFO = []; // cola global FIFO: cada elemento => ['key' => 'CERT|ESP', 'qty' => float]
+        $lotesFIFO = []; // cola global FIFO
 
         foreach ($entradasRows as $row) {
             $certLabel = $this->mapCertToLabel($row->cert_raw);
@@ -85,11 +85,13 @@ class StockCalculator
 
         // === 2) SALIDAS con snapshot (asignacion_cert_esp) ===
         $salidasSnapshotRows = DB::table('carga_transportes as ct')
+            ->join('parte_trabajo_suministro_transportes as pt', 'pt.id', '=', 'ct.parte_trabajo_suministro_transporte_id')
             ->whereNull('ct.deleted_at')
-            ->where('ct.almacen_id', $almacen->id)      // se CARGÓ en este almacén
-            ->whereNull('ct.referencia_id')             // no viene de referencia (es salida)
-            ->whereNotNull('ct.asignacion_cert_esp')    // snapshot guardado => ya viene etiquetado
-            ->get(['ct.id', 'ct.asignacion_cert_esp']);
+            ->where('pt.almacen_id', $almacen->id)      // origen: este almacén
+            ->whereNotNull('pt.cliente_id')             // destino: cliente
+            ->whereNotNull('ct.asignacion_cert_esp')    // tiene snapshot
+            ->orderByRaw('ct.created_at asc, ct.id asc')
+            ->get(['ct.asignacion_cert_esp']);
 
         $salidasSnapshotByKey = [];
 
@@ -115,15 +117,16 @@ class StockCalculator
 
         // === 3) SALIDAS SIN snapshot: FIFO sobre la cola global de entradas ===
         $salidasNoSnapRows = DB::table('carga_transportes as ct')
+            ->join('parte_trabajo_suministro_transportes as pt', 'pt.id', '=', 'ct.parte_trabajo_suministro_transporte_id')
             ->whereNull('ct.deleted_at')
-            ->where('ct.almacen_id', $almacen->id)
-            ->whereNull('ct.referencia_id')           // salidas desde almacén
-            ->whereNull('ct.asignacion_cert_esp')     // sin snapshot (históricas)
+            ->where('pt.almacen_id', $almacen->id)      // origen: este almacén
+            ->whereNotNull('pt.cliente_id')             // destino: cliente
+            ->whereNull('ct.asignacion_cert_esp')       // sin snapshot → hay que repartir FIFO
             ->orderByRaw('ct.created_at asc, ct.id asc')
             ->get(['ct.cantidad']);
 
         $consumoNoSnapByKey = [];
-        $idxLote = 0; // índice en la cola FIFO
+        $idxLote = 0;
 
         foreach ($salidasNoSnapRows as $s) {
             $rest = (float) $s->cantidad;
@@ -131,6 +134,7 @@ class StockCalculator
                 continue;
             }
 
+            // FIFO global: lo primero que entra es lo primero que sale
             while ($rest > 0 && $idxLote < count($lotesFIFO)) {
                 if ($lotesFIFO[$idxLote]['qty'] <= 0) {
                     $idxLote++;
@@ -150,9 +154,8 @@ class StockCalculator
                 }
             }
 
-            // Si rest > 0 y no hay más lotes, significa que se ha "vendido de más" de lo que había.
-            // Ese exceso NO se puede asignar a ninguna CERT|ESP concreta, así que lo ignoramos
-            // a nivel de desglose, pero seguirás viéndolo como stock negativo si miras global.
+            // Si rest > 0 y no hay más lotes, ese exceso ya no se puede asignar a una CERT|ESP concreta.
+            // A nivel global lo verás como descuadre, y lo podrás corregir con ajustes.
         }
 
         // === 4) AJUSTES MANUALES ===
@@ -168,7 +171,7 @@ class StockCalculator
             $ajustesByKey[$key] = (float) $a->total;
         }
 
-        // === 5) SALIDAS FINALES (snapshot + FIFO sin snapshot) ===
+        // === 5) SALIDAS finales = snapshot + FIFO sin snapshot ===
         $salidasByKey = [];
         $allSalidaKeys = array_unique(array_merge(
             array_keys($salidasSnapshotByKey),
@@ -181,7 +184,7 @@ class StockCalculator
                 (float) ($consumoNoSnapByKey[$key] ?? 0.0);
         }
 
-        // === 6) DISPONIBLE = ENTRADAS - SALIDAS + AJUSTES (por CERT|ESP) ===
+        // === 6) DISPONIBLE = ENTRADAS - SALIDAS + AJUSTES ===
         $disponible = [];
         $allKeys = array_unique(array_merge(
             array_keys($entradasByKey),
@@ -194,7 +197,7 @@ class StockCalculator
             $out = (float) ($salidasByKey[$key] ?? 0.0);
             $adj = (float) ($ajustesByKey[$key] ?? 0.0);
 
-            // Si quieres ver negativos para detectar desajustes, quita el max(0.0, ...)
+            // Si quieres ver negativos para detectar descuadres, puedes quitar el max(0.0, ...)
             $disponible[$key] = max(0.0, $in - $out + $adj);
         }
 
