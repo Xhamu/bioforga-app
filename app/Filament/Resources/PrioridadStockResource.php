@@ -348,21 +348,34 @@ class PrioridadStockResource extends Resource
                         $espLabel = strtoupper(trim($r->especie));
                         $key = $certLabel . '|' . $espLabel;
 
-                        // 1) Entradas por referencia (descargas en el almacén)
+                        /** @var \App\Services\StockCalculator $calc */
+                        $calc = app(\App\Services\StockCalculator::class);
+                        $agg = $calc->calcular($r->almacen);
+
+                        $fmt = fn($n) => number_format((float) $n, 2, ',', '.');
+
+                        // Totales por combinación (mismo origen que PrioridadStock)
+                        $totalEntradas = (float) ($agg['entradas'][$key] ?? 0.0);
+                        $totalSalidas = (float) ($agg['salidas'][$key] ?? 0.0);
+                        $ajusteTotal = (float) ($agg['ajustes'][$key] ?? 0.0);
+                        $totalDisp = (float) ($agg['disponible'][$key] ?? 0.0);
+
+                        // 1) Entradas por referencia (descargas en el almacén desde referencia)
                         $entradas = \DB::table('carga_transportes as ct')
                             ->join('parte_trabajo_suministro_transportes as pt', 'pt.id', '=', 'ct.parte_trabajo_suministro_transporte_id')
                             ->join('referencias as rf', 'rf.id', '=', 'ct.referencia_id')
                             ->whereNull('ct.deleted_at')
                             ->whereNull('rf.deleted_at')
                             ->where('pt.almacen_id', $almacenId)
+                            ->whereNull('pt.cliente_id')          // 🔹 igual que StockCalculator::calcular()
                             ->whereNotNull('ct.referencia_id')
                             ->selectRaw('
-                                rf.referencia,
-                                rf.tipo_certificacion as cert_raw,
-                                rf.producto_especie   as esp_raw,
-                                MIN(ct.created_at)    as first_at,
-                                SUM(ct.cantidad)      as m3_in
-                            ')
+            rf.referencia,
+            rf.tipo_certificacion as cert_raw,
+            rf.producto_especie   as esp_raw,
+            MIN(ct.created_at)    as first_at,
+            SUM(ct.cantidad)      as m3_in
+        ')
                             ->groupBy('rf.id', 'rf.referencia', 'rf.tipo_certificacion', 'rf.producto_especie')
                             ->get()
                             ->filter(
@@ -374,53 +387,73 @@ class PrioridadStockResource extends Resource
                             ->values()
                             ->all();
 
-                        /** @var \App\Services\StockCalculator $calc */
-                        $calc = app(StockCalculator::class);
-                        $agg = $calc->calcular($r->almacen);
+                        // Si no hay entradas de referencia, devolvemos solo info agregada
+                        if (empty($entradas)) {
+                            if ($totalEntradas == 0.0 && $totalSalidas == 0.0 && abs($ajusteTotal) < 0.0001) {
+                                return 'Sin trazabilidad registrada para esta combinación.';
+                            }
 
-                        $fmt = fn($n) => number_format((float) $n, 2, ',', '.');
+                            $lineas = [
+                                "Entradas: {$fmt($totalEntradas)} m³",
+                                "Salidas: {$fmt($totalSalidas)} m³",
+                            ];
+                            if (abs($ajusteTotal) > 0.0001) {
+                                $lineas[] = "Ajustes: {$fmt($ajusteTotal)} m³";
+                            }
+                            $lineas[] = "Disponible: {$fmt($totalDisp)} m³";
 
-                        // 2) Cálculos agregados (incluyen ajustes)
-                        $totalEntradas = (float) ($agg['entradas'][$key] ?? 0.0);
-                        $totalDisp = (float) ($agg['disponible'][$key] ?? 0.0);
-                        $ajusteTotal = (float) ($agg['ajustes'][$key] ?? 0.0); // ← suma de regularizaciones
-            
-                        // Consumo a repartir por FIFO en las referencias
-                        // Nota: totalEntradas - totalDisp = salidas - ajustes
+                            return implode("\n", $lineas);
+                        }
+
+                        // 2) Cálculo de consumo FIFO a partir de totales agregados
+                        // Nota: totalEntradas - totalDisp = salidas - ajustes (según StockCalculator)
                         $consumir = max(0.0, $totalEntradas - $totalDisp);
 
-                        // 3) Aplica consumo FIFO sobre las entradas por referencia
                         foreach ($entradas as $i => $row) {
-                            if ($consumir <= 0)
+                            if ($consumir <= 0) {
                                 break;
+                            }
                             $usa = min($row->m3_in, $consumir);
                             $entradas[$i]->m3_in -= $usa;
                             $consumir -= $usa;
                         }
 
-                        // 4) Construye líneas: referencias con disponible > 0 (máx. 8)
+                        // 3) Construye líneas: referencias con disponible > 0 (máx. 8)
                         $lineas = [];
                         foreach ($entradas as $row) {
                             $disp = round(max(0.0, (float) $row->m3_in), 2);
-                            if ($disp > 0) {
-                                $lineas[] = "{$row->referencia} — " . $fmt($disp) . " m³";
-                                if (count($lineas) >= 8)
-                                    break;
+                            if ($disp <= 0) {
+                                continue;
+                            }
+                            $lineas[] = "{$row->referencia} — " . $fmt($disp) . " m³";
+                            if (count($lineas) >= 8) {
+                                break;
                             }
                         }
 
-                        // 5) Añade la línea de Regularización si existe
+                        // 4) Añade la línea de Regularización si existe
                         if (abs($ajusteTotal) > 0.0001) {
                             $lineas[] = "Regularización — " . $fmt($ajusteTotal) . " m³";
                         }
 
-                        return $lineas
-                            ? implode("\n", $lineas)
-                            : (abs($ajusteTotal) > 0.0001
-                                ? "Regularización — " . $fmt($ajusteTotal) . " m³"
-                                : 'Sin trazabilidad registrada para esta combinación');
-                    })
+                        // 5) Si no hay referencias con stock, pero sí ajustes o movimiento, mostrar algo útil
+                        if (empty($lineas)) {
+                            if (abs($ajusteTotal) > 0.0001 || $totalEntradas > 0.0 || $totalSalidas > 0.0) {
+                                $lineas = [
+                                    "Entradas: {$fmt($totalEntradas)} m³",
+                                    "Salidas: {$fmt($totalSalidas)} m³",
+                                ];
+                                if (abs($ajusteTotal) > 0.0001) {
+                                    $lineas[] = "Ajustes: {$fmt($ajusteTotal)} m³";
+                                }
+                                $lineas[] = "Disponible: {$fmt($totalDisp)} m³";
+                            } else {
+                                $lineas[] = 'Sin trazabilidad registrada para esta combinación';
+                            }
+                        }
 
+                        return implode("\n", $lineas);
+                    })
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('almacen_intermedio_id')
