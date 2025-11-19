@@ -84,10 +84,11 @@ class StockCalculator
         }
 
         // === 2) SALIDAS con snapshot (asignacion_cert_esp) ===
+        // Misma lógica que el informe: origen = ct.almacen_id, destino = cliente
         $salidasSnapshotRows = DB::table('carga_transportes as ct')
             ->join('parte_trabajo_suministro_transportes as pt', 'pt.id', '=', 'ct.parte_trabajo_suministro_transporte_id')
             ->whereNull('ct.deleted_at')
-            ->where('pt.almacen_id', $almacen->id)      // origen: este almacén
+            ->where('ct.almacen_id', $almacen->id)      // ORIGEN: este almacén
             ->whereNotNull('pt.cliente_id')             // destino: cliente
             ->whereNotNull('ct.asignacion_cert_esp')    // tiene snapshot
             ->orderByRaw('ct.created_at asc, ct.id asc')
@@ -115,13 +116,17 @@ class StockCalculator
             }
         }
 
-        // === 3) SALIDAS SIN snapshot: FIFO sobre la cola global de entradas ===
+        // === 3) SALIDAS SIN snapshot: FIFO SOBRE LA COLA GLOBAL DE ENTRADAS ===
+        // Condiciones alineadas con el informe:
+        //  - ct.almacen_id = almacén
+        //  - pt.cliente_id not null
+        //  - asignacion_cert_esp null
         $salidasNoSnapRows = DB::table('carga_transportes as ct')
             ->join('parte_trabajo_suministro_transportes as pt', 'pt.id', '=', 'ct.parte_trabajo_suministro_transporte_id')
             ->whereNull('ct.deleted_at')
-            ->where('pt.almacen_id', $almacen->id)      // origen: este almacén
+            ->where('ct.almacen_id', $almacen->id)      // ORIGEN: este almacén
             ->whereNotNull('pt.cliente_id')             // destino: cliente
-            ->whereNull('ct.asignacion_cert_esp')       // sin snapshot → hay que repartir FIFO
+            ->whereNull('ct.asignacion_cert_esp')       // sin snapshot → FIFO
             ->orderByRaw('ct.created_at asc, ct.id asc')
             ->get(['ct.cantidad']);
 
@@ -154,8 +159,9 @@ class StockCalculator
                 }
             }
 
-            // Si rest > 0 y no hay más lotes, ese exceso ya no se puede asignar a una CERT|ESP concreta.
-            // A nivel global lo verás como descuadre, y lo podrás corregir con ajustes.
+            // Si rest > 0 y no hay más lotes, ese sobrante ya no lo podemos
+            // asignar a una CERT|ESP concreta. Globalmente verás descuadre y
+            // lo podrás corregir con ajustes.
         }
 
         // === 4) AJUSTES MANUALES ===
@@ -197,7 +203,7 @@ class StockCalculator
             $out = (float) ($salidasByKey[$key] ?? 0.0);
             $adj = (float) ($ajustesByKey[$key] ?? 0.0);
 
-            // Si quieres ver negativos para detectar descuadres, puedes quitar el max(0.0, ...)
+            // Si quieres ver negativos para detectar descuadres, quita el max(0.0, ...)
             $disponible[$key] = max(0.0, $in - $out + $adj);
         }
 
