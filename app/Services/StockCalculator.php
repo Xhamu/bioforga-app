@@ -47,7 +47,12 @@ class StockCalculator
         // === 1) ENTRADAS: descargas en este almacén desde referencia ===
         // Cada fila = un lote FIFO
         $entradasRows = DB::table('carga_transportes as ct')
-            ->join('parte_trabajo_suministro_transportes as pt', 'pt.id', '=', 'ct.parte_trabajo_suministro_transporte_id')
+            ->join(
+                'parte_trabajo_suministro_transportes as pt',
+                'pt.id',
+                '=',
+                'ct.parte_trabajo_suministro_transporte_id'
+            )
             ->join('referencias as r', 'r.id', '=', 'ct.referencia_id')
             ->whereNull('ct.deleted_at')
             ->whereNull('r.deleted_at')
@@ -83,25 +88,56 @@ class StockCalculator
             ];
         }
 
-        // === 2) SALIDAS con snapshot (asignacion_cert_esp) ===
-        // Misma lógica que el informe: origen = ct.almacen_id, destino = cliente
-        $salidasSnapshotRows = DB::table('carga_transportes as ct')
-            ->join('parte_trabajo_suministro_transportes as pt', 'pt.id', '=', 'ct.parte_trabajo_suministro_transporte_id')
+        // === 2) TODAS LAS SALIDAS (origen almacén -> cliente) ===
+        // Luego en PHP separamos:
+        //   - con snapshot válido (se suma por cert|esp)
+        //   - sin snapshot / snapshot vacío (van a FIFO)
+        $salidasRows = DB::table('carga_transportes as ct')
+            ->join(
+                'parte_trabajo_suministro_transportes as pt',
+                'pt.id',
+                '=',
+                'ct.parte_trabajo_suministro_transporte_id'
+            )
             ->whereNull('ct.deleted_at')
             ->where('ct.almacen_id', $almacen->id)      // ORIGEN: este almacén
             ->whereNotNull('pt.cliente_id')             // destino: cliente
-            ->whereNotNull('ct.asignacion_cert_esp')    // tiene snapshot
             ->orderByRaw('ct.created_at asc, ct.id asc')
-            ->get(['ct.asignacion_cert_esp']);
+            ->get(['ct.cantidad', 'ct.asignacion_cert_esp']);
 
         $salidasSnapshotByKey = [];
+        $salidasNoSnapQuantities = []; // cantidades que van a FIFO
 
-        foreach ($salidasSnapshotRows as $s) {
-            $detalle = json_decode($s->asignacion_cert_esp ?? '[]', true);
-            if (!is_array($detalle) || empty($detalle)) {
+        foreach ($salidasRows as $row) {
+            $qty = (float) $row->cantidad;
+            if ($qty <= 0) {
                 continue;
             }
 
+            $snapRaw = $row->asignacion_cert_esp;
+
+            // 2.1. Sin snapshot real: null, cadena vacía o valor "raro"
+            if (is_null($snapRaw) || $snapRaw === '') {
+                $salidasNoSnapQuantities[] = $qty;
+                continue;
+            }
+
+            // 2.2. Puede venir como string JSON o como array (por casts)
+            if (is_string($snapRaw)) {
+                $detalle = json_decode($snapRaw, true) ?: [];
+            } elseif (is_array($snapRaw)) {
+                $detalle = $snapRaw;
+            } else {
+                $detalle = [];
+            }
+
+            // Si el JSON está vacío o no tiene estructura esperada, lo tratamos como sin snapshot
+            if (empty($detalle)) {
+                $salidasNoSnapQuantities[] = $qty;
+                continue;
+            }
+
+            // 2.3. Snapshot válido: sumar por CERT|ESP
             foreach ($detalle as $a) {
                 $cert = strtoupper(trim((string) ($a['certificacion'] ?? '')));
                 $esp = strtoupper(trim((string) ($a['especie'] ?? '')));
@@ -117,24 +153,11 @@ class StockCalculator
         }
 
         // === 3) SALIDAS SIN snapshot: FIFO SOBRE LA COLA GLOBAL DE ENTRADAS ===
-        // Condiciones alineadas con el informe:
-        //  - ct.almacen_id = almacén
-        //  - pt.cliente_id not null
-        //  - asignacion_cert_esp null
-        $salidasNoSnapRows = DB::table('carga_transportes as ct')
-            ->join('parte_trabajo_suministro_transportes as pt', 'pt.id', '=', 'ct.parte_trabajo_suministro_transporte_id')
-            ->whereNull('ct.deleted_at')
-            ->where('ct.almacen_id', $almacen->id)      // ORIGEN: este almacén
-            ->whereNotNull('pt.cliente_id')             // destino: cliente
-            ->whereNull('ct.asignacion_cert_esp')       // sin snapshot → FIFO
-            ->orderByRaw('ct.created_at asc, ct.id asc')
-            ->get(['ct.cantidad']);
-
         $consumoNoSnapByKey = [];
         $idxLote = 0;
 
-        foreach ($salidasNoSnapRows as $s) {
-            $rest = (float) $s->cantidad;
+        foreach ($salidasNoSnapQuantities as $cantSalida) {
+            $rest = (float) $cantSalida;
             if ($rest <= 0) {
                 continue;
             }
@@ -160,8 +183,8 @@ class StockCalculator
             }
 
             // Si rest > 0 y no hay más lotes, ese sobrante ya no lo podemos
-            // asignar a una CERT|ESP concreta. Globalmente verás descuadre y
-            // lo podrás corregir con ajustes.
+            // asignar a una CERT|ESP concreta. Globalmente verás descuadre
+            // y lo podrás corregir con ajustes.
         }
 
         // === 4) AJUSTES MANUALES ===
@@ -203,7 +226,7 @@ class StockCalculator
             $out = (float) ($salidasByKey[$key] ?? 0.0);
             $adj = (float) ($ajustesByKey[$key] ?? 0.0);
 
-            // Si quieres ver negativos para detectar descuadres, quita el max(0.0, ...)
+            // Si quieres ver negativos para cazarlos, puedes quitar el max(0.0, ...)
             $disponible[$key] = max(0.0, $in - $out + $adj);
         }
 
