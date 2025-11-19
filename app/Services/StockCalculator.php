@@ -183,9 +183,24 @@ class StockCalculator
                 }
             }
 
-            // Si rest > 0 y no hay más lotes, ese sobrante ya no lo podemos
-            // asignar a una CERT|ESP concreta. Globalmente verás descuadre
-            // y lo podrás corregir con ajustes.
+            // 🔹 Fallback: si queda resto sin lotes FIFO, lo atribuimos a la "última" entrada conocida
+            if ($rest > 0) {
+                $fallbackKey = null;
+
+                // Preferimos el último lote consumido (idxLote - 1)
+                if ($idxLote > 0 && isset($lotesFIFO[$idxLote - 1])) {
+                    $fallbackKey = $lotesFIFO[$idxLote - 1]['key'];
+                } elseif (!empty($lotesFIFO)) {
+                    // Si no, cogemos el último lote definido en la cola
+                    $lastIndex = array_key_last($lotesFIFO);
+                    $fallbackKey = $lotesFIFO[$lastIndex]['key'];
+                }
+
+                if ($fallbackKey) {
+                    $consumoNoSnapByKey[$fallbackKey] = ($consumoNoSnapByKey[$fallbackKey] ?? 0.0) + $rest;
+                    $rest = 0.0;
+                }
+            }
         }
 
         // === 4) AJUSTES MANUALES ===
