@@ -140,16 +140,16 @@
 
                 // --- RESUMEN GLOBAL coherente con PrioridadStock ---
                 $totalEntradas = (float) collect($agg['entradas'] ?? [])->sum();
-                $totalSalidas = (float) collect($agg['salidas'] ?? [])->sum();
+                $totalSalidasTotales = (float) ($agg['salidas_total'] ?? 0); // 🔹 TODAS las salidas
                 $totalAjustes = (float) collect($agg['ajustes'] ?? [])->sum();
-                $totalDisp = (float) collect($agg['disponible'] ?? [])->sum();
+                $totalDispTrazado = (float) collect($agg['disponible'] ?? [])->sum(); // suma por cert|esp
 
                 $globalStock = (object) [
                     'entradas' => $totalEntradas,
-                    'salidas_totales' => $totalSalidas,
+                    'salidas_totales' => $totalSalidasTotales, // aquí ya van TODAS
                     'ajustes' => $totalAjustes,
-                    'disponible' => $totalDisp,
-                    'stock_teorico' => $totalEntradas - $totalSalidas + $totalAjustes,
+                    'disponible_trazado' => $totalDispTrazado, // lo que sale de las combinaciones
+                    'disponible_real' => $totalEntradas - $totalSalidasTotales + $totalAjustes, // 🔹 lo que quieres
                 ];
             }
         }
@@ -198,12 +198,16 @@
         <div class="mb-4 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900 space-y-1">
             <p><strong>Resumen global (almacén completo):</strong></p>
             <p>Entradas totales: {{ $fmtNum($globalStock->entradas) }} m³</p>
-            <p>Salidas totales: {{ $fmtNum($globalStock->salidas_totales) }} m³</p>
+            <p>Salidas totales (todas): {{ $fmtNum($globalStock->salidas_totales) }} m³</p>
             <p>Ajustes: {{ $fmtNum($globalStock->ajustes) }} m³</p>
-            <p>Disponible (suma de todas las combinaciones): {{ $fmtNum($globalStock->disponible) }} m³</p>
+
+            {{-- Disponible trazado (suma de combinaciones cert/especie, útil para PrioridadStock) --}}
+            <p>Disponible trazado (por combinaciones): {{ $fmtNum($globalStock->disponible_trazado) }} m³</p>
+
+            {{-- Disponible REAL contando todas las salidas, que es lo que tú quieres ver --}}
             <p class="font-semibold">
-                Stock teórico = Entradas - Salidas + Ajustes:
-                {{ $fmtNum($globalStock->stock_teorico) }} m³
+                Disponible real (Entradas - Salidas totales + Ajustes):
+                {{ $fmtNum($globalStock->disponible_real) }} m³
             </p>
         </div>
     @endif

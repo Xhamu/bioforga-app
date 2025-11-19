@@ -100,13 +100,15 @@ class StockCalculator
                 'ct.parte_trabajo_suministro_transporte_id'
             )
             ->whereNull('ct.deleted_at')
-            ->where('ct.almacen_id', $almacen->id)      // ORIGEN: este almacén
-            ->whereNotNull('pt.cliente_id')             // destino: cliente
+            ->where('ct.almacen_id', $almacen->id)
+            ->whereNotNull('pt.cliente_id')
             ->orderByRaw('ct.created_at asc, ct.id asc')
             ->get(['ct.cantidad', 'ct.asignacion_cert_esp']);
 
         $salidasSnapshotByKey = [];
-        $salidasNoSnapQuantities = []; // cantidades que van a FIFO
+        $salidasNoSnapQuantities = [];
+
+        $salidasBrutas = 0.0; // 🔹 NUEVO: acumula TODO lo que sale
 
         foreach ($salidasRows as $row) {
             $qty = (float) $row->cantidad;
@@ -114,15 +116,16 @@ class StockCalculator
                 continue;
             }
 
+            // SIEMPRE sumamos esta salida al total global
+            $salidasBrutas += $qty;
+
             $snapRaw = $row->asignacion_cert_esp;
 
-            // 2.1. Sin snapshot real: null, cadena vacía o valor "raro"
             if (is_null($snapRaw) || $snapRaw === '') {
                 $salidasNoSnapQuantities[] = $qty;
                 continue;
             }
 
-            // 2.2. Puede venir como string JSON o como array (por casts)
             if (is_string($snapRaw)) {
                 $detalle = json_decode($snapRaw, true) ?: [];
             } elseif (is_array($snapRaw)) {
@@ -131,13 +134,11 @@ class StockCalculator
                 $detalle = [];
             }
 
-            // Si el JSON está vacío o no tiene estructura esperada, lo tratamos como sin snapshot
             if (empty($detalle)) {
                 $salidasNoSnapQuantities[] = $qty;
                 continue;
             }
 
-            // 2.3. Snapshot válido: sumar por CERT|ESP
             foreach ($detalle as $a) {
                 $cert = strtoupper(trim((string) ($a['certificacion'] ?? '')));
                 $esp = strtoupper(trim((string) ($a['especie'] ?? '')));
@@ -232,10 +233,10 @@ class StockCalculator
 
         return [
             'entradas' => $entradasByKey,
-            'salidas_total' => array_sum($salidasByKey),
-            'salidas' => $salidasByKey,
+            'salidas_total' => $salidasBrutas,   // 🔹 TODAS las salidas (camiones)
+            'salidas' => $salidasByKey,    // detalle por cert|esp (trazadas)
             'ajustes' => $ajustesByKey,
-            'disponible' => $disponible,
+            'disponible' => $disponible,      // por cert|esp (con FIFO y ajustes)
         ];
     }
 
