@@ -44,8 +44,8 @@ class StockCalculator
      */
     public function calcular(AlmacenIntermedio $almacen): array
     {
-        // === 1) ENTRADAS: descargas en este almacén desde referencia ===
-        // Cada fila = un lote FIFO con fecha
+        // ... ENTRADAS IGUAL QUE ANTES, solo que guardamos fecha en los lotesFIFO ...
+
         $entradasRows = DB::table('carga_transportes as ct')
             ->join(
                 'parte_trabajo_suministro_transportes as pt',
@@ -56,9 +56,9 @@ class StockCalculator
             ->join('referencias as r', 'r.id', '=', 'ct.referencia_id')
             ->whereNull('ct.deleted_at')
             ->whereNull('r.deleted_at')
-            ->where('pt.almacen_id', $almacen->id)      // se DESCARGÓ en este almacén
-            ->whereNull('pt.cliente_id')                // no se descargó en cliente
-            ->whereNotNull('ct.referencia_id')          // venía de referencia
+            ->where('pt.almacen_id', $almacen->id)
+            ->whereNull('pt.cliente_id')
+            ->whereNotNull('ct.referencia_id')
             ->orderByRaw('ct.created_at asc, ct.id asc')
             ->get([
                 'r.tipo_certificacion as cert_raw',
@@ -68,7 +68,7 @@ class StockCalculator
             ]);
 
         $entradasByKey = [];
-        $lotesFIFO = []; // cola global FIFO (con fecha)
+        $lotesFIFO = [];
 
         foreach ($entradasRows as $row) {
             $certLabel = $this->mapCertToLabel($row->cert_raw);
@@ -89,10 +89,7 @@ class StockCalculator
             ];
         }
 
-        // === 2) TODAS LAS SALIDAS (origen almacén -> cliente) ===
-        // Luego en PHP separamos:
-        //   - con snapshot válido (se suma por cert|esp)
-        //   - sin snapshot / snapshot vacío (van a FIFO si hay stock suficiente)
+        // === 2) SALIDAS (añadimos el id de la carga) ===
         $salidasRows = DB::table('carga_transportes as ct')
             ->join(
                 'parte_trabajo_suministro_transportes as pt',
@@ -105,6 +102,7 @@ class StockCalculator
             ->whereNotNull('pt.cliente_id')
             ->orderByRaw('ct.created_at asc, ct.id asc')
             ->get([
+                'ct.id as carga_id',
                 'ct.cantidad',
                 'ct.asignacion_cert_esp',
                 'ct.created_at as fecha',
@@ -112,7 +110,7 @@ class StockCalculator
 
         $salidasSnapshotByKey = [];
         $salidasNoSnapRows = [];
-        $salidasBrutas = 0.0; // TODAS las salidas (para resumen real)
+        $salidasBrutas = 0.0;
 
         foreach ($salidasRows as $row) {
             $qty = (float) $row->cantidad;
@@ -120,18 +118,14 @@ class StockCalculator
                 continue;
             }
 
-            // SIEMPRE sumamos esta salida al total global
             $salidasBrutas += $qty;
-
             $snapRaw = $row->asignacion_cert_esp;
 
-            // Sin snapshot → lo guardamos para tratar FIFO después
             if (is_null($snapRaw) || $snapRaw === '') {
                 $salidasNoSnapRows[] = $row;
                 continue;
             }
 
-            // Snapshot presente → lo intentamos decodificar
             if (is_string($snapRaw)) {
                 $detalle = json_decode($snapRaw, true) ?: [];
             } elseif (is_array($snapRaw)) {
@@ -141,7 +135,6 @@ class StockCalculator
             }
 
             if (empty($detalle)) {
-                // Snapshot vacío o inválido → lo tratamos como sin snapshot
                 $salidasNoSnapRows[] = $row;
                 continue;
             }
@@ -160,20 +153,20 @@ class StockCalculator
             }
         }
 
-        // === 3) SALIDAS SIN snapshot: FIFO SOBRE LA COLA GLOBAL DE ENTRADAS,
-        //     PERO SOLO SI HAY STOCK SUFICIENTE PARA CUBRIR TODA LA SALIDA ===
+        // === 3) FIFO no-snapshot con trazabilidad por carga ===
         $consumoNoSnapByKey = [];
+        $salidasTrazadasPorCarga = []; // 🔹 NUEVO: detalle por carga_id
 
         foreach ($salidasNoSnapRows as $rowSalida) {
             $rest = (float) $rowSalida->cantidad;
             $fechaSalida = $rowSalida->fecha;
+            $cargaId = (int) $rowSalida->carga_id;
 
             if ($rest <= 0) {
                 continue;
             }
 
-            // 3.1) Calculamos cuánto stock FIFO queda disponible
-            //      en entradas con fecha <= fecha de la salida
+            // 3.1) Ver stock disponible en lotes anteriores a esta salida
             $stockDisponible = 0.0;
             foreach ($lotesFIFO as $lote) {
                 if ($lote['qty'] <= 0) {
@@ -185,15 +178,12 @@ class StockCalculator
                 $stockDisponible += $lote['qty'];
             }
 
-            // Si NO hay suficiente stock para cubrir toda la salida,
-            // NO consumimos nada por FIFO. Toda esa salida queda
-            // "sin trazabilidad" (solo cuenta en salidas_totales).
             if ($stockDisponible + 1e-6 < $rest) {
+                // No hay suficiente → no trazamos nada para esta salida
                 continue;
             }
 
-            // 3.2) Sí hay stock suficiente → aplicamos FIFO real
-            //      sobre los lotes con fecha <= fechaSalida
+            // 3.2) Sí hay stock suficiente → consumimos FIFO real
             for ($i = 0; $i < count($lotesFIFO) && $rest > 0; $i++) {
                 if ($lotesFIFO[$i]['qty'] <= 0) {
                     continue;
@@ -205,17 +195,24 @@ class StockCalculator
                 $usa = min($lotesFIFO[$i]['qty'], $rest);
                 $key = $lotesFIFO[$i]['key'];
 
+                // Agregado por combinación
                 $consumoNoSnapByKey[$key] = ($consumoNoSnapByKey[$key] ?? 0.0) + $usa;
+
+                // 🔹 Detalle por carga (para el informe de salidas)
+                [$certLabel, $espLabel] = explode('|', $key) + [null, null];
+
+                $salidasTrazadasPorCarga[$cargaId][] = [
+                    'certificacion' => $certLabel,
+                    'especie' => $espLabel,
+                    'cantidad' => $usa,
+                ];
 
                 $lotesFIFO[$i]['qty'] -= $usa;
                 $rest -= $usa;
             }
-
-            // Aquí, por construcción, $rest debería acabar en 0, porque
-            // ya hemos comprobado que stockDisponible >= cantidad de la salida.
         }
 
-        // === 4) AJUSTES MANUALES (regularizaciones) ===
+        // === 4) AJUSTES (igual que tenías) ===
         $ajustesRows = DB::table('ajustes_stock')
             ->where('almacen_intermedio_id', $almacen->id)
             ->select('certificacion', 'especie', DB::raw('SUM(delta_m3) as total'))
@@ -228,7 +225,7 @@ class StockCalculator
             $ajustesByKey[$key] = (float) $a->total;
         }
 
-        // === 5) SALIDAS finales = snapshot + FIFO sin snapshot trazable ===
+        // === 5) SALIDAS finales ===
         $salidasByKey = [];
         $allSalidaKeys = array_unique(array_merge(
             array_keys($salidasSnapshotByKey),
@@ -241,7 +238,7 @@ class StockCalculator
                 (float) ($consumoNoSnapByKey[$key] ?? 0.0);
         }
 
-        // === 6) DISPONIBLE = ENTRADAS - SALIDAS + AJUSTES ===
+        // === 6) DISPONIBLE ===
         $disponible = [];
         $allKeys = array_unique(array_merge(
             array_keys($entradasByKey),
@@ -254,16 +251,16 @@ class StockCalculator
             $out = (float) ($salidasByKey[$key] ?? 0.0);
             $adj = (float) ($ajustesByKey[$key] ?? 0.0);
 
-            // Si quieres ver negativos “cantosos”, quita el max(0.0, ...)
             $disponible[$key] = max(0.0, $in - $out + $adj);
         }
 
         return [
             'entradas' => $entradasByKey,
-            'salidas_total' => $salidasBrutas,   // TODAS las salidas (camiones)
-            'salidas' => $salidasByKey,    // detalle por cert|esp (solo las trazadas)
+            'salidas_total' => $salidasBrutas,
+            'salidas' => $salidasByKey,
             'ajustes' => $ajustesByKey,
-            'disponible' => $disponible,      // por cert|esp (con FIFO y ajustes)
+            'disponible' => $disponible,
+            'salidas_detalle_carga' => $salidasTrazadasPorCarga, // 🔹 NUEVO
         ];
     }
 
