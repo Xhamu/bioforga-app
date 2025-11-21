@@ -4,6 +4,7 @@
         $entradas = $salidas = collect();
         $resumenStock = collect();
         $globalStock = null;
+        $trazabilidadPorCarga = collect();
 
         // Helper especie
         $mapEspLabel = function (?string $raw): string {
@@ -25,7 +26,53 @@
                 'referencia',
             ];
 
-            $mapParte = function ($cargas) use ($mapEspLabel) {
+            // === RESUMEN STOCK (igual que PrioridadStock) + GLOBAL FIFO (volumen) ===
+            $almacen = \App\Models\AlmacenIntermedio::find($recordId);
+
+            if ($almacen) {
+                /** @var \App\Services\StockCalculator $calc */
+                $calc = app(\App\Services\StockCalculator::class);
+                $agg = $calc->calcular($almacen);
+
+                // Trazabilidad por carga (salidas sin snapshot resueltas por FIFO)
+                $trazabilidadPorCarga = collect($agg['salidas_detalle_carga'] ?? []);
+
+                // --- Detalle por combinación CERT|ESP (igual que ahora) ---
+                $keys = collect(array_keys($agg['entradas'] ?? []))
+                    ->merge(array_keys($agg['salidas'] ?? []))
+                    ->merge(array_keys($agg['ajustes'] ?? []))
+                    ->merge(array_keys($agg['disponible'] ?? []))
+                    ->unique();
+
+                $resumenStock = $keys->map(function ($key) use ($agg) {
+                    [$cert, $esp] = explode('|', $key) + [null, null];
+
+                    return (object) [
+                        'cert' => $cert ?: '—',
+                        'esp' => $esp ?: '—',
+                        'entradas' => (float) ($agg['entradas'][$key] ?? 0),
+                        'salidas' => (float) ($agg['salidas'][$key] ?? 0),
+                        'ajustes' => (float) ($agg['ajustes'][$key] ?? 0),
+                        'disponible' => (float) ($agg['disponible'][$key] ?? 0),
+                    ];
+                });
+
+                // --- RESUMEN GLOBAL coherente con PrioridadStock ---
+                $totalEntradas = (float) collect($agg['entradas'] ?? [])->sum();
+                $totalSalidasTotales = (float) ($agg['salidas_total'] ?? 0); // 🔹 TODAS las salidas
+                $totalAjustes = (float) collect($agg['ajustes'] ?? [])->sum();
+                $totalDispTrazado = (float) collect($agg['disponible'] ?? [])->sum(); // suma por cert|esp
+
+                $globalStock = (object) [
+                    'entradas' => $totalEntradas,
+                    'salidas_totales' => $totalSalidasTotales, // aquí ya van TODAS
+                    'ajustes' => $totalAjustes,
+                    'disponible_trazado' => $totalDispTrazado, // lo que sale de las combinaciones
+                    'disponible_real' => $totalEntradas - $totalSalidasTotales + $totalAjustes, // 🔹 lo que quieres
+                ];
+            }
+
+            $mapParte = function ($cargas) use ($mapEspLabel, $trazabilidadPorCarga) {
                 $parte = $cargas->first()->parteTrabajoSuministroTransporte;
 
                 $u = $parte?->usuario;
@@ -38,7 +85,7 @@
                     }
                 }
 
-                // === ESPECIE desde referencia o snapshot ===
+                // === ESPECIE desde referencia, snapshot o FIFO ===
                 $especies = collect();
 
                 // 1) Desde referencias vinculadas (producto_especie)
@@ -46,27 +93,36 @@
                 if ($especiesRef->isNotEmpty()) {
                     $especies = $especiesRef->map(fn($e) => $mapEspLabel($e))->unique()->values();
                 } else {
-                    // 2) Si no hay referencia: leer desde asignacion_cert_esp (string o array)
+                    // 2) Sin referencia: snapshot y/o trazabilidad FIFO
                     $esSnap = collect();
 
                     foreach ($cargas as $c) {
+                        // 2.a) Snapshot si existe
                         $snap = $c->asignacion_cert_esp;
 
-                        if (empty($snap)) {
-                            continue;
+                        if (!empty($snap)) {
+                            if (is_string($snap)) {
+                                $arr = json_decode($snap, true) ?: [];
+                            } elseif (is_array($snap)) {
+                                $arr = $snap;
+                            } else {
+                                $arr = [];
+                            }
+
+                            foreach ($arr as $a) {
+                                if (!empty($a['especie'])) {
+                                    $esSnap->push($a['especie']);
+                                }
+                            }
                         }
 
-                        if (is_string($snap)) {
-                            $arr = json_decode($snap, true) ?: [];
-                        } elseif (is_array($snap)) {
-                            $arr = $snap;
-                        } else {
-                            $arr = [];
-                        }
-
-                        foreach ($arr as $a) {
-                            if (!empty($a['especie'])) {
-                                $esSnap->push($a['especie']);
+                        // 2.b) Detalle FIFO por carga (salidas sin snapshot)
+                        if ($trazabilidadPorCarga->isNotEmpty()) {
+                            $det = collect($trazabilidadPorCarga->get($c->id, []));
+                            foreach ($det as $a) {
+                                if (!empty($a['especie'])) {
+                                    $esSnap->push($a['especie']);
+                                }
                             }
                         }
                     }
@@ -109,49 +165,6 @@
                 ->groupBy('parte_trabajo_suministro_transporte_id')
                 ->map($mapParte)
                 ->values();
-
-            // === RESUMEN STOCK (igual que PrioridadStock) + GLOBAL FIFO (volumen) ===
-            $almacen = \App\Models\AlmacenIntermedio::find($recordId);
-
-            if ($almacen) {
-                /** @var \App\Services\StockCalculator $calc */
-                $calc = app(\App\Services\StockCalculator::class);
-                $agg = $calc->calcular($almacen);
-
-                // --- Detalle por combinación CERT|ESP (igual que ahora) ---
-                $keys = collect(array_keys($agg['entradas'] ?? []))
-                    ->merge(array_keys($agg['salidas'] ?? []))
-                    ->merge(array_keys($agg['ajustes'] ?? []))
-                    ->merge(array_keys($agg['disponible'] ?? []))
-                    ->unique();
-
-                $resumenStock = $keys->map(function ($key) use ($agg) {
-                    [$cert, $esp] = explode('|', $key) + [null, null];
-
-                    return (object) [
-                        'cert' => $cert ?: '—',
-                        'esp' => $esp ?: '—',
-                        'entradas' => (float) ($agg['entradas'][$key] ?? 0),
-                        'salidas' => (float) ($agg['salidas'][$key] ?? 0),
-                        'ajustes' => (float) ($agg['ajustes'][$key] ?? 0),
-                        'disponible' => (float) ($agg['disponible'][$key] ?? 0),
-                    ];
-                });
-
-                // --- RESUMEN GLOBAL coherente con PrioridadStock ---
-                $totalEntradas = (float) collect($agg['entradas'] ?? [])->sum();
-                $totalSalidasTotales = (float) ($agg['salidas_total'] ?? 0); // 🔹 TODAS las salidas
-                $totalAjustes = (float) collect($agg['ajustes'] ?? [])->sum();
-                $totalDispTrazado = (float) collect($agg['disponible'] ?? [])->sum(); // suma por cert|esp
-
-                $globalStock = (object) [
-                    'entradas' => $totalEntradas,
-                    'salidas_totales' => $totalSalidasTotales, // aquí ya van TODAS
-                    'ajustes' => $totalAjustes,
-                    'disponible_trazado' => $totalDispTrazado, // lo que sale de las combinaciones
-                    'disponible_real' => $totalEntradas - $totalSalidasTotales + $totalAjustes, // 🔹 lo que quieres
-                ];
-            }
         }
 
         $fmt = fn($dt) => optional($dt)?->timezone('Europe/Madrid')->format('d/m/Y H:i');
