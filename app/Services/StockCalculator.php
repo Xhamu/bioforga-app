@@ -44,8 +44,8 @@ class StockCalculator
      */
     public function calcular(AlmacenIntermedio $almacen): array
     {
-        // ... ENTRADAS IGUAL QUE ANTES, solo que guardamos fecha en los lotesFIFO ...
-
+        // === 1) ENTRADAS: descargas en este almacén desde referencia ===
+        // Cada fila = un lote FIFO, con su timestamp real: pt.fecha_hora_descarga
         $entradasRows = DB::table('carga_transportes as ct')
             ->join(
                 'parte_trabajo_suministro_transportes as pt',
@@ -56,19 +56,20 @@ class StockCalculator
             ->join('referencias as r', 'r.id', '=', 'ct.referencia_id')
             ->whereNull('ct.deleted_at')
             ->whereNull('r.deleted_at')
-            ->where('pt.almacen_id', $almacen->id)
-            ->whereNull('pt.cliente_id')
-            ->whereNotNull('ct.referencia_id')
-            ->orderByRaw('ct.created_at asc, ct.id asc')
+            ->where('pt.almacen_id', $almacen->id)      // se DESCARGÓ en este almacén
+            ->whereNull('pt.cliente_id')                // no se descargó en cliente
+            ->whereNotNull('ct.referencia_id')          // venía de referencia
+            ->orderByRaw('pt.fecha_hora_descarga asc, ct.id asc')
             ->get([
                 'r.tipo_certificacion as cert_raw',
                 'r.producto_especie   as esp_raw',
                 'ct.cantidad',
-                'ct.created_at as fecha',
+                'pt.fecha_hora_descarga as evento_at',
+                'ct.created_at',
             ]);
 
         $entradasByKey = [];
-        $lotesFIFO = [];
+        $entradasLotes = []; // cola global de entradas, pero con ts para poder hacer FIFO temporal
 
         foreach ($entradasRows as $row) {
             $certLabel = $this->mapCertToLabel($row->cert_raw);
@@ -82,14 +83,17 @@ class StockCalculator
 
             $entradasByKey[$key] = ($entradasByKey[$key] ?? 0.0) + $qty;
 
-            $lotesFIFO[] = [
+            $ts = $row->evento_at ?? $row->created_at;
+
+            $entradasLotes[] = [
                 'key' => $key,
                 'qty' => $qty,
-                'fecha' => $row->fecha,
+                'ts' => $ts ? \Carbon\Carbon::parse($ts) : null,
             ];
         }
 
-        // === 2) SALIDAS (añadimos el id de la carga) ===
+        // === 2) TODAS LAS SALIDAS (origen almacén -> cliente) ===
+        // Usamos ct.fecha_hora_inicio_carga como timestamp real de la salida
         $salidasRows = DB::table('carga_transportes as ct')
             ->join(
                 'parte_trabajo_suministro_transportes as pt',
@@ -100,17 +104,19 @@ class StockCalculator
             ->whereNull('ct.deleted_at')
             ->where('ct.almacen_id', $almacen->id)
             ->whereNotNull('pt.cliente_id')
-            ->orderByRaw('ct.created_at asc, ct.id asc')
+            ->orderByRaw('ct.fecha_hora_inicio_carga asc, ct.id asc')
             ->get([
-                'ct.id as carga_id',
+                'ct.id',
                 'ct.cantidad',
                 'ct.asignacion_cert_esp',
-                'ct.created_at as fecha',
+                'ct.fecha_hora_inicio_carga as evento_at',
+                'ct.created_at',
             ]);
 
         $salidasSnapshotByKey = [];
-        $salidasNoSnapRows = [];
-        $salidasBrutas = 0.0;
+        $salidasNoSnapEvents = [];   // cada elemento: ['qty' => ..., 'ts' => Carbon|null]
+
+        $salidasBrutas = 0.0; // 🔹 TODAS las salidas (para el resumen global)
 
         foreach ($salidasRows as $row) {
             $qty = (float) $row->cantidad;
@@ -119,10 +125,17 @@ class StockCalculator
             }
 
             $salidasBrutas += $qty;
-            $snapRaw = $row->asignacion_cert_esp;
 
+            $snapRaw = $row->asignacion_cert_esp;
+            $ts = $row->evento_at ?? $row->created_at;
+            $ts = $ts ? \Carbon\Carbon::parse($ts) : null;
+
+            // === Sin snapshot o snapshot vacío -> van a FIFO temporal ===
             if (is_null($snapRaw) || $snapRaw === '') {
-                $salidasNoSnapRows[] = $row;
+                $salidasNoSnapEvents[] = [
+                    'qty' => $qty,
+                    'ts' => $ts,
+                ];
                 continue;
             }
 
@@ -135,10 +148,15 @@ class StockCalculator
             }
 
             if (empty($detalle)) {
-                $salidasNoSnapRows[] = $row;
+                // snapshot inválido o vacío -> lo tratamos como "sin snapshot"
+                $salidasNoSnapEvents[] = [
+                    'qty' => $qty,
+                    'ts' => $ts,
+                ];
                 continue;
             }
 
+            // === Con snapshot: sumamos por CERT|ESP directamente ===
             foreach ($detalle as $a) {
                 $cert = strtoupper(trim((string) ($a['certificacion'] ?? '')));
                 $esp = strtoupper(trim((string) ($a['especie'] ?? '')));
@@ -153,66 +171,80 @@ class StockCalculator
             }
         }
 
-        // === 3) FIFO no-snapshot con trazabilidad por carga ===
+        // Por si acaso, ordenamos las salidas sin snapshot por fecha (aunque la query ya viene ordenada)
+        usort($salidasNoSnapEvents, function ($a, $b) {
+            if ($a['ts'] === null && $b['ts'] === null) {
+                return 0;
+            }
+            if ($a['ts'] === null) {
+                return 1; // null al final
+            }
+            if ($b['ts'] === null) {
+                return -1;
+            }
+            return $a['ts']->timestamp <=> $b['ts']->timestamp;
+        });
+
+        // === 3) SALIDAS SIN snapshot: FIFO TEMPORAL ===
+        // Solo usamos entradas con ts <= ts de la salida.
         $consumoNoSnapByKey = [];
-        $salidasTrazadasPorCarga = []; // 🔹 NUEVO: detalle por carga_id
+        $fifo = [];
+        $idxEntrada = 0;
+        $numEntradas = count($entradasLotes);
 
-        foreach ($salidasNoSnapRows as $rowSalida) {
-            $rest = (float) $rowSalida->cantidad;
-            $fechaSalida = $rowSalida->fecha;
-            $cargaId = (int) $rowSalida->carga_id;
-
+        foreach ($salidasNoSnapEvents as $ev) {
+            $rest = (float) $ev['qty'];
             if ($rest <= 0) {
                 continue;
             }
 
-            // 3.1) Ver stock disponible en lotes anteriores a esta salida
-            $stockDisponible = 0.0;
-            foreach ($lotesFIFO as $lote) {
-                if ($lote['qty'] <= 0) {
-                    continue;
+            $tsSalida = $ev['ts'];
+
+            // Cargamos en la FIFO las entradas que hayan ocurrido ANTES (o igual) que esta salida
+            while ($idxEntrada < $numEntradas) {
+                $entrada = $entradasLotes[$idxEntrada];
+                $tsEntrada = $entrada['ts'];
+
+                // Si la entrada tiene ts y es POSTERIOR a la salida, paramos
+                if ($tsSalida && $tsEntrada && $tsEntrada->gt($tsSalida)) {
+                    break;
                 }
-                if ($lote['fecha'] > $fechaSalida) {
-                    continue;
-                }
-                $stockDisponible += $lote['qty'];
+
+                // Si no tenemos ts en la entrada, la consideramos "antigua" y la cargamos igualmente
+                $fifo[] = [
+                    'key' => $entrada['key'],
+                    'qty' => $entrada['qty'],
+                ];
+                $idxEntrada++;
             }
 
-            if ($stockDisponible + 1e-6 < $rest) {
-                // No hay suficiente → no trazamos nada para esta salida
-                continue;
-            }
-
-            // 3.2) Sí hay stock suficiente → consumimos FIFO real
-            for ($i = 0; $i < count($lotesFIFO) && $rest > 0; $i++) {
-                if ($lotesFIFO[$i]['qty'] <= 0) {
-                    continue;
-                }
-                if ($lotesFIFO[$i]['fecha'] > $fechaSalida) {
+            // Ahora consumimos desde la FIFO (solo tiene entradas previas a esta salida)
+            $i = 0;
+            while ($rest > 0 && $i < count($fifo)) {
+                if ($fifo[$i]['qty'] <= 0) {
+                    $i++;
                     continue;
                 }
 
-                $usa = min($lotesFIFO[$i]['qty'], $rest);
-                $key = $lotesFIFO[$i]['key'];
+                $usa = min($fifo[$i]['qty'], $rest);
+                $key = $fifo[$i]['key'];
 
-                // Agregado por combinación
                 $consumoNoSnapByKey[$key] = ($consumoNoSnapByKey[$key] ?? 0.0) + $usa;
 
-                // 🔹 Detalle por carga (para el informe de salidas)
-                [$certLabel, $espLabel] = explode('|', $key) + [null, null];
-
-                $salidasTrazadasPorCarga[$cargaId][] = [
-                    'certificacion' => $certLabel,
-                    'especie' => $espLabel,
-                    'cantidad' => $usa,
-                ];
-
-                $lotesFIFO[$i]['qty'] -= $usa;
+                $fifo[$i]['qty'] -= $usa;
                 $rest -= $usa;
+
+                if ($fifo[$i]['qty'] <= 1e-6) {
+                    $i++;
+                }
             }
+
+            // ⚠️ Si queda $rest > 0 aquí, significa que han salido más m³ sin snapshot
+            // de los que habían entrado (hasta ese momento) -> ese sobrante queda SIN traza.
+            // Cuenta en $salidasBrutas, pero NO se reparte por combinaciones CERT|ESP.
         }
 
-        // === 4) AJUSTES (igual que tenías) ===
+        // === 4) AJUSTES MANUALES ===
         $ajustesRows = DB::table('ajustes_stock')
             ->where('almacen_intermedio_id', $almacen->id)
             ->select('certificacion', 'especie', DB::raw('SUM(delta_m3) as total'))
@@ -225,7 +257,7 @@ class StockCalculator
             $ajustesByKey[$key] = (float) $a->total;
         }
 
-        // === 5) SALIDAS finales ===
+        // === 5) SALIDAS finales = snapshot + FIFO sin snapshot ===
         $salidasByKey = [];
         $allSalidaKeys = array_unique(array_merge(
             array_keys($salidasSnapshotByKey),
@@ -238,7 +270,7 @@ class StockCalculator
                 (float) ($consumoNoSnapByKey[$key] ?? 0.0);
         }
 
-        // === 6) DISPONIBLE ===
+        // === 6) DISPONIBLE = ENTRADAS - SALIDAS + AJUSTES ===
         $disponible = [];
         $allKeys = array_unique(array_merge(
             array_keys($entradasByKey),
@@ -251,16 +283,16 @@ class StockCalculator
             $out = (float) ($salidasByKey[$key] ?? 0.0);
             $adj = (float) ($ajustesByKey[$key] ?? 0.0);
 
+            // Si quieres ver negativos para cazarlos, puedes quitar el max(0.0, ...)
             $disponible[$key] = max(0.0, $in - $out + $adj);
         }
 
         return [
             'entradas' => $entradasByKey,
-            'salidas_total' => $salidasBrutas,
-            'salidas' => $salidasByKey,
+            'salidas_total' => $salidasBrutas,   // 🔹 TODAS las salidas (camiones)
+            'salidas' => $salidasByKey,    // detalle por cert|esp (trazadas)
             'ajustes' => $ajustesByKey,
-            'disponible' => $disponible,
-            'salidas_detalle_carga' => $salidasTrazadasPorCarga, // 🔹 NUEVO
+            'disponible' => $disponible,      // por cert|esp (con FIFO y ajustes)
         ];
     }
 

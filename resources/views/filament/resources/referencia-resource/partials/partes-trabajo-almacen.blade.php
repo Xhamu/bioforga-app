@@ -255,6 +255,7 @@
                 ->get()
                 ->groupBy('parte_trabajo_suministro_transporte_id')
                 ->map($mapParte)
+                ->sortBy('inicio')
                 ->values();
 
             // === SALIDAS === (desde este almacén → cliente)
@@ -265,6 +266,7 @@
                 ->get()
                 ->groupBy('parte_trabajo_suministro_transporte_id')
                 ->map($mapParte)
+                ->sortBy('inicio')
                 ->values();
         }
 
