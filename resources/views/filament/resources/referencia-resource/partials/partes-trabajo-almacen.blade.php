@@ -6,6 +6,30 @@
         $globalStock = null;
         $trazabilidadPorCarga = collect();
 
+        // Helper certificación
+        $mapCertLabel = function (?string $raw): string {
+            $raw = trim($raw ?? '');
+
+            if ($raw === '') {
+                return '—';
+            }
+
+            // Reemplazar guiones bajos por espacios
+            $normalized = str_replace('_', ' ', $raw);
+
+            // Colapsar espacios múltiples
+            $normalized = preg_replace('/\s+/', ' ', $normalized);
+
+            // Pasar a mayúsculas
+            $normalized = mb_strtoupper($normalized, 'UTF-8');
+
+            // Correcciones específicas de typos conocidos
+            $normalized = str_replace('SURE INDUESTRIAL', 'SURE INDUSTRIAL', $normalized);
+            $normalized = str_replace('SURE FORESAL', 'SURE FORESTAL', $normalized);
+
+            return $normalized;
+        };
+
         // Helper especie
         $mapEspLabel = function (?string $raw): string {
             $raw = strtolower(trim($raw ?? ''));
@@ -35,6 +59,7 @@
                 $agg = $calc->calcular($almacen);
 
                 // Trazabilidad por carga (salidas sin snapshot resueltas por FIFO)
+                // Formato esperado: [ carga_id => [ ['certificacion' => '...', 'especie' => '...', 'cantidad' => ...], ... ] ]
                 $trazabilidadPorCarga = collect($agg['salidas_detalle_carga'] ?? []);
 
                 // --- Detalle por combinación CERT|ESP (igual que ahora) ---
@@ -59,20 +84,28 @@
 
                 // --- RESUMEN GLOBAL coherente con PrioridadStock ---
                 $totalEntradas = (float) collect($agg['entradas'] ?? [])->sum();
-                $totalSalidasTotales = (float) ($agg['salidas_total'] ?? 0); // 🔹 TODAS las salidas
+                $totalSalidasTotales = (float) ($agg['salidas_total'] ?? 0); // 🔹 TODAS las salidas (con y sin snapshot)
                 $totalAjustes = (float) collect($agg['ajustes'] ?? [])->sum();
                 $totalDispTrazado = (float) collect($agg['disponible'] ?? [])->sum(); // suma por cert|esp
 
                 $globalStock = (object) [
                     'entradas' => $totalEntradas,
-                    'salidas_totales' => $totalSalidasTotales, // aquí ya van TODAS
+                    'salidas_totales' => $totalSalidasTotales,
                     'ajustes' => $totalAjustes,
-                    'disponible_trazado' => $totalDispTrazado, // lo que sale de las combinaciones
-                    'disponible_real' => $totalEntradas - $totalSalidasTotales + $totalAjustes, // 🔹 lo que quieres
+                    'disponible_trazado' => $totalDispTrazado,
+                    'disponible_real' => $totalEntradas - $totalSalidasTotales + $totalAjustes,
                 ];
             }
 
-            $mapParte = function ($cargas) use ($mapEspLabel, $trazabilidadPorCarga) {
+            /**
+             * Mapea un grupo de cargas de un parte (tanto entrada como salida)
+             * y construye: fecha, refs, transportista, cliente, cantidad_total
+             * y combo de "Certificación / Especie" usando:
+             *  - Referencias (tipo_certificacion + producto_especie)
+             *  - o snapshot
+             *  - o trazabilidad FIFO por carga (salidas sin snapshot)
+             */
+            $mapParte = function ($cargas) use ($mapEspLabel, $mapCertLabel, $trazabilidadPorCarga) {
                 $parte = $cargas->first()->parteTrabajoSuministroTransporte;
 
                 $u = $parte?->usuario;
@@ -85,16 +118,45 @@
                     }
                 }
 
-                // === ESPECIE desde referencia, snapshot o FIFO ===
-                $especies = collect();
+                // === CERTIFICACIÓN + ESPECIE ===
+                $combos = collect();
 
-                // 1) Desde referencias vinculadas (producto_especie)
-                $especiesRef = $cargas->pluck('referencia.producto_especie')->filter();
-                if ($especiesRef->isNotEmpty()) {
-                    $especies = $especiesRef->map(fn($e) => $mapEspLabel($e))->unique()->values();
+                // 1) Desde referencias vinculadas
+                $tieneReferencias = $cargas->pluck('referencia')->filter()->isNotEmpty();
+
+                if ($tieneReferencias) {
+                    foreach ($cargas as $c) {
+                        $ref = $c->referencia;
+                        if (!$ref) {
+                            continue;
+                        }
+
+                        $certRaw = $ref->tipo_certificacion ?? null;
+                        $espRaw = $ref->producto_especie ?? null;
+
+                        $cert = $mapCertLabel($certRaw);
+                        $esp = $mapEspLabel($espRaw);
+
+                        // Evitamos meter "— —" si no hay nada
+                        if ($cert === '—' && $esp === '—') {
+                            continue;
+                        }
+
+                        if ($cert === '—') {
+                            $cert = '';
+                        }
+                        if ($esp === '—') {
+                            $esp = '';
+                        }
+
+                        $texto = trim($cert . ' ' . $esp);
+                        if ($texto !== '') {
+                            $combos->push($texto);
+                        }
+                    }
                 } else {
-                    // 2) Sin referencia: snapshot y/o trazabilidad FIFO
-                    $esSnap = collect();
+                    // 2) Sin referencia: snapshot + trazabilidad FIFO
+                    $combosSnap = collect();
 
                     foreach ($cargas as $c) {
                         // 2.a) Snapshot si existe
@@ -110,27 +172,66 @@
                             }
 
                             foreach ($arr as $a) {
-                                if (!empty($a['especie'])) {
-                                    $esSnap->push($a['especie']);
+                                $certRaw = $a['certificacion'] ?? null;
+                                $espRaw = $a['especie'] ?? null;
+
+                                $cert = $mapCertLabel($certRaw);
+                                $esp = $mapEspLabel($espRaw);
+
+                                if ($cert === '—' && $esp === '—') {
+                                    continue;
+                                }
+
+                                if ($cert === '—') {
+                                    $cert = '';
+                                }
+                                if ($esp === '—') {
+                                    $esp = '';
+                                }
+
+                                $texto = trim($cert . ' ' . $esp);
+                                if ($texto !== '') {
+                                    $combosSnap->push($texto);
                                 }
                             }
                         }
 
-                        // 2.b) Detalle FIFO por carga (salidas sin snapshot)
+                        // 2.b) Detalle FIFO por carga (para salidas sin snapshot)
                         if ($trazabilidadPorCarga->isNotEmpty()) {
                             $det = collect($trazabilidadPorCarga->get($c->id, []));
                             foreach ($det as $a) {
-                                if (!empty($a['especie'])) {
-                                    $esSnap->push($a['especie']);
+                                $certRaw = $a['certificacion'] ?? null;
+                                $espRaw = $a['especie'] ?? null;
+
+                                $cert = $mapCertLabel($certRaw);
+                                $esp = $mapEspLabel($espRaw);
+
+                                if ($cert === '—' && $esp === '—') {
+                                    continue;
+                                }
+
+                                if ($cert === '—') {
+                                    $cert = '';
+                                }
+                                if ($esp === '—') {
+                                    $esp = '';
+                                }
+
+                                $texto = trim($cert . ' ' . $esp);
+                                if ($texto !== '') {
+                                    $combosSnap->push($texto);
                                 }
                             }
                         }
                     }
 
-                    if ($esSnap->isNotEmpty()) {
-                        $especies = $esSnap->map(fn($e) => $mapEspLabel($e))->unique()->values();
+                    if ($combosSnap->isNotEmpty()) {
+                        $combos = $combosSnap;
                     }
                 }
+
+                $combos = $combos->unique()->values();
+                $certEspTexto = $combos->isNotEmpty() ? $combos->implode(', ') : '—';
 
                 return (object) [
                     'inicio' => $cargas->min('fecha_hora_inicio_carga'),
@@ -139,7 +240,7 @@
                     'cliente' => $parte?->cliente?->razon_social ?? '—',
                     'referencias' => $cargas->pluck('referencia.referencia')->filter()->unique()->values(),
                     'transportista' => $transportista,
-                    'especie' => $especies->implode(', ') ?: '—',
+                    'cert_esp' => $certEspTexto, // ⬅️ "CERTIFICACIÓN ESPECIE"
                 ];
             };
 
@@ -156,7 +257,7 @@
                 ->map($mapParte)
                 ->values();
 
-            // === SALIDAS === (desde este almacén → cliente) [criterio visual del informe]
+            // === SALIDAS === (desde este almacén → cliente)
             $salidas = \App\Models\CargaTransporte::with($with)
                 ->whereNull('deleted_at')
                 ->where('almacen_id', $recordId)
@@ -213,11 +314,7 @@
             <p>Entradas totales: {{ $fmtNum($globalStock->entradas) }} m³</p>
             <p>Salidas totales (todas): {{ $fmtNum($globalStock->salidas_totales) }} m³</p>
             <p>Ajustes: {{ $fmtNum($globalStock->ajustes) }} m³</p>
-
-            {{-- Disponible trazado (suma de combinaciones cert/especie, útil para PrioridadStock) --}}
             <p>Disponible trazado (por combinaciones): {{ $fmtNum($globalStock->disponible_trazado) }} m³</p>
-
-            {{-- Disponible REAL contando todas las salidas, que es lo que tú quieres ver --}}
             <p class="font-semibold">
                 Disponible real (Entradas - Salidas totales + Ajustes):
                 {{ $fmtNum($globalStock->disponible_real) }} m³
@@ -239,7 +336,7 @@
                         <th class="px-4 py-3 text-left font-medium text-gray-700">Fecha (Inicio - Fin)</th>
                         <th class="px-4 py-3 text-left font-medium text-gray-700">Referencia de origen</th>
                         <th class="px-4 py-3 text-left font-medium text-gray-700">Transportista</th>
-                        <th class="px-4 py-3 text-left font-medium text-gray-700">Especie</th>
+                        <th class="px-4 py-3 text-left font-medium text-gray-700">Certificación / Especie</th>
                         <th class="px-4 py-3 text-left font-medium text-gray-700">Cantidad (m³)</th>
                     </tr>
                 </thead>
@@ -256,7 +353,7 @@
                                 {{ $p->transportista }}
                             </td>
                             <td class="px-4 py-3 text-gray-800">
-                                {{ $p->especie }}
+                                {{ $p->cert_esp }}
                             </td>
                             <td class="px-4 py-3 text-gray-800">
                                 {{ $fmtNum($p->cantidad_total) }}
@@ -274,7 +371,7 @@
                     <p><span class="font-semibold">Fecha:</span> {{ $fmt($p->inicio) }} - {{ $fmt($p->fin) }}</p>
                     <p><span class="font-semibold">Referencia:</span> {{ $p->referencias->implode(', ') ?: 'N/D' }}</p>
                     <p><span class="font-semibold">Transportista:</span> {{ $p->transportista }}</p>
-                    <p><span class="font-semibold">Especie:</span> {{ $p->especie }}</p>
+                    <p><span class="font-semibold">Certificación / Especie:</span> {{ $p->cert_esp }}</p>
                     <p><span class="font-semibold">Cantidad:</span>
                         {{ $fmtNum($p->cantidad_total) }} m³</p>
                 </div>
@@ -294,7 +391,7 @@
                     <tr>
                         <th class="px-4 py-3 text-left font-medium text-gray-700">Fecha (Inicio - Fin)</th>
                         <th class="px-4 py-3 text-left font-medium text-gray-700">Transportista</th>
-                        <th class="px-4 py-3 text-left font-medium text-gray-700">Especie</th>
+                        <th class="px-4 py-3 text-left font-medium text-gray-700">Certificación / Especie</th>
                         <th class="px-4 py-3 text-left font-medium text-gray-700">Cantidad (m³)</th>
                         <th class="px-4 py-3 text-left font-medium text-gray-700">Destino</th>
                     </tr>
@@ -309,7 +406,7 @@
                                 {{ $p->transportista }}
                             </td>
                             <td class="px-4 py-3 text-gray-800">
-                                {{ $p->especie }}
+                                {{ $p->cert_esp }}
                             </td>
                             <td class="px-4 py-3 text-gray-800">
                                 {{ $fmtNum($p->cantidad_total) }}
@@ -329,7 +426,7 @@
                 <div class="rounded-xl border border-gray-300 bg-white shadow-sm p-4">
                     <p><span class="font-semibold">Fecha:</span> {{ $fmt($p->inicio) }} - {{ $fmt($p->fin) }}</p>
                     <p><span class="font-semibold">Transportista:</span> {{ $p->transportista }}</p>
-                    <p><span class="font-semibold">Especie:</span> {{ $p->especie }}</p>
+                    <p><span class="font-semibold">Certificación / Especie:</span> {{ $p->cert_esp }}</p>
                     <p><span class="font-semibold">Cantidad:</span>
                         {{ $fmtNum($p->cantidad_total) }} m³</p>
                     <p><span class="font-semibold">Destino:</span> {{ $p->cliente }}</p>
