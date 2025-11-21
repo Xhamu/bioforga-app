@@ -68,7 +68,7 @@ class StockCalculator
             ]);
 
         $entradasByKey = [];
-        $lotesFIFO = []; // cola global FIFO
+        $lotesFIFO = []; // cola global FIFO con fecha
 
         foreach ($entradasRows as $row) {
             $certLabel = $this->mapCertToLabel($row->cert_raw);
@@ -85,6 +85,7 @@ class StockCalculator
             $lotesFIFO[] = [
                 'key' => $key,
                 'qty' => $qty,
+                'fecha' => $row->created_at,   // 🔹 guardamos cuándo entró este lote
             ];
         }
 
@@ -103,12 +104,16 @@ class StockCalculator
             ->where('ct.almacen_id', $almacen->id)
             ->whereNotNull('pt.cliente_id')
             ->orderByRaw('ct.created_at asc, ct.id asc')
-            ->get(['ct.cantidad', 'ct.asignacion_cert_esp']);
+            ->get([
+                'ct.cantidad',
+                'ct.asignacion_cert_esp',
+                'ct.created_at as salida_at',   // 🔹 fecha de la salida
+            ]);
 
         $salidasSnapshotByKey = [];
-        $salidasNoSnapQuantities = [];
+        $salidasNoSnapRows = [];
 
-        $salidasBrutas = 0.0; // 🔹 NUEVO: acumula TODO lo que sale
+        $salidasBrutas = 0.0; // 🔹 TODAS las salidas (para el resumen global)
 
         foreach ($salidasRows as $row) {
             $qty = (float) $row->cantidad;
@@ -122,7 +127,11 @@ class StockCalculator
             $snapRaw = $row->asignacion_cert_esp;
 
             if (is_null($snapRaw) || $snapRaw === '') {
-                $salidasNoSnapQuantities[] = $qty;
+                // Sin snapshot → FIFO por fecha
+                $salidasNoSnapRows[] = (object) [
+                    'cantidad' => $qty,
+                    'salida_at' => $row->salida_at,
+                ];
                 continue;
             }
 
@@ -135,7 +144,10 @@ class StockCalculator
             }
 
             if (empty($detalle)) {
-                $salidasNoSnapQuantities[] = $qty;
+                $salidasNoSnapRows[] = (object) [
+                    'cantidad' => $qty,
+                    'salida_at' => $row->salida_at,
+                ];
                 continue;
             }
 
@@ -153,25 +165,36 @@ class StockCalculator
             }
         }
 
-        // === 3) SALIDAS SIN snapshot: FIFO SOBRE LA COLA GLOBAL DE ENTRADAS ===
+        // === 3) SALIDAS SIN snapshot: FIFO SOBRE LA COLA GLOBAL DE ENTRADAS (por fecha) ===
         $consumoNoSnapByKey = [];
         $idxLote = 0;
 
-        foreach ($salidasNoSnapQuantities as $cantSalida) {
-            $rest = (float) $cantSalida;
+        foreach ($salidasNoSnapRows as $s) {
+            $rest = (float) $s->cantidad;
+            $salidaAt = $s->salida_at;
+
             if ($rest <= 0) {
                 continue;
             }
 
             // FIFO global: lo primero que entra es lo primero que sale
+            // pero solo usamos lotes cuya fecha <= fecha de la salida
             while ($rest > 0 && $idxLote < count($lotesFIFO)) {
-                if ($lotesFIFO[$idxLote]['qty'] <= 0) {
+                $lote = $lotesFIFO[$idxLote];
+
+                // Si el lote entra DESPUÉS de la salida, no se puede usar aún.
+                if ($lote['fecha'] > $salidaAt) {
+                    // No hay más lotes "disponibles" cronológicamente para esta salida.
+                    break;
+                }
+
+                if ($lote['qty'] <= 0) {
                     $idxLote++;
                     continue;
                 }
 
-                $usa = min($lotesFIFO[$idxLote]['qty'], $rest);
-                $key = $lotesFIFO[$idxLote]['key'];
+                $usa = min($lote['qty'], $rest);
+                $key = $lote['key'];
 
                 $consumoNoSnapByKey[$key] = ($consumoNoSnapByKey[$key] ?? 0.0) + $usa;
 
@@ -183,27 +206,14 @@ class StockCalculator
                 }
             }
 
-            // 🔹 Fallback: si queda resto sin lotes FIFO, lo atribuimos a la "última" entrada conocida
-            if ($rest > 0) {
-                $fallbackKey = null;
-
-                // Preferimos el último lote consumido (idxLote - 1)
-                if ($idxLote > 0 && isset($lotesFIFO[$idxLote - 1])) {
-                    $fallbackKey = $lotesFIFO[$idxLote - 1]['key'];
-                } elseif (!empty($lotesFIFO)) {
-                    // Si no, cogemos el último lote definido en la cola
-                    $lastIndex = array_key_last($lotesFIFO);
-                    $fallbackKey = $lotesFIFO[$lastIndex]['key'];
-                }
-
-                if ($fallbackKey) {
-                    $consumoNoSnapByKey[$fallbackKey] = ($consumoNoSnapByKey[$fallbackKey] ?? 0.0) + $rest;
-                    $rest = 0.0;
-                }
-            }
+            // ⚠️ Si aquí queda $rest > 0:
+            // - Había menos stock trazable (hasta esa fecha) que lo que ha salido.
+            // - Ese resto sigue contando en $salidasBrutas, pero NO se asigna a ninguna CERT|ESP.
+            //   Queda como "salida sin trazabilidad", visible en:
+            //   - diferencia entre disponible trazado vs disponible real.
         }
 
-        // === 4) AJUSTES MANUALES ===
+        // === 4) AJUSTES MANUALES (regularizaciones) ===
         $ajustesRows = DB::table('ajustes_stock')
             ->where('almacen_intermedio_id', $almacen->id)
             ->select('certificacion', 'especie', DB::raw('SUM(delta_m3) as total'))
@@ -242,7 +252,6 @@ class StockCalculator
             $out = (float) ($salidasByKey[$key] ?? 0.0);
             $adj = (float) ($ajustesByKey[$key] ?? 0.0);
 
-            // Si quieres ver negativos para cazarlos, puedes quitar el max(0.0, ...)
             $disponible[$key] = max(0.0, $in - $out + $adj);
         }
 
@@ -251,7 +260,7 @@ class StockCalculator
             'salidas_total' => $salidasBrutas,   // 🔹 TODAS las salidas (camiones)
             'salidas' => $salidasByKey,    // detalle por cert|esp (trazadas)
             'ajustes' => $ajustesByKey,
-            'disponible' => $disponible,      // por cert|esp (con FIFO y ajustes)
+            'disponible' => $disponible,      // por cert|esp (con FIFO + ajustes)
         ];
     }
 
