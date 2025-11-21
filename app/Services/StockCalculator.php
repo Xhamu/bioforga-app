@@ -114,9 +114,9 @@ class StockCalculator
             ]);
 
         $salidasSnapshotByKey = [];
-        $salidasNoSnapEvents = [];   // cada elemento: ['qty' => ..., 'ts' => Carbon|null]
-
-        $salidasBrutas = 0.0; // 🔹 TODAS las salidas (para el resumen global)
+        $salidasNoSnapEvents = [];   // cada elemento: ['id' => ..., 'qty' => ..., 'ts' => Carbon|null]
+        $salidasBrutas = 0.0;        // 🔹 TODAS las salidas (para el resumen global)
+        $salidasDetallePorCarga = []; // 🔹 detalle por carga: [ carga_id => [ ['certificacion'=>..., 'especie'=>..., 'cantidad'=>...], ... ] ]
 
         foreach ($salidasRows as $row) {
             $qty = (float) $row->cantidad;
@@ -133,6 +133,7 @@ class StockCalculator
             // === Sin snapshot o snapshot vacío -> van a FIFO temporal ===
             if (is_null($snapRaw) || $snapRaw === '') {
                 $salidasNoSnapEvents[] = [
+                    'id' => $row->id,
                     'qty' => $qty,
                     'ts' => $ts,
                 ];
@@ -150,13 +151,15 @@ class StockCalculator
             if (empty($detalle)) {
                 // snapshot inválido o vacío -> lo tratamos como "sin snapshot"
                 $salidasNoSnapEvents[] = [
+                    'id' => $row->id,
                     'qty' => $qty,
                     'ts' => $ts,
                 ];
                 continue;
             }
 
-            // === Con snapshot: sumamos por CERT|ESP directamente ===
+            // === Con snapshot: sumamos por CERT|ESP directamente
+            // y guardamos el detalle por carga ===
             foreach ($detalle as $a) {
                 $cert = strtoupper(trim((string) ($a['certificacion'] ?? '')));
                 $esp = strtoupper(trim((string) ($a['especie'] ?? '')));
@@ -168,6 +171,13 @@ class StockCalculator
 
                 $key = "{$cert}|{$esp}";
                 $salidasSnapshotByKey[$key] = ($salidasSnapshotByKey[$key] ?? 0.0) + $q;
+
+                // Detalle por carga (para la vista)
+                $salidasDetallePorCarga[$row->id][] = [
+                    'certificacion' => $cert,
+                    'especie' => $esp,
+                    'cantidad' => $q,
+                ];
             }
         }
 
@@ -199,6 +209,7 @@ class StockCalculator
             }
 
             $tsSalida = $ev['ts'];
+            $detalleEvento = []; // 🔹 aquí acumulamos qué CERT|ESP sale en esta salida concreta
 
             // Cargamos en la FIFO las entradas que hayan ocurrido ANTES (o igual) que esta salida
             while ($idxEntrada < $numEntradas) {
@@ -229,7 +240,11 @@ class StockCalculator
                 $usa = min($fifo[$i]['qty'], $rest);
                 $key = $fifo[$i]['key'];
 
+                // Acumulado global por combinación
                 $consumoNoSnapByKey[$key] = ($consumoNoSnapByKey[$key] ?? 0.0) + $usa;
+
+                // Detalle para ESTA salida concreta
+                $detalleEvento[$key] = ($detalleEvento[$key] ?? 0.0) + $usa;
 
                 $fifo[$i]['qty'] -= $usa;
                 $rest -= $usa;
@@ -239,9 +254,23 @@ class StockCalculator
                 }
             }
 
+            // Si hay detalle FIFO para esta salida, lo guardamos por carga
+            if (!empty($detalleEvento)) {
+                foreach ($detalleEvento as $key => $cant) {
+                    [$cert, $esp] = explode('|', $key) + [null, null];
+
+                    $salidasDetallePorCarga[$ev['id']][] = [
+                        'certificacion' => $cert ?? '',
+                        'especie' => $esp ?? '',
+                        'cantidad' => $cant,
+                    ];
+                }
+            }
+
             // ⚠️ Si queda $rest > 0 aquí, significa que han salido más m³ sin snapshot
             // de los que habían entrado (hasta ese momento) -> ese sobrante queda SIN traza.
-            // Cuenta en $salidasBrutas, pero NO se reparte por combinaciones CERT|ESP.
+            // Cuenta en $salidasBrutas, pero NO se reparte por combinaciones CERT|ESP
+            // ni se incluye en $salidasDetallePorCarga.
         }
 
         // === 4) AJUSTES MANUALES ===
@@ -289,10 +318,11 @@ class StockCalculator
 
         return [
             'entradas' => $entradasByKey,
-            'salidas_total' => $salidasBrutas,   // 🔹 TODAS las salidas (camiones)
-            'salidas' => $salidasByKey,    // detalle por cert|esp (trazadas)
+            'salidas_total' => $salidasBrutas,        // 🔹 TODAS las salidas (camiones)
+            'salidas' => $salidasByKey,         // detalle por cert|esp (trazadas)
             'ajustes' => $ajustesByKey,
-            'disponible' => $disponible,      // por cert|esp (con FIFO y ajustes)
+            'disponible' => $disponible,           // por cert|esp (con FIFO y ajustes)
+            'salidas_detalle_carga' => $salidasDetallePorCarga, // 🔹 NUEVO: detalle por ct.id (snapshot + FIFO)
         ];
     }
 
