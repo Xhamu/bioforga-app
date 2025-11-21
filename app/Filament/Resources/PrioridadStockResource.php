@@ -333,6 +333,7 @@ class PrioridadStockResource extends Resource
                         /** @var StockCalculator $calc */
                         $calc = app(StockCalculator::class);
                         $m3 = (float) $calc->disponiblePara($r->almacen, $r->certificacion, $r->especie);
+
                         return number_format($m3, 2, ',', '.');
                     })
                     ->badge()
@@ -340,6 +341,7 @@ class PrioridadStockResource extends Resource
                         /** @var StockCalculator $calc */
                         $calc = app(StockCalculator::class);
                         $m3 = (float) $calc->disponiblePara($r->almacen, $r->certificacion, $r->especie);
+
                         return $m3 <= 0 ? 'danger' : 'success';
                     })
                     ->tooltip(function (PrioridadStock $r) {
@@ -354,20 +356,34 @@ class PrioridadStockResource extends Resource
 
                         $fmt = fn($n) => number_format((float) $n, 2, ',', '.');
 
-                        // Totales por combinación (mismo origen que PrioridadStock)
                         $totalEntradas = (float) ($agg['entradas'][$key] ?? 0.0);
                         $totalSalidas = (float) ($agg['salidas'][$key] ?? 0.0);
                         $ajusteTotal = (float) ($agg['ajustes'][$key] ?? 0.0);
                         $totalDisp = (float) ($agg['disponible'][$key] ?? 0.0);
 
-                        // 1) Entradas por referencia (descargas en el almacén desde referencia)
+                        // === 1) Si no hay stock disponible, nunca mostramos referencias ===
+                        if ($totalDisp <= 0.0001) {
+                            if (abs($ajusteTotal) > 0.0001) {
+                                // Solo info de regularización
+                                return 'Regularización — ' . $fmt($ajusteTotal) . ' m³';
+                            }
+
+                            return 'Sin stock disponible para esta combinación.';
+                        }
+
+                        // === 2) Cargamos las entradas por referencia (como en calcular) ===
                         $entradas = \DB::table('carga_transportes as ct')
-                            ->join('parte_trabajo_suministro_transportes as pt', 'pt.id', '=', 'ct.parte_trabajo_suministro_transporte_id')
+                            ->join(
+                                'parte_trabajo_suministro_transportes as pt',
+                                'pt.id',
+                                '=',
+                                'ct.parte_trabajo_suministro_transporte_id'
+                            )
                             ->join('referencias as rf', 'rf.id', '=', 'ct.referencia_id')
                             ->whereNull('ct.deleted_at')
                             ->whereNull('rf.deleted_at')
                             ->where('pt.almacen_id', $almacenId)
-                            ->whereNull('pt.cliente_id')          // 🔹 igual que StockCalculator::calcular()
+                            ->whereNull('pt.cliente_id')          // igual que StockCalculator::calcular()
                             ->whereNotNull('ct.referencia_id')
                             ->selectRaw('
             rf.referencia,
@@ -387,69 +403,61 @@ class PrioridadStockResource extends Resource
                             ->values()
                             ->all();
 
-                        // Si no hay entradas de referencia, devolvemos solo info agregada
+                        // Si no hay entradas de referencia, todo el stock viene de regularizaciones
                         if (empty($entradas)) {
-                            if ($totalEntradas == 0.0 && $totalSalidas == 0.0 && abs($ajusteTotal) < 0.0001) {
-                                return 'Sin trazabilidad registrada para esta combinación.';
-                            }
-
-                            $lineas = [
-                                "Entradas: {$fmt($totalEntradas)} m³",
-                                "Salidas: {$fmt($totalSalidas)} m³",
-                            ];
-                            if (abs($ajusteTotal) > 0.0001) {
-                                $lineas[] = "Ajustes: {$fmt($ajusteTotal)} m³";
-                            }
-                            $lineas[] = "Disponible: {$fmt($totalDisp)} m³";
-
-                            return implode("\n", $lineas);
+                            return 'Regularización — ' . $fmt($totalDisp) . ' m³';
                         }
 
-                        // 2) Cálculo de consumo FIFO a partir de totales agregados
-                        // Nota: totalEntradas - totalDisp = salidas - ajustes (según StockCalculator)
-                        $consumir = max(0.0, $totalEntradas - $totalDisp);
+                        // === 3) Calculamos cuánto se ha consumido de las entradas ===
+                        // Consumimos como mucho hasta las salidas, no mezclamos ajustes aquí.
+                        $consumir = max(0.0, min($totalEntradas, $totalSalidas));
 
                         foreach ($entradas as $i => $row) {
                             if ($consumir <= 0) {
                                 break;
                             }
+
                             $usa = min($row->m3_in, $consumir);
                             $entradas[$i]->m3_in -= $usa;
                             $consumir -= $usa;
                         }
 
-                        // 3) Construye líneas: referencias con disponible > 0 (máx. 8)
-                        $lineas = [];
+                        // === 4) Lo que queda en las referencias es "stock procedente de referencias" ===
+                        $lineasRefs = [];
+                        $restoRefs = 0.0;
+
                         foreach ($entradas as $row) {
-                            $disp = round(max(0.0, (float) $row->m3_in), 2);
-                            if ($disp <= 0) {
+                            $dispRef = max(0.0, (float) $row->m3_in);
+                            if ($dispRef <= 0) {
                                 continue;
                             }
-                            $lineas[] = "{$row->referencia} — " . $fmt($disp) . " m³";
-                            if (count($lineas) >= 8) {
+
+                            $restoRefs += $dispRef;
+                            $lineasRefs[] = "{$row->referencia} — " . $fmt($dispRef) . " m³";
+
+                            if (count($lineasRefs) >= 8) {
                                 break;
                             }
                         }
 
-                        // 4) Añade la línea de Regularización si existe
-                        if (abs($ajusteTotal) > 0.0001) {
-                            $lineas[] = "Regularización — " . $fmt($ajusteTotal) . " m³";
+                        $lineas = [];
+
+                        // Si queda algo de referencias, lo mostramos
+                        if ($restoRefs > 0.0001) {
+                            $lineas = $lineasRefs;
                         }
 
-                        // 5) Si no hay referencias con stock, pero sí ajustes o movimiento, mostrar algo útil
+                        // Parte del stock que no podemos atribuir a referencias viene de regularizaciones
+                        // (ajustes netos + posibles redondeos)
+                        $extraReg = $totalDisp - $restoRefs;
+
+                        if ($extraReg > 0.0001) {
+                            $lineas[] = 'Regularización — ' . $fmt($extraReg) . ' m³';
+                        }
+
+                        // Si por lo que sea no hay referencias con resto pero sí stock, todo es regularización
                         if (empty($lineas)) {
-                            if (abs($ajusteTotal) > 0.0001 || $totalEntradas > 0.0 || $totalSalidas > 0.0) {
-                                $lineas = [
-                                    "Entradas: {$fmt($totalEntradas)} m³",
-                                    "Salidas: {$fmt($totalSalidas)} m³",
-                                ];
-                                if (abs($ajusteTotal) > 0.0001) {
-                                    $lineas[] = "Ajustes: {$fmt($ajusteTotal)} m³";
-                                }
-                                $lineas[] = "Disponible: {$fmt($totalDisp)} m³";
-                            } else {
-                                $lineas[] = 'Sin trazabilidad registrada para esta combinación';
-                            }
+                            $lineas[] = 'Regularización — ' . $fmt($totalDisp) . ' m³';
                         }
 
                         return implode("\n", $lineas);
