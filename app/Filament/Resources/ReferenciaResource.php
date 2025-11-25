@@ -5,7 +5,9 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\ReferenciaResource\Pages;
 use App\Filament\Resources\ReferenciaResource\Pages\ListReferencias;
 use App\Filament\Resources\ReferenciaResource\RelationManagers;
+use App\Models\CargaTransporte;
 use App\Models\Cliente;
+use App\Models\ParteTrabajoSuministroOperacionMaquina;
 use App\Models\Poblacion;
 use App\Models\Proveedor;
 use App\Models\Provincia;
@@ -571,11 +573,78 @@ class ReferenciaResource extends Resource
                             })
                             ->columnSpanFull(),
 
+                        Filter::make('partes_entre_fechas')
+                            ->label('Partes de trabajo entre fechas')
+                            ->form([
+                                DatePicker::make('desde')
+                                    ->label('Partes desde'),
+                                DatePicker::make('hasta')
+                                    ->label('Partes hasta'),
+                            ])
+                            ->columns(2)
+                            ->query(function (Builder $query, array $data) {
+                                $desde = $data['desde'] ?? null;
+                                $hasta = $data['hasta'] ?? null;
+
+                                if (!$desde && !$hasta) {
+                                    return $query;
+                                }
+
+                                return $query->where(function (Builder $q) use ($desde, $hasta) {
+                                    // 🔹 Referencias con CARGAS de transporte en rango
+                                    $q->whereIn('id', function ($sub) use ($desde, $hasta) {
+                                        $sub->from((new CargaTransporte())->getTable())
+                                            ->select('referencia_id');
+
+                                        if ($desde) {
+                                            $sub->whereDate('fecha_hora_inicio_carga', '>=', $desde);
+                                        }
+
+                                        if ($hasta) {
+                                            $sub->whereDate('fecha_hora_inicio_carga', '<=', $hasta);
+                                        }
+                                    });
+
+                                    // 🔹 O referencias con PARTES DE TRABAJO (máquina) en rango
+                                    $q->orWhereIn('id', function ($sub) use ($desde, $hasta) {
+                                        $sub->from((new ParteTrabajoSuministroOperacionMaquina())->getTable())
+                                            ->select('referencia_id');
+
+                                        if ($desde) {
+                                            $sub->whereDate('fecha_hora_inicio_trabajo', '>=', $desde);
+                                        }
+
+                                        if ($hasta) {
+                                            $sub->whereDate('fecha_hora_inicio_trabajo', '<=', $hasta);
+                                        }
+                                    });
+                                });
+                            })
+                            ->indicateUsing(function (array $data) {
+                                $desde = $data['desde'] ?? null;
+                                $hasta = $data['hasta'] ?? null;
+
+                                if ($desde && $hasta) {
+                                    return "Partes entre {$desde} y {$hasta}";
+                                }
+
+                                if ($desde) {
+                                    return "Partes desde {$desde}";
+                                }
+
+                                if ($hasta) {
+                                    return "Partes hasta {$hasta}";
+                                }
+
+                                return null;
+                            })
+                            ->columnSpanFull(),
+
                         SelectFilter::make('usuario')
-                            ->label('Usuario')
+                            ->label('Usuarios')
                             ->multiple()
                             ->searchable()
-                            ->placeholder('Seleccionar usuario')
+                            ->placeholder('Seleccionar usuarios')
                             ->options(
                                 User::whereDoesntHave('roles', fn($q) => $q->where('name', 'superadmin'))
                                     ->select('id', DB::raw("CONCAT(name, ' ', apellidos) as full_name"))
@@ -1034,11 +1103,63 @@ class ReferenciaResource extends Resource
                             })
                             ->columnSpanFull(),
 
+                        Filter::make('partes_entre_fechas')
+                            ->label('Partes de trabajo entre fechas')
+                            ->form([
+                                DatePicker::make('desde')
+                                    ->label('Partes desde'),
+                                DatePicker::make('hasta')
+                                    ->label('Partes hasta'),
+                            ])
+                            ->columns(2)
+                            ->query(function (Builder $query, array $data) {
+                                $desde = $data['desde'] ?? null;
+                                $hasta = $data['hasta'] ?? null;
+
+                                if (!$desde && !$hasta) {
+                                    return $query;
+                                }
+
+                                // Filtrar referencias que tengan cargas (partes de transporte)
+                                // dentro del rango de fechas indicado
+                                return $query->whereIn('id', function ($sub) use ($desde, $hasta) {
+                                    $sub->from((new CargaTransporte())->getTable())
+                                        ->select('referencia_id');
+
+                                    if ($desde) {
+                                        $sub->whereDate('fecha_hora_inicio_carga', '>=', $desde);
+                                    }
+
+                                    if ($hasta) {
+                                        $sub->whereDate('fecha_hora_inicio_carga', '<=', $hasta);
+                                    }
+                                });
+                            })
+                            ->indicateUsing(function (array $data) {
+                                $desde = $data['desde'] ?? null;
+                                $hasta = $data['hasta'] ?? null;
+
+                                if ($desde && $hasta) {
+                                    return "Partes entre {$desde} y {$hasta}";
+                                }
+
+                                if ($desde) {
+                                    return "Partes desde {$desde}";
+                                }
+
+                                if ($hasta) {
+                                    return "Partes hasta {$hasta}";
+                                }
+
+                                return null;
+                            })
+                            ->columnSpanFull(),
+
                         SelectFilter::make('usuario')
-                            ->label('Usuario')
+                            ->label('Usuarios')
                             ->multiple()
                             ->searchable()
-                            ->placeholder('Seleccionar usuario')
+                            ->placeholder('Seleccionar usuarios')
                             ->options(
                                 User::whereDoesntHave('roles', fn($q) => $q->where('name', 'superadmin'))
                                     ->select('id', \DB::raw("CONCAT(name, ' ', apellidos) as full_name"))

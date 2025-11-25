@@ -96,81 +96,175 @@ class EditReferencia extends EditRecord
 
                     Tabs\Tab::make('Facturación')
                         ->schema([
-                            Forms\Components\Select::make('estado_facturacion')
-                                ->label('Estado')
-                                ->searchable()
-                                ->options([
-                                    'completa' => 'Completa',
-                                    'parcial' => 'Parcial',
-                                    'no_facturada' => 'No facturada',
-                                ]),
-
-                            Repeater::make('facturas')
-                                ->relationship()
-                                ->label('Facturas')
+                            Forms\Components\Section::make('Estado de facturación')
+                                ->description('Indica el estado de la facturación de esta referencia.')
                                 ->schema([
-                                    Forms\Components\TextInput::make('numero')
-                                        ->label('Número de factura')
-                                        ->nullable(),
-
-                                    Forms\Components\DatePicker::make('fecha')
-                                        ->label('Fecha')
-                                        ->default(now())
-                                        ->nullable(),
-
-                                    Forms\Components\Select::make('tipo')
+                                    Forms\Components\Select::make('estado_facturacion')
+                                        ->label('')
+                                        ->native(false)
                                         ->options([
-                                            'horas' => 'Horas',
-                                            'toneladas' => 'Tn',
+                                            'completa' => 'Completa',
+                                            'parcial' => 'Parcial',
+                                            'no_facturada' => 'No facturada',
+                                            'no_procede' => 'No procede',
                                         ])
-                                        ->label('Tipo')
-                                        ->searchable()
-                                        ->nullable()
-                                        ->reactive(),
+                                        ->helperText('Este estado resume la situación total de facturación de la referencia.')
+                                        ->reactive()
+                                        ->afterStateUpdated(function ($state, callable $set, callable $get) {
+                                            // Cuando pasa a "completa" o "parcial" y no hay facturas,
+                                            // crear automáticamente una línea vacía en el repeater.
+                                            if (in_array($state, ['completa', 'parcial'], true)) {
+                                                $facturas = $get('facturas') ?? [];
 
-                                    Forms\Components\TextInput::make('importe')
-                                        ->label(fn(callable $get) => match ($get('tipo')) {
-                                            'horas' => 'Importe / hora',
-                                            'toneladas' => 'Importe / tonelada',
-                                            default => 'Importe',
-                                        })
-                                        ->numeric()
-                                        ->nullable()
-                                        ->suffix(function (callable $get) {
-                                            return match ($get('tipo')) {
-                                                'horas' => '€/hora',
-                                                'toneladas' => '€/tn',
-                                                default => '€',
-                                            };
+                                                if (empty($facturas)) {
+                                                    // Una fila vacía para que el usuario la rellene
+                                                    $set('facturas', [
+                                                        [
+                                                            'numero' => null,
+                                                            'fecha' => now()->toDateString(),
+                                                            'tipo' => null,
+                                                            'importe' => null,
+                                                            'cantidad' => null,
+                                                            'importe_sin_iva' => null,
+                                                            'notas' => null,
+                                                        ],
+                                                    ]);
+                                                }
+                                            }
                                         }),
-
-                                    Forms\Components\TextInput::make('importe_sin_iva')
-                                        ->label('Importe sin IVA')
-                                        ->numeric()
-                                        ->suffix('€')
-                                        ->nullable(),
-
-                                    Forms\Components\TextInput::make('cantidad')
-                                        ->label('Cantidad')
-                                        ->numeric()
-                                        ->step(0.01)
-                                        ->nullable(),
-
-                                    Forms\Components\Textarea::make('notas')
-                                        ->label('Notas')
-                                        ->nullable()
-                                        ->columnSpanFull(),
                                 ])
-                                ->columns(2) // Opcional: puedes poner en columnas si quieres ahorrar espacio
-                                ->defaultItems(1) // Opcional: cuántas facturas se muestran por defecto
-                                ->createItemButtonLabel('Añadir factura'),
+                                ->columns(1),
+
+                            Forms\Components\Section::make('Facturas asociadas')
+                                ->description('Registra aquí las facturas vinculadas a esta referencia.')
+                                ->schema([
+                                    Forms\Components\Repeater::make('facturas')
+                                        ->relationship()
+                                        ->label('Facturas')
+                                        ->addActionLabel('Añadir factura')
+                                        ->collapsible()
+                                        ->itemLabel(function (array $state): string {
+                                            $num = $state['numero'] ?? null;
+                                            $fecha = $state['fecha'] ?? null;
+
+                                            if ($num && $fecha) {
+                                                try {
+                                                    $f = \Carbon\Carbon::parse($fecha)->format('d/m/Y');
+                                                } catch (\Throwable $e) {
+                                                    $f = $fecha;
+                                                }
+
+                                                return "Factura {$num} ({$f})";
+                                            }
+
+                                            if ($num) {
+                                                return "Factura {$num}";
+                                            }
+
+                                            return 'Nueva factura';
+                                        })
+                                        ->schema([
+                                            Forms\Components\Grid::make()
+                                                ->columns([
+                                                    'default' => 1,
+                                                    'sm' => 2,
+                                                    'lg' => 3,
+                                                ])
+                                                ->schema([
+                                                    Forms\Components\TextInput::make('numero')
+                                                        ->label('Número de factura')
+                                                        ->maxLength(50)
+                                                        ->nullable(),
+
+                                                    Forms\Components\DatePicker::make('fecha')
+                                                        ->label('Fecha')
+                                                        ->default(now())
+                                                        ->nullable()
+                                                        ->native(false),
+
+                                                    Forms\Components\Select::make('tipo')
+                                                        ->label('Tipo de facturación')
+                                                        ->options([
+                                                            'horas' => 'Horas',
+                                                            'toneladas' => 'Toneladas (Tn)',
+                                                        ])
+                                                        ->searchable()
+                                                        ->nullable()
+                                                        ->reactive(),
+                                                ]),
+
+                                            Forms\Components\Grid::make()
+                                                ->columns([
+                                                    'default' => 1,
+                                                    'sm' => 3,
+                                                ])
+                                                ->schema([
+                                                    Forms\Components\TextInput::make('importe')
+                                                        ->label(fn(callable $get) => match ($get('tipo')) {
+                                                            'horas' => 'Importe por hora',
+                                                            'toneladas' => 'Importe por tonelada',
+                                                            default => 'Importe unitario',
+                                                        })
+                                                        ->numeric()
+                                                        ->step('0.01')
+                                                        ->nullable()
+                                                        ->suffix(function (callable $get) {
+                                                            return match ($get('tipo')) {
+                                                                'horas' => '€/hora',
+                                                                'toneladas' => '€/tn',
+                                                                default => '€',
+                                                            };
+                                                        })
+                                                        ->reactive()
+                                                        ->afterStateUpdated(function ($state, callable $set, callable $get) {
+                                                            $precio = $state;
+                                                            $cantidad = $get('cantidad');
+
+                                                            if ($precio !== null && $cantidad !== null) {
+                                                                $set('importe_sin_iva', round((float) $precio * (float) $cantidad, 2));
+                                                            }
+                                                        }),
+
+                                                    Forms\Components\TextInput::make('cantidad')
+                                                        ->label('Cantidad')
+                                                        ->numeric()
+                                                        ->step('0.01')
+                                                        ->nullable()
+                                                        ->reactive()
+                                                        ->afterStateUpdated(function ($state, callable $set, callable $get) {
+                                                            $cantidad = $state;
+                                                            $precio = $get('importe');
+
+                                                            if ($precio !== null && $cantidad !== null) {
+                                                                $set('importe_sin_iva', round((float) $precio * (float) $cantidad, 2));
+                                                            }
+                                                        }),
+
+                                                    Forms\Components\TextInput::make('importe_sin_iva')
+                                                        ->label('Importe sin IVA')
+                                                        ->numeric()
+                                                        ->step('0.01')
+                                                        ->suffix('€')
+                                                        ->nullable()
+                                                        ->columnSpan(2)
+                                                        ->helperText('Se calcula automáticamente a partir de tipo de facturación, importe y cantidad, pero puedes ajustarlo manualmente si es necesario.'),
+                                                ]),
+
+                                            Forms\Components\Textarea::make('notas')
+                                                ->label('Notas')
+                                                ->rows(5)
+                                                ->nullable()
+                                                ->columnSpanFull(),
+                                        ])
+                                        ->defaultItems(0),
+                                ]),
                         ]),
 
                     Tabs\Tab::make('Historial de cambios')
                         ->schema([
                             Forms\Components\View::make('filament.resources.referencia-resource.partials.historial-cambios')
                                 ->viewData([
-                                    'logs' => \Spatie\Activitylog\Models\Activity::where('subject_type', \App\Models\Referencia::class)
+                                    'logs' => \Spatie\Activitylog\Models\Activity::where('subject_type', Referencia::class)
                                         ->where('subject_id', $this->record?->id)
                                         ->latest()
                                         ->take(20)
@@ -178,7 +272,6 @@ class EditReferencia extends EditRecord
                                 ])
                                 ->columnSpanFull(),
                         ]),
-
 
                     Tabs\Tab::make('Mapa')
                         ->schema([
@@ -260,19 +353,26 @@ class EditReferencia extends EditRecord
     {
         $record = $this->record;
 
-        // Estado y facturación anteriores
         $this->estadoAnterior = $record->estado ?? null;
-        $estadoFacturacionAnterior = $record->estado_facturacion ?? null;
+        $estadoFactAnterior = $record->estado_facturacion ?? null;
 
-        // Nuevo estado que se va a guardar
         $nuevoEstado = $data['estado'] ?? $this->estadoAnterior;
 
-        // Si estaba CERRADA y con FACTURACIÓN COMPLETA
-        // y ahora se cambia a ABIERTO o EN PROCESO,
-        // entonces la facturación pasa a PARCIAL
+        /**
+         * Si el estado de referencia pasa a "cerrado_no_procede",
+         * la facturación pasa directamente a "no_procede".
+         */
+        if ($nuevoEstado === 'cerrado_no_procede') {
+            $data['estado_facturacion'] = 'no_procede';
+        }
+
+        /**
+         * Si la referencia estaba cerrada y facturada completa,
+         * y se vuelve a abrir → facturación pasa a PARCIAL.
+         */
         if (
             in_array($this->estadoAnterior, ['cerrado', 'cerrado_no_procede'], true)
-            && $estadoFacturacionAnterior === 'completa'
+            && $estadoFactAnterior === 'completa'
             && in_array($nuevoEstado, ['abierto', 'en_proceso'], true)
         ) {
             $data['estado_facturacion'] = 'parcial';
