@@ -13,6 +13,7 @@ use Carbon\Carbon;
 use Filament\Forms;
 use Filament\Forms\Components\Builder;
 use Filament\Forms\Components\Checkbox;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -600,11 +601,54 @@ class UserResource extends Resource
                                 ->label('Mensaje')
                                 ->required()
                                 ->rows(4),
+
+                            FileUpload::make('attachments')
+                                ->label('Adjuntar archivos')
+                                ->multiple()
+                                ->disk('public')                  // apunta a public_path('archivos')
+                                ->directory('chat/adjuntos')      // => public/archivos/chat/adjuntos
+                                ->preserveFilenames()
+                                ->acceptedFileTypes([
+                                    // PDF
+                                    'application/pdf',
+                                    // Word
+                                    'application/msword',
+                                    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                                    // Imágenes
+                                    'image/*',
+                                ])
+                                ->downloadable()
+                                ->openable()
+                                ->helperText('PDF, Word o imágenes (JPG, PNG, etc.)'),
                         ])
                         ->action(function (array $data, User $record) {
+                            /** @var \App\Services\ChatService $service */
                             $service = app(ChatService::class);
+
+                            // Inicia (o recupera) la conversación directa
                             $conv = $service->startDirect(auth()->user(), $record);
-                            $service->sendMessage($conv, auth()->user(), $data['body']);
+
+                            // Normalizar adjuntos a array de strings (rutas relativas en el disk public)
+                            $attachments = collect($data['attachments'] ?? [])
+                                ->map(function ($item) {
+                                // Por si algún disk devuelve ['path' => '...']
+                                if (is_array($item) && isset($item['path'])) {
+                                    return $item['path'];
+                                }
+                                return $item;
+                            })
+                                ->filter()
+                                ->values()
+                                ->all();
+
+                            // En tu ChatService: attachments se guardan tal cual (p.ej. "chat/adjuntos/archivo.png")
+                            $service->sendMessage(
+                                $conv,
+                                auth()->user(),
+                                $data['body'],
+                                $attachments ?: null,
+                            );
+
                             Notification::make()
                                 ->title('Mensaje enviado')
                                 ->success()

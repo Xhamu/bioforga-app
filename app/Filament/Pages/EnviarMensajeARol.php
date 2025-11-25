@@ -4,12 +4,13 @@ namespace App\Filament\Pages;
 
 use Filament\Facades\Filament;
 use Filament\Forms;
+use Filament\Forms\Form;
 use Filament\Pages\Page;
 use Spatie\Permission\Models\Role;
 use App\Services\ChatService;
 use Filament\Forms\Get;
-use Filament\Forms\Components;
 use App\Models\User;
+use Filament\Forms\Components\FileUpload;
 
 class EnviarMensajeARol extends Page implements Forms\Contracts\HasForms
 {
@@ -21,8 +22,11 @@ class EnviarMensajeARol extends Page implements Forms\Contracts\HasForms
     protected static ?int $navigationSort = 4;
     protected static string $view = 'filament.pages.enviar-mensaje-a-rol';
 
-    public ?int $role_id = null;
-    public ?string $body = null;
+    /** 
+     * Estado del formulario (role_id, body, attachments, etc.)
+     * Filament lo gestionará todo dentro de este array.
+     */
+    public ?array $data = [];
 
     /** 🔒 Ocultar del menú si no tiene rol permitido */
     public static function shouldRegisterNavigation(): bool
@@ -38,6 +42,17 @@ class EnviarMensajeARol extends Page implements Forms\Contracts\HasForms
         if (!$user?->hasAnyRole(['superadmin', 'administración'])) {
             abort(403);
         }
+
+        // Rellenar el form con valores por defecto (vacíos)
+        $this->form->fill();
+    }
+
+    /** Definir el form de Filament */
+    public function form(Form $form): Form
+    {
+        return $form
+            ->schema($this->getFormSchema())
+            ->statePath('data'); // todo el estado irá en $this->data
     }
 
     protected function recipientsQuery(?int $roleId)
@@ -118,23 +133,66 @@ class EnviarMensajeARol extends Page implements Forms\Contracts\HasForms
                         ->maxLength(2000)
                         ->placeholder('Escribe el mensaje que recibirán los miembros del rol seleccionado…')
                         ->required(),
+
+                    FileUpload::make('attachments')
+                        ->label('Adjuntar archivos')
+                        ->multiple()
+                        ->disk('public')              // apunta a public_path('archivos')
+                        ->directory('chat/adjuntos')  // => public/archivos/chat/adjuntos
+                        ->preserveFilenames()
+                        ->openable()
+                        ->downloadable()
+                        ->acceptedFileTypes([
+                            // PDF
+                            'application/pdf',
+                            // Word
+                            'application/msword',
+                            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                            // Imágenes
+                            'image/*',
+                        ])
+                        ->helperText('PDF, Word o imágenes (JPG, PNG, etc.)'),
                 ]),
         ];
     }
-
 
     public function submit(): void
     {
         abort_unless(auth()->user()->hasAnyRole(['superadmin', 'administración']), 403);
 
-        $role = Role::findOrFail($this->role_id);
+        // Estado actual del formulario (tal como hace la Action en UserResource)
+        $data = $this->form->getState();
+
+        $roleId = $data['role_id'] ?? null;
+        $body = $data['body'] ?? null;
+
+        if (!$roleId || !$body) {
+            // Por si acaso, aunque ya está validado por "required"
+            return;
+        }
+
+        $role = Role::findOrFail($roleId);
         $svc = app(ChatService::class);
 
-        // 📩 Enviar a cada usuario del rol (sin asunto)
+        // Normalizar adjuntos igual que en UserResource
+        $attachments = collect($data['attachments'] ?? [])
+            ->map(function ($item) {
+                // Por si viene en formato ['path' => '...']
+                if (is_array($item) && isset($item['path'])) {
+                    return $item['path'];
+                }
+                return $item;
+            })
+            ->filter()
+            ->values()
+            ->all();
+
+        // 📩 Enviar a cada usuario del rol (mensaje + adjuntos)
         $sentCount = $svc->broadcastToRole(
             auth()->user(),
             $role,
-            $this->body
+            $body,
+            $attachments ?: null, // firma ?array en ChatService
         );
 
         \Filament\Notifications\Notification::make()
@@ -142,6 +200,8 @@ class EnviarMensajeARol extends Page implements Forms\Contracts\HasForms
             ->success()
             ->send();
 
-        $this->reset(['role_id', 'body']);
+        // Reset del formulario
+        $this->reset('data');
+        $this->form->fill();
     }
 }

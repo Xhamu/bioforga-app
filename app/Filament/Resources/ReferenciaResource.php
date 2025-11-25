@@ -614,7 +614,7 @@ class ReferenciaResource extends Resource
                         SelectFilter::make('formato')
                             ->label('Formato')
                             ->options([
-                                'CA' => 'Cargador',
+                                'CA' => 'Cargadero',
                                 'SA' => 'Saca',
                                 'EX' => 'Explotación',
                                 'OT' => 'Otros',
@@ -1077,7 +1077,7 @@ class ReferenciaResource extends Resource
                         SelectFilter::make('formato')
                             ->label('Formato')
                             ->options([
-                                'CA' => 'Cargador',
+                                'CA' => 'Cargadero',
                                 'SA' => 'Saca',
                                 'EX' => 'Explotación',
                                 'OT' => 'Otros',

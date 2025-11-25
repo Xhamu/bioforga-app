@@ -21,27 +21,28 @@
         }
     @endphp
 
-    <x-filament::card class="px-5 py-4 rounded-lg">
-        <div class="flex items-center justify-between gap-6">
+    <x-filament::card class="px-4 sm:px-5 py-4 rounded-lg">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sm:gap-6">
 
             {{-- Avatar + nombre + apellidos --}}
-            <div class="flex items-center gap-5">
+            <div class="flex items-center sm:items-center gap-4 sm:gap-5">
                 <div
-                    class="flex items-center justify-center w-12 h-12 rounded-full bg-black text-white text-base font-semibold uppercase">
+                    class="flex items-center justify-center w-12 h-12 rounded-full bg-black text-white text-base font-semibold uppercase flex-shrink-0">
                     {{ $iniciales }}
                 </div>
 
-                <div class="leading-tight">
-                    <div class="text-[15px] font-semibold text-gray-900 dark:text-white">
+                <div class="leading-tight text-center sm:text-left">
+                    <div class="text-[14px] sm:text-[15px] font-semibold text-gray-900 dark:text-white">
                         Bienvenido/a
                     </div>
-                    <div class="text-lg text-gray-500 dark:text-gray-400">
+                    <div class="text-base sm:text-lg text-gray-500 dark:text-gray-400">
                         {{ $nombre }} {{ strtoupper(substr($apellidos, 0, 1)) }}.
                     </div>
 
                     {{-- Estado actual --}}
                     @if ($this->canSeeStates())
-                        <div class="mt-2 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                        <div
+                            class="mt-2 flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs text-gray-500 dark:text-gray-400">
                             <span class="font-medium">Estado actual:</span>
 
                             @php
@@ -57,17 +58,22 @@
                             </x-filament::badge>
 
                             @if ($isActive)
-                                <span>desde {{ $startedAt }}</span>
+                                <span class="sm:ml-1">
+                                    desde {{ $startedAt }}
+                                </span>
                             @endif
                         </div>
                     @endif
                 </div>
             </div>
 
-            <div class="flex items-center gap-2 ml-auto">
-                {{-- Botón ESTADOS (abre modal por evento nativo de Filament) --}}
+            {{-- Botones --}}
+            <div class="flex flex-wrap items-center justify-center sm:justify-end gap-2 sm:gap-2.5 lg:gap-3 sm:ml-auto">
+
+                {{-- Botón ESTADOS --}}
                 @if ($this->canSeeStates())
-                    <x-filament::button color="primary" size="md" icon="heroicon-o-adjustments-horizontal"
+                    <x-filament::button color="primary" size="sm" class="w-full xs:w-auto sm:w-auto justify-center"
+                        icon="heroicon-o-adjustments-horizontal"
                         x-on:click="$dispatch('open-modal', { id: 'statesModal' })">
                         Estados
                     </x-filament::button>
@@ -79,26 +85,25 @@
                     $color = $unread > 0 ? 'danger' : 'gray'; // rojo si hay mensajes sin leer
                 @endphp
 
-                <x-filament::button color="{{ $color }}" size="md" icon="heroicon-m-chat-bubble-left-right"
+                <x-filament::button color="{{ $color }}" size="sm"
+                    class="w-full xs:w-auto sm:w-auto justify-center" icon="heroicon-m-chat-bubble-left-right"
                     x-on:click="$dispatch('open-modal', { id: 'messagesModal' })">
-
-                    <span class="inline-flex items-center gap-2">
+                    <span class="inline-flex items-center gap-1.5 sm:gap-2">
                         <span>Mensajes</span>
 
                         @if ($unread > 0)
-                            {{-- Badge sigue mostrando el número --}}
-                            <x-filament::badge :color="$unread > 0 ? 'white' : 'gray'">
+                            <x-filament::badge :color="$unread > 0 ? 'white' : 'gray'" size="sm">
                                 {{ $unread }}
                             </x-filament::badge>
                         @endif
                     </span>
                 </x-filament::button>
 
-                {{-- Botón logout completamente a la derecha --}}
-                <form method="POST" action="{{ filament()->getLogoutUrl() }}">
+                {{-- Botón logout --}}
+                <form method="POST" action="{{ filament()->getLogoutUrl() }}" class="w-full xs:w-auto sm:w-auto">
                     @csrf
-                    <x-filament::button color="gray" size="md" type="submit"
-                        icon="heroicon-o-arrow-left-on-rectangle">
+                    <x-filament::button color="gray" size="sm" type="submit"
+                        class="w-full xs:w-auto sm:w-auto justify-center" icon="heroicon-o-arrow-left-on-rectangle">
                         Salir
                     </x-filament::button>
                 </form>
@@ -160,8 +165,9 @@
 
     {{-- MODAL de mensajes estilo WhatsApp (con ChatPanel dinámico) --}}
     <x-filament::modal id="messagesModal" width="3xl" icon="heroicon-m-chat-bubble-left-right"
-        heading="Mensajería interna"
+        class="overflow-hidden max-h-[70vh] overscroll-none" x-data="{ activeId: @js(optional(optional($conversations ?? null)->first())->id ?? null) }"
         x-on:close-modal.window="if ($event.detail?.id === 'messagesModal') { $wire.$refresh() }">
+
         @php
             $uid = auth()->id();
 
@@ -191,15 +197,24 @@
             $firstConvId = optional($conversations->first())->id;
         @endphp
 
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-4" wire:poll.10s>
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 h-[70vh] max-h-[calc(100vh-180px)]" wire:poll.10s>
             {{-- Sidebar: lista de conversaciones --}}
             <aside
-                class="lg:col-span-4 h-[40vh] max-h-[40vh] overflow-y-auto rounded-xl border bg-white dark:bg-gray-900">
-                <div class="p-3 border-b sticky top-0 bg-white/90 dark:bg-gray-900/90 backdrop-blur z-10">
-                    <div class="text-sm font-semibold">Chats</div>
+                class="lg:col-span-4 h-full overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-gray-900 flex flex-col">
+                {{-- Header sidebar --}}
+                <div
+                    class="p-3 border-b border-slate-200 dark:border-slate-800 sticky top-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur z-10 flex items-center justify-between">
+                    <div class="text-xs font-semibold tracking-wide text-slate-700 dark:text-slate-200 uppercase">
+                        Chats
+                    </div>
+                    <div class="text-[11px] text-slate-400">
+                        {{ $conversations->count() }}
+                        {{ $conversations->count() === 1 ? 'conversación' : 'conversaciones' }}
+                    </div>
                 </div>
 
-                <div class="divide-y">
+                {{-- Lista --}}
+                <div class="flex-1 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
                     @php
                         $canSeeNames = auth()
                             ->user()
@@ -220,19 +235,19 @@
                             // Último mensaje (latest())
                             $last = $conv->messages->first();
 
-                            // Prefijo de preview: por coherencia mantenemos el ROL del autor del último mensaje
+                            // Prefijo de preview: rol del autor del último mensaje
                             $senderRole = $last?->author?->getRoleNames()->first() ?? 'Usuario';
                             $senderRoleLabel = ucfirst($senderRole);
 
                             $preview = $last
                                 ? $senderRoleLabel . ': ' . \Illuminate\Support\Str::limit($last->body, 70)
-                                : '—';
+                                : 'Sin mensajes todavía';
 
                             $time = $last ? $last->created_at->timezone('Europe/Madrid')->format('d/m H:i') : '';
                             $unread = (int) ($conv->unread_count ?? 0);
 
                             // Iniciales: si puede ver nombres -> de nombre; si no -> del rol
-                            if ($canSeeNames) {
+                            if ($canSeeNames && $other) {
                                 $firstInitial = mb_substr($other->name ?? 'U', 0, 1);
                                 $lastInitial = mb_substr($other->apellidos ?? '', 0, 1);
                                 $ini = mb_strtoupper($firstInitial . ($lastInitial ?: ''));
@@ -241,56 +256,79 @@
                             }
                         @endphp
 
-                        <button type="button"
-                            class="w-full p-3 flex items-start gap-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition text-left"
-                            x-on:click="Livewire.dispatch('open-chat-panel', { id: {{ $conv->id }} })">
-
+                        <button type="button" class="w-full p-3 flex items-start gap-3 text-left transition"
+                            :class="activeId === {{ $conv->id }} ?
+                                'bg-slate-100/80 dark:bg-slate-800/80' :
+                                'hover:bg-slate-50 dark:hover:bg-slate-800/60'"
+                            x-on:click="
+                            activeId = {{ $conv->id }};
+                            Livewire.dispatch('open-chat-panel', { id: {{ $conv->id }} });
+                        ">
+                            {{-- Avatar --}}
                             <div
-                                class="w-10 h-10 rounded-full bg-gray-800 text-white flex items-center justify-center text-sm font-semibold">
+                                class="w-10 h-10 rounded-full bg-slate-800 text-white flex items-center justify-center text-sm font-semibold shrink-0">
                                 {{ $ini }}
                             </div>
 
+                            {{-- Info --}}
                             <div class="min-w-0 grow">
                                 <div class="flex items-center gap-2">
                                     <div class="truncate">
-                                        @if ($canSeeNames)
-                                            {{-- Muestra NOMBRE en grande y el rol debajo en pequeño --}}
-                                            <div class="font-medium truncate">{{ $name }}</div>
-                                            <div class="text-[11px] text-gray-500 dark:text-gray-400 truncate">
-                                                {{ $otherRoleLabel }}</div>
+                                        @if ($canSeeNames && $other)
+                                            <div
+                                                class="font-medium text-sm text-slate-800 dark:text-slate-100 truncate">
+                                                {{ $name }}
+                                            </div>
+                                            <div class="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                                                {{ $otherRoleLabel }}
+                                            </div>
                                         @else
-                                            {{-- Solo el ROL (como antes) --}}
-                                            <div class="font-medium truncate">{{ $otherRoleLabel }}</div>
+                                            <div
+                                                class="font-medium text-sm text-slate-800 dark:text-slate-100 truncate">
+                                                {{ $otherRoleLabel }}
+                                            </div>
                                         @endif
                                     </div>
-                                    <div class="ml-auto text-xs text-gray-500">{{ $time }}</div>
+                                    <div class="ml-auto text-[11px] text-slate-400">
+                                        {{ $time }}
+                                    </div>
                                 </div>
 
-                                {{-- Preview mantiene el rol del autor del último mensaje --}}
-                                <div class="text-sm text-gray-500 truncate">{{ $preview }}</div>
-                            </div>
+                                <div class="mt-0.5 flex items-center gap-2">
+                                    <div class="text-xs text-slate-500 dark:text-slate-400 truncate">
+                                        {{ $preview }}
+                                    </div>
 
-                            @if ($unread > 0)
-                                <x-filament::badge color="danger">{{ $unread }}</x-filament::badge>
-                            @endif
+                                    @if ($unread > 0)
+                                        <span class="ml-auto">
+                                            <x-filament::badge color="danger" size="xs">
+                                                {{ $unread }}
+                                            </x-filament::badge>
+                                        </span>
+                                    @endif
+                                </div>
+                            </div>
                         </button>
                     @empty
-                        <div class="p-4 text-sm text-gray-500">Sin conversaciones.</div>
+                        <div class="p-6 text-sm text-slate-500 flex flex-col items-center justify-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 text-slate-300 dark:text-slate-600"
+                                fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                    d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.985 9.985 0 01-4.244-.938L3 20l1.133-3.398A7.96 7.96 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                            </svg>
+                            <div>No tienes conversaciones todavía.</div>
+                        </div>
                     @endforelse
                 </div>
             </aside>
 
-            {{-- Panel de conversación: componente Livewire que reacciona al evento "open-chat-panel" --}}
-            <section class="lg:col-span-8 h-[40vh] max-h-[40vh] rounded-xl border bg-white dark:bg-gray-900">
+            {{-- Panel de conversación --}}
+            <section
+                class="lg:col-span-8 h-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-gray-900 overflow-hidden">
                 <livewire:chat-panel :conversation-id="$firstConvId" :key="'chat-panel'" />
             </section>
         </div>
 
-        <x-slot name="footerActions">
-            <x-filament::button color="gray" x-on:click="$dispatch('close-modal', { id: 'messagesModal' })">
-                Cerrar
-            </x-filament::button>
-        </x-slot>
     </x-filament::modal>
 
 </x-filament::widget>

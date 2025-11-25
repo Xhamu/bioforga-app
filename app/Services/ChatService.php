@@ -57,7 +57,7 @@ class ChatService
         }
     }
 
-    public function broadcastToRole(User $from, Role $role, string $body): int
+    public function broadcastToRole(User $from, Role $role, string $body, ?array $attachments = null): int
     {
         if (!$from->hasAnyRole(['superadmin', 'administración'])) {
             abort(403, 'No autorizado para enviar a roles.');
@@ -71,7 +71,7 @@ class ChatService
         $sent = 0;
         foreach ($targets as $user) {
             $conv = $this->startDirect($from, $user);
-            $this->sendMessage($conv, $from, $body, null);
+            $this->sendMessage($conv, $from, $body, $attachments ?: null);
             $sent++;
         }
 

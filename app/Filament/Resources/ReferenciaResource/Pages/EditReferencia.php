@@ -258,7 +258,26 @@ class EditReferencia extends EditRecord
 
     protected function mutateFormDataBeforeSave(array $data): array
     {
-        $this->estadoAnterior = $this->record->estado ?? null; // guarda estado antes de guardar
+        $record = $this->record;
+
+        // Estado y facturación anteriores
+        $this->estadoAnterior = $record->estado ?? null;
+        $estadoFacturacionAnterior = $record->estado_facturacion ?? null;
+
+        // Nuevo estado que se va a guardar
+        $nuevoEstado = $data['estado'] ?? $this->estadoAnterior;
+
+        // Si estaba CERRADA y con FACTURACIÓN COMPLETA
+        // y ahora se cambia a ABIERTO o EN PROCESO,
+        // entonces la facturación pasa a PARCIAL
+        if (
+            in_array($this->estadoAnterior, ['cerrado', 'cerrado_no_procede'], true)
+            && $estadoFacturacionAnterior === 'completa'
+            && in_array($nuevoEstado, ['abierto', 'en_proceso'], true)
+        ) {
+            $data['estado_facturacion'] = 'parcial';
+        }
+
         return $data;
     }
 
