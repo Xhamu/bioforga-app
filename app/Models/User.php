@@ -126,4 +126,9 @@ class User extends Authenticatable
             ->latestOfMany('started_at');
     }
 
+    public function referenciaAlertas()
+    {
+        return $this->hasMany(ReferenciaUserAlerta::class);
+    }
+
 }

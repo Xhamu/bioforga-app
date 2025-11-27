@@ -3,24 +3,18 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\AlmacenIntermedioResource\Pages;
-use App\Filament\Resources\AlmacenIntermedioResource\RelationManagers;
 use App\Models\AlmacenIntermedio;
 use Filament\Forms;
+use Filament\Forms\Components\ViewField;
 use Filament\Forms\Form;
-use Filament\Forms\Components\DatePicker;
-use Filament\Forms\Components\Repeater;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\View;
 use Filament\Resources\Resource;
 use Filament\Support\Enums\FontWeight;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Filament\Tables\Columns\TextColumn;
-use Illuminate\Database\Eloquent\Builder;   // <— IMPORTANTE
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
-use Filament\Forms\Components\Fieldset;
-use Filament\Forms\Get;
 
 class AlmacenIntermedioResource extends Resource
 {
@@ -37,7 +31,7 @@ class AlmacenIntermedioResource extends Resource
             ->schema([
                 Forms\Components\Tabs::make('AlmacenTabs')
                     ->columnSpanFull()
-                    ->id('almacen-tabs')           // id único para esta Tabs
+                    ->id('almacen-tabs')
                     ->persistTab()
                     ->tabs([
                         Forms\Components\Tabs\Tab::make('Datos generales')
@@ -103,7 +97,7 @@ class AlmacenIntermedioResource extends Resource
                                     ->visible(fn($get) => !empty($get('referencia'))),
                             ]),
 
-                        Forms\Components\Tabs\Tab::make('Entradas')
+                        /*Forms\Components\Tabs\Tab::make('Entradas')
                             ->schema([
                                 Repeater::make('entradasAlmacen')
                                     ->relationship('entradasAlmacen')
@@ -259,12 +253,22 @@ class AlmacenIntermedioResource extends Resource
                                             ]),
                                     ])
                                     ->columnSpanFull(), // el repeater ocupa todo el ancho de la Tab
-                            ]),
+                            ]),*/
 
                         // TAB NUEVO
                         Forms\Components\Tabs\Tab::make('Suministro almacén')
                             ->schema([
                                 Forms\Components\View::make('filament.resources.referencia-resource.partials.partes-trabajo-almacen')
+                                    ->viewData([
+                                        'recordId' => request()->route('record'),
+                                    ])
+                                    ->columnSpanFull(),
+                            ]),
+
+                        Forms\Components\Tabs\Tab::make('Prioridades de stock')
+                            ->schema([
+                                ViewField::make('prioridad_stock_tab')
+                                    ->view('filament.resources.almacen-intermedio-resource.partials.prioridad-stock-tab')
                                     ->viewData([
                                         'recordId' => request()->route('record'),
                                     ])
@@ -328,7 +332,6 @@ class AlmacenIntermedioResource extends Resource
         return [
             'index' => Pages\ListAlmacenIntermedios::route('/'),
             'create' => Pages\CreateAlmacenIntermedio::route('/create'),
-            'view' => Pages\ViewAlmacenIntermedio::route('/{record}'),
             'edit' => Pages\EditAlmacenIntermedio::route('/{record}/edit'),
         ];
     }

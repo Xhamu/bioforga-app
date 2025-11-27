@@ -47,7 +47,7 @@ class PrioridadStockResource extends Resource
     /** 2) Autorización de páginas/acciones del recurso */
     public static function canViewAny(): bool
     {
-        return static::usuarioPermitido();
+        return false;
     }
 
     public static function canCreate(): bool

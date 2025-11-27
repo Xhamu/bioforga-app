@@ -3,156 +3,116 @@
 namespace App\Exports;
 
 use App\Models\Referencia;
+use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromCollection;
+use Maatwebsite\Excel\Concerns\ShouldAutoSize;
+use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
-use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithStyles;
-use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Events\AfterSheet;
-use PhpOffice\PhpSpreadsheet\Cell\DataType;
-use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
-use Illuminate\Support\Collection;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
 class ReferenciasExport implements FromCollection, WithHeadings, WithMapping, WithEvents, WithStyles, ShouldAutoSize
 {
-    protected $tipo;
+    /**
+     * @var 'suministro'|'servicio'
+     */
+    protected string $tipo;
+
+    // Número de columnas reales (A..S => 19)
+    private const COLS = 19;
 
     public function __construct(string $tipo)
     {
         $this->tipo = $tipo;
     }
-    public function collection()
+
+    public function collection(): Collection
     {
         $filtros = ['SUSA', 'SUEX', 'SUOT', 'SUCA'];
 
+        // ================= SERVICIO =================
         if ($this->tipo === 'servicio') {
-            $referencias = Referencia::where(function ($query) use ($filtros) {
-                foreach ($filtros as $filtro) {
-                    $query->where('referencia', 'NOT LIKE', "%$filtro%");
-                }
-            })->get()->groupBy(fn($item) => optional($item->cliente)->razon_social ?? 'Sin Cliente');
+            $referencias = Referencia::query()
+                ->with(['cliente', 'usuarios'])
+                ->where(function ($query) use ($filtros) {
+                    foreach ($filtros as $filtro) {
+                        $query->where('referencia', 'NOT LIKE', "%{$filtro}%");
+                    }
+                })
+                ->orderBy('cliente_id')
+                ->orderBy('created_at')
+                ->get()
+                ->groupBy(fn($item) => optional($item->cliente)->razon_social ?? 'Sin cliente');
 
             $bloques = collect();
 
             foreach ($referencias as $cliente => $items) {
+                // Título de grupo
                 $bloques->push((object) [
                     'created_at' => null,
                     'referencia' => "=== {$cliente} ===",
                 ]);
 
-                $bloques->push((object) [
-                    'created_at' => 'FECHA',
-                    'referencia' => 'REFERENCIA',
-                    'proveedor_id' => 'CLIENTE',
-                    'contacto_nombre' => 'CONTACTO',
-                    'monte_parcela' => 'MONTE',
-                    'ayuntamiento' => 'MUNICIPIO',
-                    'ubicacion_gps' => 'UBICACION',
-                    'cantidad_aprox' => 'CANTIDAD',
-                    'producto_tipo' => 'TIPO-CLASIFICACIÓN',
-                    'observaciones' => 'OBSERVACIONES',
-                    'referencia_precio' => 'PRECIO',
-                    'estado' => 'ESTADO',
-                ]);
-
+                // Datos
                 foreach ($items as $d) {
                     $bloques->push($d);
                 }
 
-                $bloques->push((object) [
-                    'created_at' => null,
-                    'referencia' => null,
-                    'proveedor_id' => null,
-                    'contacto_nombre' => null,
-                    'monte_parcela' => null,
-                    'ayuntamiento' => null,
-                    'ubicacion_gps' => null,
-                    'cantidad_aprox' => null,
-                    'producto_tipo' => null,
-                    'observaciones' => null,
-                    'referencia_precio' => null,
-                    'estado' => null,
-                ]);
+                // Separador visual
+                $bloques->push($this->emptySeparatorRow());
             }
 
             return $bloques;
         }
 
-        // Si es suministro, agrupamos en bloques por filtro
+        // ================= SUMINISTRO =================
         $bloques = collect();
 
         foreach ($filtros as $tipo) {
-            $datos = Referencia::where('referencia', 'LIKE', "%$tipo%")->get();
+            $datos = Referencia::query()
+                ->with(['proveedor', 'usuarios'])
+                ->where('referencia', 'LIKE', "%{$tipo}%")
+                ->orderBy('created_at')
+                ->get();
 
-            if ($datos->isNotEmpty()) {
-                $nombreMapeado = match ($tipo) {
-                    'SUSA' => 'SACA',
-                    'SUEX' => 'EXPLOTACIÓN',
-                    'SUCA' => 'CARGADOR',
-                    'SUOT' => 'OTROS',
-                    default => $tipo,
-                };
-
-                // Fila de título de grupo
-                $bloques->push((object) [
-                    'created_at' => null,
-                    'referencia' => "=== {$nombreMapeado} ===",
-                    'proveedor_id' => null,
-                    'contacto_nombre' => null,
-                    'monte_parcela' => null,
-                    'ayuntamiento' => null,
-                    'ubicacion_gps' => null,
-                    'cantidad_aprox' => null,
-                    'producto_tipo' => null,
-                    'observaciones' => null,
-                    'estado' => null,
-                ]);
-
-                // Fila de encabezado personalizada
-                $bloques->push((object) [
-                    'created_at' => 'FECHA',
-                    'referencia' => 'REFERENCIA',
-                    'proveedor_id' => 'PROVEEDOR',
-                    'contacto_nombre' => 'CONTACTO',
-                    'monte_parcela' => 'MONTE',
-                    'ayuntamiento' => 'MUNICIPIO',
-                    'ubicacion_gps' => 'UBICACION',
-                    'cantidad_aprox' => 'CANTIDAD',
-                    'producto_tipo' => 'TIPO-CLASIFICACIÓN',
-                    'observaciones' => 'OBSERVACIONES',
-                    'referencia_precio' => 'PRECIO',
-                    'estado' => 'ESTADO',
-                ]);
-
-                // Datos reales
-                foreach ($datos as $d) {
-                    $bloques->push($d);
-                }
-
-                // Separador visual
-                $bloques->push((object) [
-                    'created_at' => null,
-                    'referencia' => null,
-                    'proveedor_id' => null,
-                    'contacto_nombre' => null,
-                    'monte_parcela' => null,
-                    'ayuntamiento' => null,
-                    'ubicacion_gps' => null,
-                    'cantidad_aprox' => null,
-                    'producto_tipo' => null,
-                    'observaciones' => null,
-                    'estado' => null,
-                ]);
+            if ($datos->isEmpty()) {
+                continue;
             }
+
+            $nombreMapeado = match ($tipo) {
+                'SUSA' => 'Saca',
+                'SUEX' => 'Explotación',
+                'SUCA' => 'Cargadero',
+                'SUOT' => 'Otros',
+                default => $tipo,
+            };
+
+            // Título de grupo
+            $bloques->push((object) [
+                'created_at' => null,
+                'referencia' => "=== {$nombreMapeado} ===",
+            ]);
+
+            // Datos
+            foreach ($datos as $d) {
+                $bloques->push($d);
+            }
+
+            // Separador visual
+            $bloques->push($this->emptySeparatorRow());
         }
 
         return $bloques;
     }
 
+    /**
+     * Cabecera estándar (fila 1 y cabeceras de cada bloque)
+     */
     public function headings(): array
     {
         return [
@@ -160,61 +120,83 @@ class ReferenciasExport implements FromCollection, WithHeadings, WithMapping, Wi
             'REFERENCIA',
             'PROVEEDOR / CLIENTE',
             'CONTACTO',
-            'PROVINCIA', // new
-            'MUNICIPIO', // new
+            'PROVINCIA',
+            'MUNICIPIO',
             'MONTE',
             'UBICACIÓN',
-            'TIPO', // new
-            'ESPECIE', // new
+            'TIPO',
+            'ESPECIE',
             'CANTIDAD',
             'OBSERVACIONES',
-            'CERTIFICACIÓN', // NEW
-            'G. SANIDAD', // NEW
-            'TARIFA / UNIDAD', // new
+            'CERTIFICACIÓN',
+            'G. SANIDAD',
+            'TARIFA / UNIDAD',
             'ESTADO',
-            'NEGOCIACIÓN', // new
-            'FOTOS', // new
-            'USUARIOS', // new
+            'NEGOCIACIÓN',
+            'FOTOS',
+            'USUARIOS',
+        ];
+    }
+
+    /**
+     * Fila separadora en blanco entre bloques.
+     */
+    protected function emptySeparatorRow(): object
+    {
+        return (object) [
+            'created_at' => null,
+            'referencia' => null,
+            'proveedor_id' => null,
+            'cliente_id' => null,
+            'contacto_nombre' => null,
+            'monte_parcela' => null,
+            'provincia' => null,
+            'ayuntamiento' => null,
+            'ubicacion_gps' => null,
+            'cantidad_aprox' => null,
+            'producto_tipo' => null,
+            'producto_especie' => null,
+            'observaciones' => null,
+            'tipo_certificacion' => null,
+            'guia_sanidad' => null,
+            'tarifa' => null,
+            'estado' => null,
+            'en_negociacion' => null,
         ];
     }
 
     public function map($row): array
     {
-        // Fila de grupo (título tipo "=== SACA ===")
-        if ($row->created_at === null && str_starts_with($row->referencia, '=== ')) {
-            return array_pad(["'" . $row->referencia], 20, null);
+        // ========= Fila de título de grupo (=== X ===) =========
+        if ($row->created_at === null && !empty($row->referencia) && str_starts_with((string) $row->referencia, '=== ')) {
+            // Prefijamos con ' para que Excel NO lo trate como fórmula
+            return array_pad(["'" . (string) $row->referencia], self::COLS, null);
         }
 
-        // Fila de encabezados personalizados para cada grupo
+        // ========= Fila cabecera interna de bloque =========
         if ($row->created_at === 'FECHA') {
             return $this->headings();
         }
 
-        // Fila separadora vacía
-        if ($row->created_at === null && $row->referencia === null) {
-            return array_fill(0, 20, null);
+        // ========= Fila separadora en blanco =========
+        if ($row->created_at === null && empty($row->referencia)) {
+            return array_fill(0, self::COLS, null);
         }
 
-        $esServicio = !str_contains($row->referencia, 'SU');
+        // ========= Fila de datos "normal" =========
+        $esServicio = !str_contains((string) $row->referencia, 'SU');
 
-        return [
-            $row->created_at?->format('d/m/Y'),
-            $row->referencia,
-            $esServicio
+        $clienteOProveedor = $esServicio
             ? optional($row->cliente)->razon_social
-            : optional($row->proveedor)->razon_social,
-            $row->contacto_nombre,
-            $row->provincia,
-            $row->ayuntamiento,
-            $row->monte_parcela,
-            $row->ubicacion_gps
-            ? '=HYPERLINK("https://maps.google.com/?q=' . urlencode($row->ubicacion_gps) . '")'
-            : null,
-            $row->producto_tipo,
-            $row->producto_especie,
-            $row->cantidad_aprox,
-            $row->observaciones,
-            $row->tipo_certificacion
+            : optional($row->proveedor)->razon_social;
+
+        // Link de Google Maps (como fórmula de Excel)
+        $gps = $row->ubicacion_gps
+            ? '=HYPERLINK("https://maps.google.com/?q=' . urlencode($row->ubicacion_gps) . '","Ver mapa")'
+            : null;
+
+        // Mapeo tipos de certificación
+        $certificacion = $row->tipo_certificacion
             ? match ($row->tipo_certificacion) {
                 'sure_induestrial' => 'SURE - Industrial',
                 'sure_foresal' => 'SURE - Forestal',
@@ -222,21 +204,52 @@ class ReferenciasExport implements FromCollection, WithHeadings, WithMapping, Wi
                 'pefc' => 'PEFC',
                 default => $row->tipo_certificacion,
             }
-            : null,
+            : null;
+
+        // Tarifa / unidad un poco más legible
+        $tarifa = $row->tarifa
+            ? match ($row->tarifa) {
+                'toneladas' => '€/tonelada',
+                'm3' => '€/m³',
+                'hora' => '€/hora',
+                default => $row->tarifa,
+            }
+            : null;
+
+        // Estado y negociación en texto legible
+        $estado = match ($row->estado) {
+            'abierto' => 'Abierto',
+            'cerrado' => 'Cerrado',
+            'en_proceso' => 'En proceso',
+            'cerrado_no_procede' => 'Cerrado (no procede)',
+            default => $row->estado ?? '',
+        };
+
+        $negociacion = match ($row->en_negociacion) {
+            'confirmado' => 'Confirmado',
+            'sin_confirmar' => 'Sin confirmar',
+            default => $row->en_negociacion ?? '',
+        };
+
+        return [
+            optional($row->created_at)?->format('d/m/Y'),
+            $row->referencia,
+            $clienteOProveedor,
+            $row->contacto_nombre,
+            $row->provincia,
+            $row->ayuntamiento,
+            $row->monte_parcela,
+            $gps,
+            $row->producto_tipo,
+            $row->producto_especie,
+            $row->cantidad_aprox,
+            $row->observaciones,
+            $certificacion,
             $row->guia_sanidad ? 'Sí' : 'No',
-            $row->tarifa,
-            match ($row->estado) {
-                'abierto' => 'Abierto',
-                'cerrado' => 'Cerrado',
-                'en_proceso' => 'En proceso',
-                default => $row->estado ?? '',
-            },
-            match ($row->en_negociacion) {
-                'confirmado' => 'Confirmado',
-                'sin_confirmar' => 'Sin confirmar',
-                default => $row->en_negociacion ?? '',
-            },
-            '', // FOTOS (vacío, puedes añadir lógica si tienes imágenes)
+            $tarifa,
+            $estado,
+            $negociacion,
+            '', // FOTOS (reservado para futuro)
             optional($row->usuarios)->pluck('name')->join(', '),
         ];
     }
@@ -244,37 +257,38 @@ class ReferenciasExport implements FromCollection, WithHeadings, WithMapping, Wi
     public function registerEvents(): array
     {
         return [
-            AfterSheet::class => function (AfterSheet $event) {
+            AfterSheet::class => function (AfterSheet $event): void {
                 $sheet = $event->sheet->getDelegate();
                 $rowCount = $sheet->getHighestRow();
 
-                // Congelar fila de encabezado
+                // Congelar encabezado (fila 1)
                 $sheet->freezePane('A2');
 
-                // Autofiltro en fila 1
+                // Autofiltro sobre fila de encabezado
                 $sheet->setAutoFilter('A1:S1');
 
-                // Ajustar altura según observaciones (columna I)
+                // Ajustar altura de filas según longitud de OBSERVACIONES (columna L)
                 for ($row = 2; $row <= $rowCount; $row++) {
-                    $contenido = $sheet->getCell("L{$row}")->getValue();
-                    $saltos = substr_count((string) $contenido, PHP_EOL);
-                    $lineas = floor(strlen((string) $contenido) / 140);
+                    $contenido = (string) $sheet->getCell("L{$row}")->getValue();
+                    $saltos = substr_count($contenido, PHP_EOL);
+                    $lineas = floor(strlen($contenido) / 140);
                     $altura = max(15 * ($lineas + $saltos + 1), 16);
+
                     $sheet->getRowDimension($row)->setRowHeight($altura);
                 }
 
-                // Colores según estado en columna K
+                // Colorear filas según ESTADO (columna P)
                 for ($row = 2; $row <= $rowCount; $row++) {
                     $estado = (string) $sheet->getCell("P{$row}")->getValue();
 
                     $color = match ($estado) {
-                        'Cerrado' => 'FFCCCC',
-                        'En proceso' => 'B8B825',
+                        'Cerrado', 'Cerrado (no procede)' => 'FFCCCC', // rojo suave
+                        'En proceso' => 'FFF7C2', // amarillo suave
                         default => null,
                     };
 
                     if ($color) {
-                        $sheet->getStyle("A{$row}:T{$row}")
+                        $sheet->getStyle("A{$row}:S{$row}")
                             ->getFill()
                             ->setFillType(Fill::FILL_SOLID)
                             ->getStartColor()
@@ -288,7 +302,8 @@ class ReferenciasExport implements FromCollection, WithHeadings, WithMapping, Wi
     public function styles(Worksheet $sheet): array
     {
         return [
-            1 => [ // Fila de encabezado
+            // Fila de encabezado principal
+            1 => [
                 'font' => ['bold' => true],
                 'alignment' => [
                     'horizontal' => Alignment::HORIZONTAL_CENTER,
@@ -298,7 +313,9 @@ class ReferenciasExport implements FromCollection, WithHeadings, WithMapping, Wi
                     'bottom' => ['borderStyle' => Border::BORDER_THIN],
                 ],
             ],
-            'A:S' => [ // Aplica a todas las columnas de datos
+
+            // Estilo general columnas A..S
+            'A:S' => [
                 'alignment' => [
                     'horizontal' => Alignment::HORIZONTAL_CENTER,
                     'vertical' => Alignment::VERTICAL_CENTER,

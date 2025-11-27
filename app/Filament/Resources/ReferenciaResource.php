@@ -2,6 +2,11 @@
 
 namespace App\Filament\Resources;
 
+use App\Exports\BalanceDeMasasExport;
+use App\Exports\PartesTrabajoMultiSheetExport;
+use App\Exports\ReferenciasExport;
+use App\Exports\ReferenciasFiltradasExport;
+use App\Exports\StockClientesServicioMainExport;
 use App\Filament\Resources\ReferenciaResource\Pages;
 use App\Filament\Resources\ReferenciaResource\Pages\ListReferencias;
 use App\Filament\Resources\ReferenciaResource\RelationManagers;
@@ -41,6 +46,7 @@ use Filament\Forms\Components\View;
 use Filament\Tables\Columns\Layout\Grid;
 use Filament\Tables\Columns\Layout\Panel;
 use Jenssegers\Agent\Agent;
+use Maatwebsite\Excel\Facades\Excel;
 use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 use pxlrbt\FilamentExcel\Actions\Tables\ExportAction;
 use pxlrbt\FilamentExcel\Actions\Tables\ExportBulkAction;
@@ -887,85 +893,139 @@ class ReferenciaResource extends Resource
                 )
                 ->filtersFormColumns(2)
                 ->headerActions([
-                    Action::make('exportar_balance_masas')
-                        ->label('Balance de Masas')
-                        ->icon('heroicon-m-document-arrow-down')
-                        ->color('gray')
-                        ->modalWidth('md')
-                        ->modalHeading('Selecciona el periodo para exportar')
-                        ->modalSubmitActionLabel('Exportar')
-                        ->form([
-                            DatePicker::make('fecha_inicio')
-                                ->label('Fecha inicio')
-                                ->default(now()->subDays(30)->startOfDay())
-                                ->required(),
-                            DatePicker::make('fecha_fin')
-                                ->label('Fecha fin')
-                                ->default(now()->endOfDay())
-                                ->required(),
-                        ])
-                        ->action(function (array $data) {
-                            $fechaInicio = $data['fecha_inicio'];
-                            $fechaFin = $data['fecha_fin'];
-
-                            $hayDatos = \App\Models\CargaTransporte::whereBetween('fecha_hora_inicio_carga', [
-                                $fechaInicio,
-                                $fechaFin,
-                            ])->exists();
-
-                            if (!$hayDatos) {
-                                Notification::make()
-                                    ->title('Sin datos')
-                                    ->body('No hay cargas registradas en el periodo seleccionado.')
-                                    ->warning()
-                                    ->send();
-                                return;
-                            }
-
-                            $filename = 'balance-de-masas-' . now()->format('Y-m-d') . '.xlsx';
-                            return \Maatwebsite\Excel\Facades\Excel::download(
-                                new \App\Exports\BalanceDeMasasExport($fechaInicio, $fechaFin),
-                                $filename
-                            );
-                        })
-                        ->after(function () {
-                            Notification::make()
-                                ->title('Exportación iniciada')
-                                ->body('El archivo "Balance de Masas" se está descargando.')
-                                ->success()
-                                ->send();
-                        }),
-
                     Action::make('exportar_excel')
                         ->label('Exportar a Excel')
+                        ->icon('heroicon-m-document-arrow-down')
                         ->color('gray')
-                        ->modalWidth('xl')
+                        ->visible(fn() => auth()->user()?->hasAnyRole(['técnico', 'administración', 'superadmin']))
+                        ->modalWidth('lg')
+                        ->modalHeading('Exportar a Excel')
                         ->modalSubmitActionLabel('Exportar')
                         ->modalCancelActionLabel('Cerrar')
                         ->form([
                             Select::make('tipo_exportacion')
-                                ->label('Selecciona una opción')
+                                ->label('Tipo de exportación')
                                 ->options([
-                                    'suministro' => 'Suministro',
-                                    'servicio' => 'Servicio',
+                                    'partes_trabajo' => 'Partes de trabajo',
+                                    'stock_clientes_servicio' => 'Stock clientes de servicio',
+                                    'referencias_suministro' => 'Referencias de suministro',
+                                    'referencias_servicio' => 'Referencias de servicio',
+                                    'balance_masas' => 'Balance de masas',
+                                    'referencias_filtradas' => 'Referencias (según filtros)',
                                 ])
                                 ->searchable()
-                                ->required(),
+                                ->required()
+                                ->reactive(),
 
                             TextInput::make('nombre_archivo')
                                 ->label('Nombre del archivo')
-                                ->default('referencias-' . now()->format('Y-m-d'))
-                                ->required(),
-                        ])
-                        ->action(function (array $data) {
-                            $tipo = $data['tipo_exportacion'];
-                            $nombre = $data['nombre_archivo'] . '.xlsx';
+                                ->default(fn(Get $get) => match ($get('tipo_exportacion')) {
+                                    'partes_trabajo' => 'partes_trabajo_' . now()->format('Y-m-d'),
+                                    'stock_clientes_servicio' => 'stock_clientes_servicio_' . now()->format('Y-m-d'),
+                                    'referencias_suministro' => 'referencias_suministro_' . now()->format('Y-m-d'),
+                                    'referencias_servicio' => 'referencias_servicio_' . now()->format('Y-m-d'),
+                                    'balance_masas' => 'balance_masas_' . now()->format('Y-m-d'),
+                                    'referencias_filtradas' => 'referencias_filtradas_' . now()->format('Y-m-d'),
+                                    default => 'export_' . now()->format('Y-m-d'),
+                                })
+                                ->required()
+                                ->visible(fn(Get $get) => filled($get('tipo_exportacion'))),
 
-                            return redirect()->route('referencias.export', [
-                                'tipo' => $tipo,
-                                'nombre' => $nombre,
-                            ]);
-                        })
+                            DatePicker::make('fecha_inicio')
+                                ->label('Fecha inicio (balance de masas)')
+                                ->default(now()->subDays(30)->startOfDay())
+                                ->visible(fn(Get $get) => $get('tipo_exportacion') === 'balance_masas'),
+
+                            DatePicker::make('fecha_fin')
+                                ->label('Fecha fin (balance de masas)')
+                                ->default(now()->endOfDay())
+                                ->visible(fn(Get $get) => $get('tipo_exportacion') === 'balance_masas'),
+                        ])
+                        ->action(function (array $data, Action $action) {
+                            $tipo = $data['tipo_exportacion'];
+                            $nombre = ($data['nombre_archivo'] ?? 'export_' . now()->format('Y-m-d')) . '.xlsx';
+
+                            switch ($tipo) {
+                                case 'partes_trabajo':
+                                    // Multi-hoja por tipo de parte
+                                    return Excel::download(new PartesTrabajoMultiSheetExport, $nombre);
+
+                                case 'stock_clientes_servicio':
+                                    return Excel::download(new StockClientesServicioMainExport, $nombre);
+
+                                case 'referencias_suministro':
+                                    return Excel::download(new ReferenciasExport('suministro'), $nombre);
+
+                                case 'referencias_servicio':
+                                    return Excel::download(new ReferenciasExport('servicio'), $nombre);
+
+                                case 'balance_masas':
+                                    $fechaInicio = $data['fecha_inicio'] ?? null;
+                                    $fechaFin = $data['fecha_fin'] ?? null;
+
+                                    if (!$fechaInicio || !$fechaFin) {
+                                        Notification::make()
+                                            ->title('Rango de fechas requerido')
+                                            ->body('Debes indicar fecha de inicio y fin para el balance de masas.')
+                                            ->warning()
+                                            ->send();
+                                        return;
+                                    }
+
+                                    $hayDatos = CargaTransporte::whereBetween('fecha_hora_inicio_carga', [
+                                        $fechaInicio,
+                                        $fechaFin,
+                                    ])->exists();
+
+                                    if (!$hayDatos) {
+                                        Notification::make()
+                                            ->title('Sin datos')
+                                            ->body('No hay cargas registradas en el periodo seleccionado.')
+                                            ->warning()
+                                            ->send();
+                                        return;
+                                    }
+
+                                    return Excel::download(
+                                        new BalanceDeMasasExport($fechaInicio, $fechaFin),
+                                        $nombre
+                                    );
+
+                                case 'referencias_filtradas':
+                                    // Usamos los filtros activos del listado de referencias
+                                    $livewire = $action->getLivewire();
+
+                                    if (method_exists($livewire, 'getFilteredTableQuery')) {
+                                        /** @var \Illuminate\Database\Eloquent\Builder $query */
+                                        $query = $livewire->getFilteredTableQuery();
+                                    } else {
+                                        $query = Referencia::query();
+                                    }
+
+                                    $referencias = $query
+                                        ->with(['cliente', 'proveedor', 'usuarios'])
+                                        ->get();
+
+                                    if ($referencias->isEmpty()) {
+                                        Notification::make()
+                                            ->title('Sin resultados')
+                                            ->body('No hay referencias para exportar con los filtros actuales.')
+                                            ->warning()
+                                            ->send();
+                                        return;
+                                    }
+
+                                    return Excel::download(
+                                        new ReferenciasFiltradasExport($referencias),
+                                        $nombre
+                                    );
+                            }
+
+                            Notification::make()
+                                ->title('Tipo de exportación no reconocido')
+                                ->warning()
+                                ->send();
+                        }),
                 ])
                 ->actions([
                     Tables\Actions\EditAction::make(),
@@ -1402,85 +1462,139 @@ class ReferenciaResource extends Resource
                 )
                 ->filtersFormColumns(2)
                 ->headerActions([
-                    Action::make('exportar_balance_masas')
-                        ->label('Balance de Masas')
-                        ->icon('heroicon-m-document-arrow-down')
-                        ->color('gray')
-                        ->modalWidth('md')
-                        ->modalHeading('Selecciona el periodo para exportar')
-                        ->modalSubmitActionLabel('Exportar')
-                        ->form([
-                            DatePicker::make('fecha_inicio')
-                                ->label('Fecha inicio')
-                                ->default(now()->subDays(30)->startOfDay())
-                                ->required(),
-                            DatePicker::make('fecha_fin')
-                                ->label('Fecha fin')
-                                ->default(now()->endOfDay())
-                                ->required(),
-                        ])
-                        ->action(function (array $data) {
-                            $fechaInicio = $data['fecha_inicio'];
-                            $fechaFin = $data['fecha_fin'];
-
-                            $hayDatos = \App\Models\CargaTransporte::whereBetween('fecha_hora_inicio_carga', [
-                                $fechaInicio,
-                                $fechaFin,
-                            ])->exists();
-
-                            if (!$hayDatos) {
-                                Notification::make()
-                                    ->title('Sin datos')
-                                    ->body('No hay cargas registradas en el periodo seleccionado.')
-                                    ->warning()
-                                    ->send();
-                                return;
-                            }
-
-                            $filename = 'balance-de-masas-' . now()->format('Y-m-d') . '.xlsx';
-                            return \Maatwebsite\Excel\Facades\Excel::download(
-                                new \App\Exports\BalanceDeMasasExport($fechaInicio, $fechaFin),
-                                $filename
-                            );
-                        })
-                        ->after(function () {
-                            Notification::make()
-                                ->title('Exportación iniciada')
-                                ->body('El archivo "Balance de Masas" se está descargando.')
-                                ->success()
-                                ->send();
-                        }),
-
                     Action::make('exportar_excel')
                         ->label('Exportar a Excel')
+                        ->icon('heroicon-m-document-arrow-down')
                         ->color('gray')
-                        ->modalWidth('xl')
+                        ->visible(fn() => auth()->user()?->hasAnyRole(['técnico', 'administración', 'superadmin']))
+                        ->modalWidth('lg')
+                        ->modalHeading('Exportar a Excel')
                         ->modalSubmitActionLabel('Exportar')
                         ->modalCancelActionLabel('Cerrar')
                         ->form([
                             Select::make('tipo_exportacion')
-                                ->label('Selecciona una opción')
+                                ->label('Tipo de exportación')
                                 ->options([
-                                    'suministro' => 'Suministro',
-                                    'servicio' => 'Servicio',
+                                    'partes_trabajo' => 'Partes de trabajo',
+                                    'stock_clientes_servicio' => 'Stock clientes de servicio',
+                                    'referencias_suministro' => 'Referencias de suministro',
+                                    'referencias_servicio' => 'Referencias de servicio',
+                                    'balance_masas' => 'Balance de masas',
+                                    'referencias_filtradas' => 'Referencias (según filtros)',
                                 ])
                                 ->searchable()
-                                ->required(),
+                                ->required()
+                                ->reactive(),
 
                             TextInput::make('nombre_archivo')
                                 ->label('Nombre del archivo')
-                                ->default('referencias-' . now()->format('Y-m-d'))
-                                ->required(),
-                        ])
-                        ->action(function (array $data) {
-                            $tipo = $data['tipo_exportacion'];
-                            $nombre = $data['nombre_archivo'] . '.xlsx';
+                                ->default(fn(Get $get) => match ($get('tipo_exportacion')) {
+                                    'partes_trabajo' => 'partes_trabajo_' . now()->format('Y-m-d'),
+                                    'stock_clientes_servicio' => 'stock_clientes_servicio_' . now()->format('Y-m-d'),
+                                    'referencias_suministro' => 'referencias_suministro_' . now()->format('Y-m-d'),
+                                    'referencias_servicio' => 'referencias_servicio_' . now()->format('Y-m-d'),
+                                    'balance_masas' => 'balance_masas_' . now()->format('Y-m-d'),
+                                    'referencias_filtradas' => 'referencias_filtradas_' . now()->format('Y-m-d'),
+                                    default => 'export_' . now()->format('Y-m-d'),
+                                })
+                                ->required()
+                                ->visible(fn(Get $get) => filled($get('tipo_exportacion'))),
 
-                            return redirect()->route('referencias.export', [
-                                'tipo' => $tipo,
-                                'nombre' => $nombre,
-                            ]);
-                        })
+                            DatePicker::make('fecha_inicio')
+                                ->label('Fecha inicio (balance de masas)')
+                                ->default(now()->subDays(30)->startOfDay())
+                                ->visible(fn(Get $get) => $get('tipo_exportacion') === 'balance_masas'),
+
+                            DatePicker::make('fecha_fin')
+                                ->label('Fecha fin (balance de masas)')
+                                ->default(now()->endOfDay())
+                                ->visible(fn(Get $get) => $get('tipo_exportacion') === 'balance_masas'),
+                        ])
+                        ->action(function (array $data, Action $action) {
+                            $tipo = $data['tipo_exportacion'];
+                            $nombre = ($data['nombre_archivo'] ?? 'export_' . now()->format('Y-m-d')) . '.xlsx';
+
+                            switch ($tipo) {
+                                case 'partes_trabajo':
+                                    // Multi-hoja por tipo de parte
+                                    return Excel::download(new PartesTrabajoMultiSheetExport, $nombre);
+
+                                case 'stock_clientes_servicio':
+                                    return Excel::download(new StockClientesServicioMainExport, $nombre);
+
+                                case 'referencias_suministro':
+                                    return Excel::download(new ReferenciasExport('suministro'), $nombre);
+
+                                case 'referencias_servicio':
+                                    return Excel::download(new ReferenciasExport('servicio'), $nombre);
+
+                                case 'balance_masas':
+                                    $fechaInicio = $data['fecha_inicio'] ?? null;
+                                    $fechaFin = $data['fecha_fin'] ?? null;
+
+                                    if (!$fechaInicio || !$fechaFin) {
+                                        Notification::make()
+                                            ->title('Rango de fechas requerido')
+                                            ->body('Debes indicar fecha de inicio y fin para el balance de masas.')
+                                            ->warning()
+                                            ->send();
+                                        return;
+                                    }
+
+                                    $hayDatos = CargaTransporte::whereBetween('fecha_hora_inicio_carga', [
+                                        $fechaInicio,
+                                        $fechaFin,
+                                    ])->exists();
+
+                                    if (!$hayDatos) {
+                                        Notification::make()
+                                            ->title('Sin datos')
+                                            ->body('No hay cargas registradas en el periodo seleccionado.')
+                                            ->warning()
+                                            ->send();
+                                        return;
+                                    }
+
+                                    return Excel::download(
+                                        new BalanceDeMasasExport($fechaInicio, $fechaFin),
+                                        $nombre
+                                    );
+
+                                case 'referencias_filtradas':
+                                    // Usamos los filtros activos del listado de referencias
+                                    $livewire = $action->getLivewire();
+
+                                    if (method_exists($livewire, 'getFilteredTableQuery')) {
+                                        /** @var \Illuminate\Database\Eloquent\Builder $query */
+                                        $query = $livewire->getFilteredTableQuery();
+                                    } else {
+                                        $query = Referencia::query();
+                                    }
+
+                                    $referencias = $query
+                                        ->with(['cliente', 'proveedor', 'usuarios'])
+                                        ->get();
+
+                                    if ($referencias->isEmpty()) {
+                                        Notification::make()
+                                            ->title('Sin resultados')
+                                            ->body('No hay referencias para exportar con los filtros actuales.')
+                                            ->warning()
+                                            ->send();
+                                        return;
+                                    }
+
+                                    return Excel::download(
+                                        new ReferenciasFiltradasExport($referencias),
+                                        $nombre
+                                    );
+                            }
+
+                            Notification::make()
+                                ->title('Tipo de exportación no reconocido')
+                                ->warning()
+                                ->send();
+                        }),
                 ])
                 ->actions([
                     Tables\Actions\EditAction::make(),

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\ReferenciaAlertasController;
 use App\Models\Referencia;
 use Illuminate\Support\Facades\Route;
 use App\Exports\ReferenciasExport;
@@ -21,3 +22,8 @@ Route::get('/admin/referencias/export', function (Request $request) {
 
     return Excel::download(new ReferenciasExport($tipo), $nombre);
 })->name('referencias.export')->middleware(['auth', 'verified']);
+
+Route::post(
+    '/referencias/alertas/aceptar',
+    [ReferenciaAlertasController::class, 'aceptarTodas']
+)->name('referencias.alertas.aceptar');

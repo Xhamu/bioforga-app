@@ -102,8 +102,9 @@ class StockCalculator
                 'ct.parte_trabajo_suministro_transporte_id'
             )
             ->whereNull('ct.deleted_at')
-            ->where('ct.almacen_id', $almacen->id)
-            ->whereNotNull('pt.cliente_id')
+            ->where('ct.almacen_id', $almacen->id)       // origen = este almacén
+            ->whereNull('ct.referencia_id')             // NO es una descarga desde referencia
+            ->whereNotNull('ct.fecha_hora_inicio_carga')// ya ha empezado a cargar -> reserva stock
             ->orderByRaw('ct.fecha_hora_inicio_carga asc, ct.id asc')
             ->get([
                 'ct.id',
@@ -407,6 +408,7 @@ class StockCalculator
             ->where('ct.almacen_id', $almacen->id)
             ->whereNull('ct.referencia_id')           // salidas desde almacén
             ->whereNotNull('ct.asignacion_cert_esp')  // snapshot presente
+            ->whereNotNull('ct.fecha_hora_inicio_carga')
             ->orderByRaw('ct.created_at asc, ct.id asc')
             ->pluck('ct.asignacion_cert_esp')
             ->map(fn($json) => json_decode($json, true) ?: [])

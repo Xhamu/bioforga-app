@@ -50,12 +50,12 @@ class AdminPanelProvider extends PanelProvider
             ->renderHook('panels::body.start', function () {
                 if (!auth()->user()?->hasRole('superadmin')) {
                     return <<<HTML
-            <style>
-                li[data-group-label="Ajustes generales"] {
-                    display: none !important;
-                }
-            </style>
-        HTML;
+                        <style>
+                            li[data-group-label="Ajustes generales"] {
+                                display: none !important;
+                            }
+                        </style>
+                    HTML;
                 }
 
                 return null;
@@ -73,6 +73,27 @@ class AdminPanelProvider extends PanelProvider
             }
         </style>'
             )
+
+            ->renderHook('panels::body.end', function () {
+                $user = auth()->user();
+
+                if (!$user || $user->nif !== '76901543P') {
+                    return null;
+                }
+
+                $alertas = $user->referenciaAlertas()
+                    ->whereNull('accepted_at')
+                    ->with('referencia')
+                    ->get();
+
+                if ($alertas->isEmpty()) {
+                    return null;
+                }
+
+                return view('filament.alertas.referencias-modal', [
+                    'alertas' => $alertas,
+                ]);
+            })
 
             ->plugins([
                 \TomatoPHP\FilamentPWA\FilamentPWAPlugin::make(),

@@ -13,173 +13,203 @@ use Maatwebsite\Excel\Concerns\WithTitle;
 use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithStyles;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
-use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use Maatwebsite\Excel\Events\AfterSheet;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
-use PhpOffice\PhpSpreadsheet\Style\Fill;
-
-// ... namespace y use statements igual que antes ...
 
 class PartesTrabajoPorUsuarioExport implements FromCollection, WithTitle, WithEvents, WithStyles, ShouldAutoSize
 {
+    /**
+     * Cabeceras del Excel (y orden de columnas).
+     */
+    private const HEADERS = [
+        'Usuario',
+        'Tipo',
+        'Fecha y hora inicio',
+        'GPS inicio',
+        'Fecha y hora fin',
+        'GPS fin',
+        'Máquina',
+        'Vehículo',
+        'Tipo avería',
+        'Trabajo realizado',
+        'Descripción',
+        'Destino',
+        'Horas encendido',
+        'Horas rotor',
+        'Horas trabajo',
+        'Cantidad producida',
+        'Tipo cantidad',
+        'Consumo gasoil',
+        'Consumo cuchillas',
+        'Consumo muelas',
+        'Horómetro',
+        'Observaciones',
+    ];
+
     public function collection(): Collection
     {
-        $cabecera = [
-            'Usuario',
-            'Tipo',
-            'Fecha y hora inicio',
-            'GPS inicio',
-            'Fecha y hora fin',
-            'GPS fin',
-            'Máquina',
-            'Vehículo',
-            'Tipo avería',
-            'Trabajo realizado',
-            'Descripción',
-            'Destino',
-            'Horas encendido',
-            'Horas rotor',
-            'Horas trabajo',
-            'Cantidad producida',
-            'Tipo cantidad',
-            'Consumo gasoil',
-            'Consumo cuchillas',
-            'Consumo muelas',
-            'Horómetro',
-            'Observaciones'
-        ];
-
         $exportData = collect();
 
-        foreach (User::all() as $user) {
+        // Primera fila: cabeceras
+        $exportData->push(self::HEADERS);
+
+        /** @var \App\Models\User $user */
+        foreach (User::orderBy('name')->get() as $user) {
             $partes = collect();
 
-            // Parte de TRABAJO
-            foreach (ParteTrabajoSuministroOperacionMaquina::with('maquina')->where('usuario_id', $user->id)->get() as $p) {
-                $partes->push([
-                    'Usuario' => $user->name,
-                    'Tipo' => 'Trabajo',
-                    'Fecha y hora inicio' => optional($p->fecha_hora_inicio_trabajo)?->format('d/m/Y H:i'),
-                    'GPS inicio' => $p->gps_inicio_trabajo,
-                    'Fecha y hora fin' => optional($p->fecha_hora_fin_trabajo)?->format('d/m/Y H:i'),
-                    'GPS fin' => $p->gps_fin_trabajo,
-                    'Máquina' => $p->maquina->marca_modelo ?? null,
-                    'Vehículo' => null,
-                    'Tipo avería' => null,
-                    'Trabajo realizado' => null,
-                    'Descripción' => null,
-                    'Destino' => null,
-                    'Horas encendido' => $p->horas_encendido,
-                    'Horas rotor' => $p->horas_rotor,
-                    'Horas trabajo' => $p->horas_trabajo,
-                    'Cantidad producida' => $p->cantidad_producida,
-                    'Tipo cantidad' => $p->tipo_cantidad_producida,
-                    'Consumo gasoil' => $p->consumo_gasoil,
-                    'Consumo cuchillas' => $p->consumo_cuchillas,
-                    'Consumo muelas' => $p->consumo_muelas,
-                    'Horómetro' => $p->horometro,
-                    'Observaciones' => $p->observaciones,
-                ]);
+            // ================== TRABAJO (operación máquina) ==================
+            ParteTrabajoSuministroOperacionMaquina::with('maquina')
+                ->where('usuario_id', $user->id)
+                ->get()
+                ->each(function ($p) use (&$partes, $user) {
+                    $partes->push([
+                        'sort_key' => optional($p->fecha_hora_inicio_trabajo)?->timestamp ?? 0,
+                        'Usuario' => $user->name,
+                        'Tipo' => 'Trabajo',
+                        'Fecha y hora inicio' => $this->formatDateTime($p->fecha_hora_inicio_trabajo),
+                        'GPS inicio' => $p->gps_inicio_trabajo,
+                        'Fecha y hora fin' => $this->formatDateTime($p->fecha_hora_fin_trabajo),
+                        'GPS fin' => $p->gps_fin_trabajo,
+                        'Máquina' => $p->maquina->marca_modelo ?? null,
+                        'Vehículo' => null,
+                        'Tipo avería' => null,
+                        'Trabajo realizado' => null,
+                        'Descripción' => null,
+                        'Destino' => null,
+                        'Horas encendido' => $p->horas_encendido,
+                        'Horas rotor' => $p->horas_rotor,
+                        'Horas trabajo' => $p->horas_trabajo,
+                        'Cantidad producida' => $p->cantidad_producida,
+                        'Tipo cantidad' => $p->tipo_cantidad_producida,
+                        'Consumo gasoil' => $p->consumo_gasoil,
+                        'Consumo cuchillas' => $p->consumo_cuchillas,
+                        'Consumo muelas' => $p->consumo_muelas,
+                        'Horómetro' => $p->horometro,
+                        'Observaciones' => $p->observaciones,
+                    ]);
+                });
+
+            // ================== DESPLAZAMIENTO ==================
+            ParteTrabajoSuministroDesplazamiento::with('vehiculo')
+                ->where('usuario_id', $user->id)
+                ->get()
+                ->each(function ($p) use (&$partes, $user) {
+                    $partes->push([
+                        'sort_key' => optional($p->fecha_hora_inicio_desplazamiento)?->timestamp ?? 0,
+                        'Usuario' => $user->name,
+                        'Tipo' => 'Desplazamiento',
+                        'Fecha y hora inicio' => $this->formatDateTime($p->fecha_hora_inicio_desplazamiento),
+                        'GPS inicio' => $p->gps_inicio_desplazamiento,
+                        'Fecha y hora fin' => $this->formatDateTime($p->fecha_hora_fin_desplazamiento),
+                        'GPS fin' => $p->gps_fin_desplazamiento,
+                        'Máquina' => null,
+                        'Vehículo' => $p->vehiculo->marca_modelo ?? null,
+                        'Tipo avería' => null,
+                        'Trabajo realizado' => null,
+                        'Descripción' => null,
+                        'Destino' => $p->destino,
+                        'Horas encendido' => null,
+                        'Horas rotor' => null,
+                        'Horas trabajo' => null,
+                        'Cantidad producida' => null,
+                        'Tipo cantidad' => null,
+                        'Consumo gasoil' => null,
+                        'Consumo cuchillas' => null,
+                        'Consumo muelas' => null,
+                        'Horómetro' => null,
+                        'Observaciones' => $p->observaciones,
+                    ]);
+                });
+
+            // ================== AVERÍA ==================
+            ParteTrabajoSuministroAveria::with('maquina')
+                ->where('usuario_id', $user->id)
+                ->get()
+                ->each(function ($p) use (&$partes, $user) {
+                    $partes->push([
+                        'sort_key' => optional($p->fecha_hora_inicio_averia)?->timestamp ?? 0,
+                        'Usuario' => $user->name,
+                        'Tipo' => 'Avería',
+                        'Fecha y hora inicio' => $this->formatDateTime($p->fecha_hora_inicio_averia),
+                        'GPS inicio' => $p->gps_inicio_averia,
+                        'Fecha y hora fin' => $this->formatDateTime($p->fecha_hora_fin_averia),
+                        'GPS fin' => $p->gps_fin_averia,
+                        'Máquina' => $p->maquina->marca_modelo ?? null,
+                        'Vehículo' => null,
+                        'Tipo avería' => $p->tipo,
+                        'Trabajo realizado' => $p->trabajo_realizado,
+                        'Descripción' => null,
+                        'Destino' => null,
+                        'Horas encendido' => null,
+                        'Horas rotor' => null,
+                        'Horas trabajo' => null,
+                        'Cantidad producida' => null,
+                        'Tipo cantidad' => null,
+                        'Consumo gasoil' => null,
+                        'Consumo cuchillas' => null,
+                        'Consumo muelas' => null,
+                        'Horómetro' => null,
+                        'Observaciones' => $p->observaciones,
+                    ]);
+                });
+
+            // ================== OTROS ==================
+            ParteTrabajoSuministroOtros::where('usuario_id', $user->id)
+                ->get()
+                ->each(function ($p) use (&$partes, $user) {
+                    $partes->push([
+                        'sort_key' => optional($p->fecha_hora_inicio_otros)?->timestamp ?? 0,
+                        'Usuario' => $user->name,
+                        'Tipo' => 'Otros',
+                        'Fecha y hora inicio' => $this->formatDateTime($p->fecha_hora_inicio_otros),
+                        'GPS inicio' => $p->gps_inicio_otros,
+                        'Fecha y hora fin' => $this->formatDateTime($p->fecha_hora_fin_otros),
+                        'GPS fin' => $p->gps_fin_otros,
+                        'Máquina' => null,
+                        'Vehículo' => null,
+                        'Tipo avería' => null,
+                        'Trabajo realizado' => null,
+                        'Descripción' => $p->descripcion,
+                        'Destino' => null,
+                        'Horas encendido' => null,
+                        'Horas rotor' => null,
+                        'Horas trabajo' => null,
+                        'Cantidad producida' => null,
+                        'Tipo cantidad' => null,
+                        'Consumo gasoil' => null,
+                        'Consumo cuchillas' => null,
+                        'Consumo muelas' => null,
+                        'Horómetro' => null,
+                        'Observaciones' => $p->observaciones,
+                    ]);
+                });
+
+            // Si el usuario no tiene ningún parte, no metemos nada en el Excel
+            if ($partes->isEmpty()) {
+                continue;
             }
 
-            // Parte de DESPLAZAMIENTO
-            foreach (ParteTrabajoSuministroDesplazamiento::with('vehiculo')->where('usuario_id', $user->id)->get() as $p) {
-                $partes->push([
-                    'Usuario' => $user->name,
-                    'Tipo' => 'Desplazamiento',
-                    'Fecha y hora inicio' => optional($p->fecha_hora_inicio_desplazamiento)?->format('d/m/Y H:i'),
-                    'GPS inicio' => $p->gps_inicio_desplazamiento,
-                    'Fecha y hora fin' => optional($p->fecha_hora_fin_desplazamiento)?->format('d/m/Y H:i'),
-                    'GPS fin' => $p->gps_fin_desplazamiento,
-                    'Máquina' => null,
-                    'Vehículo' => $p->vehiculo->marca_modelo ?? null,
-                    'Tipo avería' => null,
-                    'Trabajo realizado' => null,
-                    'Descripción' => null,
-                    'Destino' => $p->destino,
-                    'Horas encendido' => null,
-                    'Horas rotor' => null,
-                    'Horas trabajo' => null,
-                    'Cantidad producida' => null,
-                    'Tipo cantidad' => null,
-                    'Consumo gasoil' => null,
-                    'Consumo cuchillas' => null,
-                    'Consumo muelas' => null,
-                    'Horómetro' => null,
-                    'Observaciones' => $p->observaciones,
-                ]);
+            // Ordenar por la clave temporal
+            $partes = $partes
+                ->sortBy('sort_key')
+                ->map(function (array $fila) {
+                    unset($fila['sort_key']);
+
+                    // Garantizar el orden de columnas según HEADERS
+                    return collect(self::HEADERS)
+                        ->map(fn(string $col) => $fila[$col] ?? null)
+                        ->values()
+                        ->all();
+                });
+
+            // Fila separadora entre usuarios (fila vacía)
+            if ($exportData->count() > 1) {
+                $exportData->push(array_fill(0, count(self::HEADERS), null));
             }
 
-            // Parte de AVERÍA
-            foreach (ParteTrabajoSuministroAveria::with('maquina')->where('usuario_id', $user->id)->get() as $p) {
-                $partes->push([
-                    'Usuario' => $user->name,
-                    'Tipo' => 'Avería',
-                    'Fecha y hora inicio' => optional($p->fecha_hora_inicio_averia)?->format('d/m/Y H:i'),
-                    'GPS inicio' => $p->gps_inicio_averia,
-                    'Fecha y hora fin' => optional($p->fecha_hora_fin_averia)?->format('d/m/Y H:i'),
-                    'GPS fin' => $p->gps_fin_averia,
-                    'Máquina' => $p->maquina->marca_modelo ?? null,
-                    'Vehículo' => null,
-                    'Tipo avería' => $p->tipo,
-                    'Trabajo realizado' => $p->trabajo_realizado,
-                    'Descripción' => null,
-                    'Destino' => null,
-                    'Horas encendido' => null,
-                    'Horas rotor' => null,
-                    'Horas trabajo' => null,
-                    'Cantidad producida' => null,
-                    'Tipo cantidad' => null,
-                    'Consumo gasoil' => null,
-                    'Consumo cuchillas' => null,
-                    'Consumo muelas' => null,
-                    'Horómetro' => null,
-                    'Observaciones' => $p->observaciones,
-                ]);
-            }
-
-            // Parte de OTROS
-            foreach (ParteTrabajoSuministroOtros::where('usuario_id', $user->id)->get() as $p) {
-                $partes->push([
-                    'Usuario' => $user->name,
-                    'Tipo' => 'Otros',
-                    'Fecha y hora inicio' => optional($p->fecha_hora_inicio_otros)?->format('d/m/Y H:i'),
-                    'GPS inicio' => $p->gps_inicio_otros,
-                    'Fecha y hora fin' => optional($p->fecha_hora_fin_otros)?->format('d/m/Y H:i'),
-                    'GPS fin' => $p->gps_fin_otros,
-                    'Máquina' => null,
-                    'Vehículo' => null,
-                    'Tipo avería' => null,
-                    'Trabajo realizado' => null,
-                    'Descripción' => $p->descripcion,
-                    'Destino' => null,
-                    'Horas encendido' => null,
-                    'Horas rotor' => null,
-                    'Horas trabajo' => null,
-                    'Cantidad producida' => null,
-                    'Tipo cantidad' => null,
-                    'Consumo gasoil' => null,
-                    'Consumo cuchillas' => null,
-                    'Consumo muelas' => null,
-                    'Horómetro' => null,
-                    'Observaciones' => $p->observaciones,
-                ]);
-            }
-
-            // Orden por mes (abril antes que junio)
-            $partes = $partes->sortBy([
-                fn($a, $b) => substr($a['Fecha y hora inicio'], 3, 2) <=> substr($b['Fecha y hora inicio'], 3, 2),
-                fn($a, $b) => strtotime($a['Fecha y hora inicio']) <=> strtotime($b['Fecha y hora inicio']),
-            ]);
-
-            // Encabezado
-            if ($exportData->isEmpty()) {
-                $exportData->push($cabecera);
-            } else {
-                $exportData->push(array_fill_keys($cabecera, ''));
-            }
-
+            // Añadir filas del usuario
             foreach ($partes as $fila) {
                 $exportData->push($fila);
             }
@@ -196,18 +226,23 @@ class PartesTrabajoPorUsuarioExport implements FromCollection, WithTitle, WithEv
     public function registerEvents(): array
     {
         return [
-            AfterSheet::class => function (AfterSheet $event) {
+            AfterSheet::class => function (AfterSheet $event): void {
                 $sheet = $event->sheet->getDelegate();
                 $rowCount = $sheet->getHighestRow();
 
+                // Congelar cabecera
                 $sheet->freezePane('A2');
-                $sheet->setAutoFilter('A1:W1');
 
+                // Autofiltro sobre todas las columnas reales (A..V)
+                $sheet->setAutoFilter('A1:V1');
+
+                // Ajustar altura de filas según longitud de "Observaciones" (columna V)
                 for ($row = 2; $row <= $rowCount; $row++) {
-                    $contenido = $sheet->getCell("W{$row}")->getValue(); // Observaciones
-                    $saltos = substr_count((string) $contenido, PHP_EOL);
-                    $lineas = floor(strlen((string) $contenido) / 140);
+                    $contenido = (string) $sheet->getCell("V{$row}")->getValue();
+                    $saltos = substr_count($contenido, PHP_EOL);
+                    $lineas = floor(strlen($contenido) / 140);
                     $altura = max(15 * ($lineas + $saltos + 1), 16);
+
                     $sheet->getRowDimension($row)->setRowHeight($altura);
                 }
             },
@@ -217,6 +252,7 @@ class PartesTrabajoPorUsuarioExport implements FromCollection, WithTitle, WithEv
     public function styles(Worksheet $sheet): array
     {
         return [
+            // Fila de encabezado
             1 => [
                 'font' => ['bold' => true],
                 'alignment' => [
@@ -227,7 +263,9 @@ class PartesTrabajoPorUsuarioExport implements FromCollection, WithTitle, WithEv
                     'bottom' => ['borderStyle' => Border::BORDER_THIN],
                 ],
             ],
-            'A:W' => [
+
+            // Estilo general columnas A..V
+            'A:V' => [
                 'alignment' => [
                     'horizontal' => Alignment::HORIZONTAL_CENTER,
                     'vertical' => Alignment::VERTICAL_CENTER,
@@ -235,5 +273,13 @@ class PartesTrabajoPorUsuarioExport implements FromCollection, WithTitle, WithEv
                 ],
             ],
         ];
+    }
+
+    /**
+     * Formatea fecha/hora a d/m/Y H:i o devuelve null.
+     */
+    private function formatDateTime($value): ?string
+    {
+        return $value ? $value->format('d/m/Y H:i') : null;
     }
 }

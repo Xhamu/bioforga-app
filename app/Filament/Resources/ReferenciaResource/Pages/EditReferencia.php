@@ -33,7 +33,7 @@ class EditReferencia extends EditRecord
     {
         return $form->schema([
             Tabs::make('Formulario')
-                ->id('referencia-tabs')           // id único para esta Tabs
+                ->id('referencia-tabs')
                 ->persistTab()
                 ->tabs([
                     Tabs\Tab::make('General')
@@ -51,6 +51,7 @@ class EditReferencia extends EditRecord
                                     ])
                                         ->where('referencia_id', $this->record?->id) // solo cargas de ESTA referencia
                                         ->whereNull('deleted_at')
+                                        ->orderBy('fecha_hora_inicio_carga', 'asc')
                                         ->get()
                                         ->groupBy('parte_trabajo_suministro_transporte_id')
                                         ->map(function ($cargasDeEstaRef) {
@@ -83,13 +84,15 @@ class EditReferencia extends EditRecord
                                                 'almacen' => $parte?->almacen?->referencia ?? null,
                                                 'inicio' => $cargasDeEstaRef->min('fecha_hora_inicio_carga'),
                                                 'fin' => $cargasDeEstaRef->max('fecha_hora_fin_carga'),
-                                                'cantidad_total' => $m3DeEstaRef,               // m³ de ESTA referencia en el parte
+                                                'cantidad_total' => $m3DeEstaRef,
                                                 'cargas' => $cargasDeEstaRef,
-                                                'peso_neto_ref' => $pesoNetoRef,               // 👈 ya prorrateado
+                                                'peso_neto_ref' => $pesoNetoRef,
                                             ];
                                         })
                                         ->values(),
-                                    'partesMaquina' => $this->record?->partesMaquina ?? collect(),
+                                    'partesMaquina' => $this->record?->partesMaquina
+                                        ->sortBy('fecha_hora_inicio_trabajo')
+                                        ->values() ?? collect(),
                                 ])
                                 ->columnSpanFull(),
                         ]),

@@ -244,22 +244,13 @@ class ClienteResource extends Resource
                 Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),
             ])
-            ->headerActions([
-                \Filament\Tables\Actions\Action::make('exportarStockClientesServicio')
-                    ->label('Stock Clientes Servicio')
-                    ->icon('heroicon-o-document-arrow-down')
-                    ->button()
-                    ->color('gray')
-                    ->action(function () {
-                        return Excel::download(new StockClientesServicioMainExport, 'stock_clientes_servicio.xlsx');
-                    }),
-            ])->bulkActions([
-                    Tables\Actions\BulkActionGroup::make([
-                        Tables\Actions\DeleteBulkAction::make(),
-                        Tables\Actions\ForceDeleteBulkAction::make(),
-                        Tables\Actions\RestoreBulkAction::make(),
-                    ]),
-                ])
+            ->bulkActions([
+                Tables\Actions\BulkActionGroup::make([
+                    Tables\Actions\DeleteBulkAction::make(),
+                    Tables\Actions\ForceDeleteBulkAction::make(),
+                    Tables\Actions\RestoreBulkAction::make(),
+                ]),
+            ])
             ->paginated(true)
             ->paginationPageOptions([50, 100, 200])
             ->defaultSort('created_at', 'desc');

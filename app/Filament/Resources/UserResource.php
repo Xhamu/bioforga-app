@@ -563,15 +563,6 @@ class UserResource extends Resource
                     layout: FiltersLayout::AboveContentCollapsible
                 )
                 ->filtersFormColumns(3)
-                ->headerActions([
-                    Action::make('exportar_partes_trabajo')
-                        ->label('Exportar partes de trabajo')
-                        ->action(function () {
-                            return \Maatwebsite\Excel\Facades\Excel::download(new \App\Exports\PartesTrabajoPorUsuarioExport, 'partes_trabajo.xlsx');
-                        })
-                        ->icon('heroicon-m-arrow-down-tray')
-                        ->color('gray'),
-                ])
                 ->actions([
                     \STS\FilamentImpersonate\Tables\Actions\Impersonate::make()
                         ->label('Impersonar')

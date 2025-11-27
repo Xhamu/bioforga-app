@@ -3,7 +3,9 @@
 namespace App\Providers;
 
 use App\Models\ParteTrabajoSuministroTransporte;
+use App\Models\Referencia;
 use App\Observers\ParteTrabajoSuministroTransporteObserver;
+use App\Observers\ReferenciaObserver;
 use Illuminate\Support\ServiceProvider;
 use App\Models\CargaTransporte;
 use App\Models\PrioridadStock;
@@ -27,5 +29,6 @@ class AppServiceProvider extends ServiceProvider
     {
         CargaTransporte::observe(CargaTransporteObserver::class);
         PrioridadStock::observe(PrioridadStockObserver::class);
+        Referencia::observe(ReferenciaObserver::class);
     }
 }
