@@ -1,11 +1,13 @@
 <div>
     <select id="referencia-select"
-        class="w-full px-3 py-2 text-sm font-medium border-gray-300 rounded-lg shadow-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500 focus:outline-none">
+        class="w-full rounded-md border-gray-300 bg-white text-sm shadow-sm
+           px-3 py-2
+           focus:border-primary-500 focus:ring-primary-500 focus:outline-none">
         <option value="">Selecciona una opción</option>
         <option value="suministro">SUMINISTRO</option>
         <option value="servicio">SERVICIO</option>
     </select>
-
+    
     <script>
         document.addEventListener("DOMContentLoaded", function() {
             const referenciaSelect = document.getElementById('referencia-select');

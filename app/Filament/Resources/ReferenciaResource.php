@@ -12,6 +12,7 @@ use App\Filament\Resources\ReferenciaResource\Pages\ListReferencias;
 use App\Filament\Resources\ReferenciaResource\RelationManagers;
 use App\Models\CargaTransporte;
 use App\Models\Cliente;
+use App\Models\Pais;
 use App\Models\ParteTrabajoSuministroOperacionMaquina;
 use App\Models\Poblacion;
 use App\Models\Proveedor;
@@ -22,6 +23,7 @@ use Arr;
 use DB;
 use Filament\Forms;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Livewire;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
@@ -44,6 +46,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Filament\Forms\Components\View;
 use Filament\Tables\Columns\Layout\Grid;
+use Filament\Forms\Components\Grid as GridForm;
 use Filament\Tables\Columns\Layout\Panel;
 use Jenssegers\Agent\Agent;
 use Maatwebsite\Excel\Facades\Excel;
@@ -79,6 +82,34 @@ class ReferenciaResource extends Resource
          * Devuelve el prefijo (todo menos el contador final de 2 dígitos)
          */
         $buildPrefix = function (callable $get) use ($certMap): string {
+
+            // Helper para generar 2 letras (AC, AL, etc.)
+            $get2Letters = function (?string $value, string $fallback = 'NO'): string {
+                $value = trim((string) ($value ?? ''));
+
+                if ($value === '') {
+                    return $fallback;
+                }
+
+                // Dejar solo letras (incluyendo tildes, ñ, etc.)
+                $onlyLetters = preg_replace('/[^[:alpha:]]/u', '', $value);
+
+                if ($onlyLetters === '' || $onlyLetters === null) {
+                    return $fallback;
+                }
+
+                // Quitar tildes / pasar a ASCII
+                $ascii = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $onlyLetters);
+                $ascii = preg_replace('/[^A-Za-z]/', '', $ascii);
+
+                if ($ascii === '' || $ascii === null) {
+                    return $fallback;
+                }
+
+                // Primeras 2 letras, en mayúsculas
+                return strtoupper(substr($ascii, 0, 2));
+            };
+
             $sector = (string) ($get('sector') ?? '01');
             $fecha = (string) ($get('ref_fecha_fija') ?? now()->format('dmy'));
 
@@ -89,7 +120,6 @@ class ReferenciaResource extends Resource
                 $formato = (string) ($get('formato') ?? 'CA');
 
                 $mid = 'NO';
-                // si tienes checkbox/flag de certificable, úsalo aquí
                 if ($get('tipo_certificacion')) {
                     $tc = $get('tipo_certificacion');
                     if (isset($certMap[$tc])) {
@@ -101,17 +131,26 @@ class ReferenciaResource extends Resource
                 return "{$sector}SU{$formato}{$mid}{$fecha}";
             }
 
-            // Servicio
-            $prov = strtoupper(substr((string) ($get('provincia') ?? ''), 0, 2));
-            $ayto = strtoupper(substr((string) ($get('ayuntamiento') ?? ''), 0, 2));
+            // ───────── SERVICIO ─────────
+
+            // provincia es ID → buscamos el nombre y sacamos 2 letras “limpias”
+            $provinciaId = $get('provincia');
+            $provinciaNombre = $provinciaId
+                ? Provincia::find($provinciaId)?->nombre
+                : null;
+
+            $prov = $get2Letters($provinciaNombre, 'NO');
+
+            // ayuntamiento (texto)
+            $aytoNombre = (string) ($get('ayuntamiento') ?? '');
+            $ayto = $get2Letters($aytoNombre, 'NO');
 
             // Iniciales cliente (o NO)
             $inic = 'NO';
             if ($clienteId = $get('cliente_id')) {
                 $razon = optional(Cliente::find($clienteId))->razon_social;
                 if ($razon) {
-                    $slug = strtoupper(preg_replace('/[^A-Z]/i', '', $razon));
-                    $inic = substr($slug, 0, 2) ?: 'NO';
+                    $inic = $get2Letters($razon, 'NO');
                 }
             }
 
@@ -166,71 +205,137 @@ class ReferenciaResource extends Resource
 
         return $form
             ->schema([
-                // Fecha fija (no se guarda en BD)
-                Forms\Components\Hidden::make('ref_fecha_fija')
-                    ->dehydrated(false)
-                    ->default(now()->format('dmy')),
-
-                View::make('livewire.tipo-select')
-                    ->visible(fn($state) => !isset($state['id']))
-                    ->columnSpanFull(),
-
-                Forms\Components\TextInput::make('referencia')
-                    ->required()
-                    ->reactive()
+                Section::make('')
                     ->columnSpanFull()
-                    ->afterStateHydrated(function (callable $set, $state, ?Referencia $record) {
-                        $ref = (string) ($state ?: ($record->referencia ?? ''));
-                        if (preg_match('/(\d{6})/', $ref, $m)) {
-                            $set('ref_fecha_fija', $m[1]); // ej: 110725
-                        } else {
-                            $set('ref_fecha_fija', now()->format('dmy'));
-                        }
-                    }),
+                    ->columns(2)
+                    ->schema([
+                        // Fecha fija (no se guarda en BD)
+                        Hidden::make('ref_fecha_fija')
+                            ->dehydrated(false)
+                            ->default(now()->format('dmy')),
 
-                Forms\Components\Select::make('tipo_servicio')
-                    ->required()
-                    ->searchable()
-                    ->options([
-                        'Astillado Suelo' => 'Astillado Suelo',
-                        'Astillado Camión' => 'Astillado Camión',
-                        'Triturado Suelo' => 'Triturado Suelo',
-                        'Triturado Camión' => 'Triturado Camión',
-                        'Saca autocargador' => 'Saca autocargador',
-                        'Carga de suelo' => 'Carga de suelo',
-                        'Otros' => 'Otros',
-                    ])
-                    ->columnSpanFull()
-                    ->visible(fn($get) => !empty($get('referencia')) && strpos((string) $get('referencia'), 'SU') === false),
+                        // Campo referencia
+                        TextInput::make('referencia')
+                            ->required()
+                            ->reactive()
+                            ->columnSpanFull()
+                            ->afterStateHydrated(function (callable $set, $state, ?Referencia $record) {
+                                $ref = (string) ($state ?: ($record->referencia ?? ''));
+                                if (preg_match('/(\d{6})/', $ref, $m)) {
+                                    // ej: 110725
+                                    $set('ref_fecha_fija', $m[1]);
+                                } else {
+                                    $set('ref_fecha_fija', now()->format('dmy'));
+                                }
+                            }),
 
-                // FORMATO (solo SU): inserta el código de certificación entre formato y fecha
-                Forms\Components\Select::make('formato')
-                    ->nullable()
-                    ->options([
-                        'CA' => 'Cargadero',
-                        'SA' => 'Saca',
-                        'EX' => 'Explotación',
-                        'OT' => 'Otros',
-                    ])
-                    ->searchable()
-                    ->preload()
-                    ->required()
-                    ->columnSpanFull()
-                    ->live()
-                    ->afterStateUpdated(fn($state, $set, $get) => $setUniqueRef($set, $get))
-                    ->visible(fn($get) => str_contains((string) $get('referencia'), 'SU')),
+                        // Selector de tipo (solo en creación)
+                        View::make('livewire.tipo-select')
+                            ->visible(fn($state) => !isset($state['id']))
+                            ->columnSpanFull(),
+
+                        GridForm::make(2)
+                            ->columnSpanFull()
+                            ->schema([
+                                // Tipo servicio (cuando NO es Suministro)
+                                Select::make('tipo_servicio')
+                                    ->label('Tipo de servicio')
+                                    ->required()
+                                    ->searchable()
+                                    ->options([
+                                        'Astillado Suelo' => 'Astillado Suelo',
+                                        'Astillado Camión' => 'Astillado Camión',
+                                        'Triturado Suelo' => 'Triturado Suelo',
+                                        'Triturado Camión' => 'Triturado Camión',
+                                        'Saca autocargador' => 'Saca autocargador',
+                                        'Carga de suelo' => 'Carga de suelo',
+                                        'Otros' => 'Otros',
+                                    ])
+                                    ->visible(
+                                        fn($get) =>
+                                        !empty($get('referencia')) &&
+                                        strpos((string) $get('referencia'), 'SU') === false
+                                    )
+                                    ->columnSpanFull(),
+
+                                Select::make('formato')
+                                    ->label('Formato')
+                                    ->nullable()
+                                    ->options([
+                                        'CA' => 'Cargadero',
+                                        'SA' => 'Saca',
+                                        'EX' => 'Explotación',
+                                        'OT' => 'Otros',
+                                    ])
+                                    ->searchable()
+                                    ->preload()
+                                    ->required()
+                                    ->live()
+                                    ->afterStateUpdated(fn($state, $set, $get) => $setUniqueRef($set, $get))
+                                    ->visible(fn($get) => str_contains((string) $get('referencia'), 'SU'))
+                                    ->columnSpanFull(),
+                            ]),
+                    ]),
 
                 Forms\Components\Section::make('Ubicación')
                     ->schema([
-                        Forms\Components\TextInput::make('provincia')
+                        Select::make('pais')
+                            ->label('País')
+                            ->options(fn() => Pais::orderBy('nombre')->pluck('nombre', 'id'))
+                            ->searchable()
                             ->required()
-                            ->live()
+                            ->reactive()
+                            ->validationMessages([
+                                'required' => 'El :attribute es obligatorio.',
+                            ])
+                            ->columnSpanFull(),
+
+                        Select::make('provincia')
+                            ->label('Provincia')
+                            ->options(
+                                fn(callable $get) =>
+                                Provincia::query()
+                                    ->where('pais_id', $get('pais'))
+                                    ->orderBy('nombre')
+                                    ->pluck('nombre', 'nombre')
+                            )
+                            ->searchable()
+                            ->required()
+                            ->reactive()
+                            ->disabled(fn(callable $get) => !$get('pais'))
                             ->afterStateUpdated(fn($state, $set, $get) => $setUniqueRef($set, $get)),
 
-                        Forms\Components\TextInput::make('ayuntamiento')
+                        Select::make('ayuntamiento')
+                            ->label('Población')
+                            ->options(function (callable $get) {
+                                $provinciaNombre = $get('provincia');
+
+                                if (!$provinciaNombre) {
+                                    return [];
+                                }
+
+                                // Buscar el ID de la provincia a partir del nombre
+                                $provinciaId = Provincia::where('nombre', $provinciaNombre)->value('id');
+
+                                if (!$provinciaId) {
+                                    return [];
+                                }
+
+                                return Poblacion::query()
+                                    ->where('provincia_id', $provinciaId)
+                                    ->orderBy('nombre')
+                                    ->pluck('nombre', 'nombre'); // guardas el nombre en BD
+                            })
+                            ->searchable()
                             ->required()
-                            ->live()
-                            ->afterStateUpdated(fn($state, $set, $get) => $setUniqueRef($set, $get)),
+                            ->reactive()
+                            ->disabled(fn(callable $get) => !$get('provincia'))
+                            ->afterStateUpdated(function ($state, callable $set, callable $get) use ($setUniqueRef) {
+                                // Aquí $state ya es el nombre de la población (ayuntamiento),
+                                // no hace falta buscar nada ni setear otro campo.
+                                // Solo regeneramos la referencia.
+                                $setUniqueRef($set, $get);
+                            }),
 
                         Forms\Components\TextInput::make('monte_parcela')
                             ->label('Monte / Parcela')
@@ -272,6 +377,7 @@ class ReferenciaResource extends Resource
                             ->visible(fn($state) => !isset($state['id']))
                             ->columnSpanFull(),
                     ])
+                    ->visible(fn($get) => !empty($get('referencia')))
                     ->columns(2),
 
                 Forms\Components\Section::make('Intervinientes')
@@ -374,40 +480,38 @@ class ReferenciaResource extends Resource
                     ])
                     ->visible(fn($get) => !empty($get('referencia'))),
 
-                Forms\Components\Section::make('Tarifa')
-                    ->schema([
-                        Forms\Components\Section::make('')
-                            ->schema([
-                                Forms\Components\Select::make('tarifa')
-                                    ->label('Tarifa')
-                                    ->options([
-                                        'toneladas' => 'Toneladas',
-                                        'm3' => 'Metros cúbicos',
-                                        'hora' => 'Hora',
-                                    ])
-                                    ->searchable()
-                                    ->nullable()
-                                    ->reactive(),
 
-                                Forms\Components\TextInput::make('precio')
-                                    ->label(fn(callable $get) => match ($get('tarifa')) {
-                                        'toneladas' => 'Precio por tonelada',
-                                        'm3' => 'Precio por m³',
-                                        'hora' => 'Precio por hora',
-                                        default => 'Precio',
-                                    })
-                                    ->numeric()
-                                    ->nullable()
-                                    ->reactive()
-                                    ->suffix(fn(callable $get) => match ($get('tarifa')) {
-                                        'toneladas' => '€/tonelada',
-                                        'm3' => '€/m³',
-                                        'hora' => '€/hora',
-                                        default => '€',
-                                    }),
-                            ]),
+                Forms\Components\Section::make('')
+                    ->schema([
+                        Forms\Components\Select::make('tarifa')
+                            ->label('Tarifa')
+                            ->options([
+                                'toneladas' => 'Toneladas',
+                                'm3' => 'Metros cúbicos',
+                                'hora' => 'Hora',
+                            ])
+                            ->searchable()
+                            ->nullable()
+                            ->reactive(),
+
+                        Forms\Components\TextInput::make('precio')
+                            ->label(fn(callable $get) => match ($get('tarifa')) {
+                                'toneladas' => 'Precio por tonelada',
+                                'm3' => 'Precio por m³',
+                                'hora' => 'Precio por hora',
+                                default => 'Precio',
+                            })
+                            ->numeric()
+                            ->nullable()
+                            ->reactive()
+                            ->suffix(fn(callable $get) => match ($get('tarifa')) {
+                                'toneladas' => '€/tonelada',
+                                'm3' => '€/m³',
+                                'hora' => '€/hora',
+                                default => '€',
+                            }),
                     ])
-                    ->columns(3)
+                    ->columns(2)
                     ->visible(fn($get) => !empty($get('referencia'))),
 
                 Forms\Components\Section::make('Contacto')
@@ -815,61 +919,98 @@ class ReferenciaResource extends Resource
                             ->label('Provincia')
                             ->multiple()
                             ->searchable()
+                            ->preload()
                             ->placeholder('Todas')
                             ->options(
                                 fn() =>
-                                Referencia::query()
-                                    ->whereNotNull('provincia')
-                                    ->distinct()
-                                    ->orderBy('provincia')
-                                    ->pluck('provincia', 'provincia')
+                                \App\Models\Provincia::query()
+                                    ->orderBy('nombre')
+                                    ->pluck('nombre', 'nombre') // clave = nombre, valor = nombre
                                     ->toArray()
                             )
                             ->query(function ($query, array $data) {
-                                if (!empty($data['values'])) {
-                                    $query->whereIn('provincia', $data['values']);
+                                $values = $data['values'] ?? [];
+
+                                if (!empty($values)) {
+                                    $query->whereIn('provincia', $values);
                                 }
+
                                 return $query;
                             })
                             ->indicateUsing(function (array $data) {
-                                if (empty($data['values']))
+                                $values = $data['values'] ?? [];
+
+                                if (empty($values)) {
                                     return null;
-                                $n = count($data['values']);
-                                return $n === 1 ? "Provincia: {$data['values'][0]}" : "{$n} provincias";
+                                }
+
+                                $n = count($values);
+
+                                // Si hay pocas, las mostramos; si hay muchas, solo el resumen
+                                if ($n === 1) {
+                                    return 'Provincia: ' . $values[0];
+                                }
+
+                                if ($n <= 3) {
+                                    return 'Provincias: ' . implode(', ', $values);
+                                }
+
+                                return "{$n} provincias seleccionadas";
                             }),
 
                         SelectFilter::make('ayuntamiento')
                             ->label('Municipio')
                             ->multiple()
                             ->searchable()
+                            ->preload()
                             ->placeholder('Todos')
                             ->options(function () {
-                                // Provincias seleccionadas en el otro filtro
+                                // Provincias seleccionadas en el filtro de provincia (nombres)
                                 $provSel = request()->input('tableFilters.provincia.values', []);
 
-                                $q = Referencia::query()
-                                    ->whereNotNull('ayuntamiento');
+                                $query = Poblacion::query();
 
                                 if (!empty($provSel)) {
-                                    $q->whereIn('provincia', $provSel);
+                                    $provIds = Provincia::query()
+                                        ->whereIn('nombre', $provSel)
+                                        ->pluck('id');
+
+                                    $query->whereIn('provincia_id', $provIds);
                                 }
 
-                                return $q->distinct()
-                                    ->orderBy('ayuntamiento')
-                                    ->pluck('ayuntamiento', 'ayuntamiento')
+                                return $query
+                                    ->orderBy('nombre')
+                                    ->pluck('nombre', 'nombre')   // clave = nombre, valor = nombre
                                     ->toArray();
                             })
                             ->query(function ($query, array $data) {
-                                if (!empty($data['values'])) {
-                                    $query->whereIn('ayuntamiento', $data['values']);
+                                $values = $data['values'] ?? [];
+
+                                if (!empty($values)) {
+                                    // En Referencia.sigues guardando el nombre del municipio
+                                    $query->whereIn('ayuntamiento', $values);
                                 }
+
                                 return $query;
                             })
                             ->indicateUsing(function (array $data) {
-                                if (empty($data['values']))
+                                $values = $data['values'] ?? [];
+
+                                if (empty($values)) {
                                     return null;
-                                $n = count($data['values']);
-                                return $n === 1 ? "Municipio: {$data['values'][0]}" : "{$n} municipios";
+                                }
+
+                                $n = count($values);
+
+                                if ($n === 1) {
+                                    return 'Municipio: ' . $values[0];
+                                }
+
+                                if ($n <= 3) {
+                                    return 'Municipios: ' . implode(', ', $values);
+                                }
+
+                                return "{$n} municipios seleccionados";
                             }),
 
                         SelectFilter::make('trabajo_lluvia')
@@ -1384,61 +1525,98 @@ class ReferenciaResource extends Resource
                             ->label('Provincia')
                             ->multiple()
                             ->searchable()
+                            ->preload()
                             ->placeholder('Todas')
                             ->options(
                                 fn() =>
-                                Referencia::query()
-                                    ->whereNotNull('provincia')
-                                    ->distinct()
-                                    ->orderBy('provincia')
-                                    ->pluck('provincia', 'provincia')
+                                \App\Models\Provincia::query()
+                                    ->orderBy('nombre')
+                                    ->pluck('nombre', 'nombre') // clave = nombre, valor = nombre
                                     ->toArray()
                             )
                             ->query(function ($query, array $data) {
-                                if (!empty($data['values'])) {
-                                    $query->whereIn('provincia', $data['values']);
+                                $values = $data['values'] ?? [];
+
+                                if (!empty($values)) {
+                                    $query->whereIn('provincia', $values);
                                 }
+
                                 return $query;
                             })
                             ->indicateUsing(function (array $data) {
-                                if (empty($data['values']))
+                                $values = $data['values'] ?? [];
+
+                                if (empty($values)) {
                                     return null;
-                                $n = count($data['values']);
-                                return $n === 1 ? "Provincia: {$data['values'][0]}" : "{$n} provincias";
+                                }
+
+                                $n = count($values);
+
+                                // Si hay pocas, las mostramos; si hay muchas, solo el resumen
+                                if ($n === 1) {
+                                    return 'Provincia: ' . $values[0];
+                                }
+
+                                if ($n <= 3) {
+                                    return 'Provincias: ' . implode(', ', $values);
+                                }
+
+                                return "{$n} provincias seleccionadas";
                             }),
 
                         SelectFilter::make('ayuntamiento')
                             ->label('Municipio')
                             ->multiple()
                             ->searchable()
+                            ->preload()
                             ->placeholder('Todos')
                             ->options(function () {
-                                // Provincias seleccionadas en el otro filtro
+                                // Provincias seleccionadas en el filtro de provincia (nombres)
                                 $provSel = request()->input('tableFilters.provincia.values', []);
 
-                                $q = Referencia::query()
-                                    ->whereNotNull('ayuntamiento');
+                                $query = Poblacion::query();
 
                                 if (!empty($provSel)) {
-                                    $q->whereIn('provincia', $provSel);
+                                    $provIds = Provincia::query()
+                                        ->whereIn('nombre', $provSel)
+                                        ->pluck('id');
+
+                                    $query->whereIn('provincia_id', $provIds);
                                 }
 
-                                return $q->distinct()
-                                    ->orderBy('ayuntamiento')
-                                    ->pluck('ayuntamiento', 'ayuntamiento')
+                                return $query
+                                    ->orderBy('nombre')
+                                    ->pluck('nombre', 'nombre')   // clave = nombre, valor = nombre
                                     ->toArray();
                             })
                             ->query(function ($query, array $data) {
-                                if (!empty($data['values'])) {
-                                    $query->whereIn('ayuntamiento', $data['values']);
+                                $values = $data['values'] ?? [];
+
+                                if (!empty($values)) {
+                                    // En Referencia.sigues guardando el nombre del municipio
+                                    $query->whereIn('ayuntamiento', $values);
                                 }
+
                                 return $query;
                             })
                             ->indicateUsing(function (array $data) {
-                                if (empty($data['values']))
+                                $values = $data['values'] ?? [];
+
+                                if (empty($values)) {
                                     return null;
-                                $n = count($data['values']);
-                                return $n === 1 ? "Municipio: {$data['values'][0]}" : "{$n} municipios";
+                                }
+
+                                $n = count($values);
+
+                                if ($n === 1) {
+                                    return 'Municipio: ' . $values[0];
+                                }
+
+                                if ($n <= 3) {
+                                    return 'Municipios: ' . implode(', ', $values);
+                                }
+
+                                return "{$n} municipios seleccionados";
                             }),
 
                         SelectFilter::make('trabajo_lluvia')
@@ -1746,96 +1924,119 @@ class ReferenciaResource extends Resource
         // ----------------------------------------------------------------
 
         return [
-            // Fecha fija también aquí para cuando uses este schema suelto
-            Forms\Components\Hidden::make('ref_fecha_fija')
-                ->dehydrated(false)
-                ->default(now()->format('dmy')),
-
-            View::make('livewire.tipo-select')
-                ->visible(function ($state) {
-                    return !isset($state['id']);
-                })
-                ->columnSpanFull(),
-
-            Forms\Components\TextInput::make('referencia')
-                ->required()
-                ->reactive()
+            Section::make('')
                 ->columnSpanFull()
-                ->afterStateHydrated(function (callable $set, $state, ?\App\Models\Referencia $record) {
-                    $ref = (string) ($state ?: ($record->referencia ?? ''));
-                    if (preg_match('/(\d{6})/', $ref, $m)) {
-                        $set('ref_fecha_fija', $m[1]);
-                    } else {
-                        $set('ref_fecha_fija', now()->format('dmy'));
-                    }
-                }),
+                ->columns(2)
+                ->schema([
+                    Forms\Components\Hidden::make('ref_fecha_fija')
+                        ->dehydrated(false)
+                        ->default(now()->format('dmy')),
 
-            Forms\Components\Select::make('tipo_servicio')
-                ->required()
-                ->searchable()
-                ->options([
-                    'Astillado Suelo' => 'Astillado Suelo',
-                    'Astillado Camión' => 'Astillado Camión',
-                    'Triturado Suelo' => 'Triturado Suelo',
-                    'Triturado Camión' => 'Triturado Camión',
-                    'Saca autocargador' => 'Saca autocargador',
-                    'Carga de suelo' => 'Carga de suelo',
-                    'Otros' => 'Otros',
-                ])
-                ->columnSpanFull()
-                ->visible(function ($get) {
-                    return !empty($get('referencia')) && strpos($get('referencia'), 'SU') === false;
-                }),
+                    Forms\Components\TextInput::make('referencia')
+                        ->required()
+                        ->reactive()
+                        ->columnSpanFull()
+                        ->afterStateHydrated(function (callable $set, $state, ?\App\Models\Referencia $record) {
+                            $ref = (string) ($state ?: ($record->referencia ?? ''));
+                            if (preg_match('/(\d{6})/', $ref, $m)) {
+                                $set('ref_fecha_fija', $m[1]);
+                            } else {
+                                $set('ref_fecha_fija', now()->format('dmy'));
+                            }
+                        }),
 
-            Forms\Components\Select::make('formato')
-                ->nullable()
-                ->options([
-                    'CA' => 'Cargadero',
-                    'SA' => 'Saca',
-                    'EX' => 'Explotación',
-                    'OT' => 'Otros',
-                ])
-                ->searchable()
-                ->preload()
-                ->required()
-                ->columnSpanFull()
-                ->live()
-                ->afterStateUpdated(function ($state, callable $set, callable $get) {
-                    if ($state) {
-                        $referencia = $get('referencia') ?? '';
+                    View::make('livewire.tipo-select')
+                        ->visible(function ($state) {
+                            return !isset($state['id']);
+                        })
+                        ->columnSpanFull(),
 
-                        // Contador de 2 dígitos
-                        preg_match('/^(?<sector>\d{2})SU(?:CA|SA|EX|OT)?(?<fecha>\d{6})(?<contador>\d{2})$/', $referencia, $matches);
+                    Forms\Components\Select::make('tipo_servicio')
+                        ->required()
+                        ->searchable()
+                        ->options([
+                            'Astillado Suelo' => 'Astillado Suelo',
+                            'Astillado Camión' => 'Astillado Camión',
+                            'Triturado Suelo' => 'Triturado Suelo',
+                            'Triturado Camión' => 'Triturado Camión',
+                            'Saca autocargador' => 'Saca autocargador',
+                            'Carga de suelo' => 'Carga de suelo',
+                            'Otros' => 'Otros',
+                        ])
+                        ->columnSpanFull()
+                        ->visible(function ($get) {
+                            return !empty($get('referencia')) && strpos($get('referencia'), 'SU') === false;
+                        }),
 
-                        $sector = $matches['sector'] ?? '01';
-                        $fecha = (string) ($get('ref_fecha_fija') ?? now()->format('dmy'));
-                        $contador = $matches['contador'] ?? '01';
+                    Forms\Components\Select::make('formato')
+                        ->nullable()
+                        ->options([
+                            'CA' => 'Cargadero',
+                            'SA' => 'Saca',
+                            'EX' => 'Explotación',
+                            'OT' => 'Otros',
+                        ])
+                        ->searchable()
+                        ->preload()
+                        ->required()
+                        ->columnSpanFull()
+                        ->live()
+                        ->afterStateUpdated(function ($state, callable $set, callable $get) {
+                            if ($state) {
+                                $referencia = $get('referencia') ?? '';
 
-                        $contadorInt = (int) $contador;
+                                // Contador de 2 dígitos
+                                preg_match('/^(?<sector>\d{2})SU(?:CA|SA|EX|OT)?(?<fecha>\d{6})(?<contador>\d{2})$/', $referencia, $matches);
 
-                        do {
-                            $contadorFormateado = str_pad($contadorInt, 2, '0', STR_PAD_LEFT);
-                            $nuevaReferencia = $sector . 'SU' . $state . $fecha . $contadorFormateado;
+                                $sector = $matches['sector'] ?? '01';
+                                $fecha = (string) ($get('ref_fecha_fija') ?? now()->format('dmy'));
+                                $contador = $matches['contador'] ?? '01';
 
-                            $existe = Referencia::where('referencia', $nuevaReferencia)->exists();
+                                $contadorInt = (int) $contador;
 
-                            $contadorInt++;
-                        } while ($existe);
+                                do {
+                                    $contadorFormateado = str_pad($contadorInt, 2, '0', STR_PAD_LEFT);
+                                    $nuevaReferencia = $sector . 'SU' . $state . $fecha . $contadorFormateado;
 
-                        $set('referencia', $nuevaReferencia);
-                    } else {
-                        $set('referencia', '');
-                    }
-                })
-                ->visible(function ($get) {
-                    return str_contains($get('referencia'), 'SU');
-                }),
+                                    $existe = Referencia::where('referencia', $nuevaReferencia)->exists();
+
+                                    $contadorInt++;
+                                } while ($existe);
+
+                                $set('referencia', $nuevaReferencia);
+                            } else {
+                                $set('referencia', '');
+                            }
+                        })
+                        ->visible(function ($get) {
+                            return str_contains($get('referencia'), 'SU');
+                        }),
+                ]),
 
             Forms\Components\Section::make('Ubicación')
                 ->schema([
-                    Forms\Components\TextInput::make('provincia')
+                    Select::make('pais')
+                        ->label('País')
+                        ->options(fn() => Pais::orderBy('nombre')->pluck('nombre', 'id'))
+                        ->searchable()
                         ->required()
-                        ->live()
+                        ->reactive()
+                        ->validationMessages([
+                            'required' => 'El :attribute es obligatorio.',
+                        ])
+                        ->columnSpanFull(),
+
+                    Forms\Components\Select::make('provincia')
+                        ->label('Provincia')
+                        ->options(
+                            Provincia::query()
+                                ->orderBy('nombre')
+                                ->pluck('nombre', 'nombre') // clave = nombre, valor = nombre
+                                ->toArray()
+                        )
+                        ->searchable()
+                        ->required()
+                        ->reactive()
                         ->afterStateUpdated(function ($state, callable $set, callable $get) {
                             $referenciaActual = $get('referencia') ?? '';
 
@@ -1844,8 +2045,21 @@ class ReferenciaResource extends Resource
                                 return;
                             }
 
-                            $provincia = strtoupper(substr($get('provincia') ?? '', 0, 2));
-                            $ayuntamiento = strtoupper(substr($get('ayuntamiento') ?? '', 0, 2));
+                            // $state AHORA es el NOMBRE de la provincia
+                            $provinciaNombre = $state;
+
+                            // Normalizamos para evitar problemas de tildes (Álava → AL, A Coruña → AC)
+                            $provBase = $provinciaNombre ?? '';
+                            $provBase = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $provBase);
+                            $provBase = preg_replace('/[^A-Za-z]/', '', $provBase);
+                            $provincia = strtoupper(substr($provBase, 0, 2));
+
+                            // Ayuntamiento: ya es texto tal cual en la BD
+                            $aytoBase = (string) ($get('ayuntamiento') ?? '');
+                            $aytoBase = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $aytoBase);
+                            $aytoBase = preg_replace('/[^A-Za-z]/', '', $aytoBase);
+                            $ayuntamiento = strtoupper(substr($aytoBase, 0, 2));
+
                             $fecha = (string) ($get('ref_fecha_fija') ?? now()->format('dmy'));
 
                             $contador = 1;
@@ -1860,18 +2074,61 @@ class ReferenciaResource extends Resource
                             $set('referencia', $nuevaReferencia);
                         }),
 
-                    Forms\Components\TextInput::make('ayuntamiento')
+                    Forms\Components\Select::make('ayuntamiento')
+                        ->label('Población')
+                        ->options(function (callable $get) {
+                            $provinciaNombre = $get('provincia');
+
+                            if (!$provinciaNombre) {
+                                return [];
+                            }
+
+                            // Convertimos nombre de provincia → id
+                            $provinciaId = Provincia::where('nombre', $provinciaNombre)->value('id');
+
+                            if (!$provinciaId) {
+                                return [];
+                            }
+
+                            return Poblacion::query()
+                                ->where('provincia_id', $provinciaId)
+                                ->orderBy('nombre')
+                                ->pluck('nombre', 'nombre'); // nombre como clave y valor
+                        })
+                        ->searchable()
                         ->required()
-                        ->live()
+                        ->reactive()
+                        ->disabled(fn(callable $get) => !$get('provincia'))
                         ->afterStateUpdated(function ($state, callable $set, callable $get) {
                             $referenciaActual = $get('referencia') ?? '';
 
+                            // Si es SU, no tocamos la referencia
                             if (str_contains($referenciaActual, 'SU')) {
                                 return;
                             }
 
-                            $provincia = strtoupper(substr($get('provincia') ?? '', 0, 2));
-                            $ayuntamiento = strtoupper(substr($get('ayuntamiento') ?? '', 0, 2));
+                            // $state YA es el nombre de la población
+                            $poblacionNombre = $state;
+
+                            // Si quisieras tener un campo oculto distinto, aquí podrías setearlo,
+                            // pero como este select ya está ligado a 'ayuntamiento', realmente no hace falta:
+                            $set('ayuntamiento', $poblacionNombre);
+
+                            // Provincia: también es nombre ahora
+                            $provinciaNombre = $get('provincia');
+
+                            // Normalizamos provincia (A Coruña → AC, Álava → AL)
+                            $provBase = $provinciaNombre ?? '';
+                            $provBase = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $provBase);
+                            $provBase = preg_replace('/[^A-Za-z]/', '', $provBase);
+                            $provincia = strtoupper(substr($provBase, 0, 2));
+
+                            // Normalizamos ayuntamiento/población
+                            $aytoBase = $poblacionNombre ?? '';
+                            $aytoBase = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $aytoBase);
+                            $aytoBase = preg_replace('/[^A-Za-z]/', '', $aytoBase);
+                            $ayuntamiento = strtoupper(substr($aytoBase, 0, 2));
+
                             $fecha = (string) ($get('ref_fecha_fija') ?? now()->format('dmy'));
 
                             $contador = 1;
@@ -1885,6 +2142,7 @@ class ReferenciaResource extends Resource
 
                             $set('referencia', $nuevaReferencia);
                         }),
+
                     Forms\Components\TextInput::make('monte_parcela')
                         ->label('Monte / Parcela')
                         ->required(),
