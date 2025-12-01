@@ -199,88 +199,79 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                                     return new HtmlString('<p>Estado actual: <strong>Sin iniciar</strong></p>');
                                 }
 
-                                $estado = 'Desconocido';
-                                $totalMinutos = 0;
-
-                                $inicio = Carbon::parse($record->getRawOriginal('fecha_hora_inicio_trabajo'))->timezone('Europe/Madrid');
-                                $parada = $record->fecha_hora_parada_trabajo
-                                    ? Carbon::parse($record->getRawOriginal('fecha_hora_parada_trabajo'))->timezone('Europe/Madrid')
-                                    : null;
-
-                                $reanudacion = $record->fecha_hora_reanudacion_trabajo
-                                    ? Carbon::parse($record->getRawOriginal('fecha_hora_reanudacion_trabajo'))->timezone('Europe/Madrid')
-                                    : null;
-
+                                $inicio = $record->fecha_hora_inicio_trabajo->copy()->timezone('Europe/Madrid');
                                 $fin = $record->fecha_hora_fin_trabajo
-                                    ? Carbon::parse($record->getRawOriginal('fecha_hora_fin_trabajo'))->timezone('Europe/Madrid')
+                                    ? $record->fecha_hora_fin_trabajo->copy()->timezone('Europe/Madrid')
                                     : null;
+
+                                // ¿Hay alguna pausa abierta?
+                                $hayPausaAbierta = $record->pausas()
+                                    ->whereNull('fin_pausa')
+                                    ->exists();
 
                                 if ($fin) {
-                                    if ($parada && $reanudacion) {
-                                        $totalMinutos = $inicio->diffInMinutes($parada) + $reanudacion->diffInMinutes($fin);
-                                    } else {
-                                        $totalMinutos = $inicio->diffInMinutes($fin);
-                                    }
                                     $estado = 'Finalizado';
-                                } elseif ($reanudacion) {
-                                    $totalMinutos = $inicio->diffInMinutes($parada) + $reanudacion->diffInMinutes(Carbon::now('Europe/Madrid'));
-                                    $estado = 'Reanudado';
-                                } elseif ($parada) {
-                                    $totalMinutos = $inicio->diffInMinutes($parada);
+                                } elseif ($hayPausaAbierta) {
                                     $estado = 'Pausado';
                                 } else {
-                                    $totalMinutos = $inicio->diffInMinutes(Carbon::now('Europe/Madrid'));
                                     $estado = 'Trabajando';
                                 }
 
-                                $horas = floor($totalMinutos / 60);
+                                // Minutos netos = inicio/fin - pausas
+                                $totalMinutos = $record->minutos_trabajados;
+                                $horas = intdiv($totalMinutos, 60);
                                 $minutos = $totalMinutos % 60;
 
                                 $emoji = match ($estado) {
                                     'Trabajando' => '🟢',
                                     'Pausado' => '⏸️',
-                                    'Reanudado' => '🔁',
                                     'Finalizado' => '✅',
                                     default => '❓',
                                 };
 
-                                $gpsInicio = $record->gps_inicio_trabajo ? ' (<a href="https://maps.google.com/?q=' . $record->gps_inicio_trabajo . '" target="_blank" class="text-blue-600 underline">📍 Ver ubicación</a>)' : '';
-                                $gpsPausa = $record->gps_parada_trabajo ? ' (<a href="https://maps.google.com/?q=' . $record->gps_parada_trabajo . '" target="_blank" class="text-blue-600 underline">📍 Ver ubicación</a>)' : '';
-                                $gpsReanudar = $record->gps_reanudacion_trabajo ? ' (<a href="https://maps.google.com/?q=' . $record->gps_reanudacion_trabajo . '" target="_blank" class="text-blue-600 underline">📍 Ver ubicación</a>)' : '';
-                                $gpsFin = $record->gps_fin_trabajo ? ' (<a href="https://maps.google.com/?q=' . $record->gps_fin_trabajo . '" target="_blank" class="text-blue-600 underline">📍 Ver ubicación</a>)' : '';
+                                $gpsInicio = $record->gps_inicio_trabajo
+                                    ? ' (<a href="https://maps.google.com/?q=' . $record->gps_inicio_trabajo . '" target="_blank" class="text-blue-600 underline">📍 Ver ubicación</a>)'
+                                    : '';
+
+                                $gpsFin = $record->gps_fin_trabajo
+                                    ? ' (<a href="https://maps.google.com/?q=' . $record->gps_fin_trabajo . '" target="_blank" class="text-blue-600 underline">📍 Ver ubicación</a>)'
+                                    : '';
+
+                                // (Opcional) nº de pausas realizadas
+                                $numPausas = $record->pausas()->count();
+                                $detallePausas = $numPausas > 0
+                                    ? "<tr>
+                                             <th class=\"px-4 py-3\">Pausas realizadas</th>
+                                             <td class=\"px-4 py-3\">{$numPausas}</td>
+                                        </tr>"
+                                    : '';
 
                                 $tabla = '
-                <div class="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
-                    <table class="w-full text-sm text-left text-gray-700 dark:text-gray-200">
-                        <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-                            <tr class="bg-gray-50 dark:bg-gray-800">
-                                <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Estado actual</th>
-                                <td class="px-4 py-3 font-semibold text-gray-900 dark:text-white">' . $emoji . ' ' . $estado . '</td>
-                            </tr>
-                            <tr>
-                                <th class="px-4 py-3">Hora de inicio</th>
-                                <td class="px-4 py-3">' . $inicio->format('H:i') . $gpsInicio . '</td>
-                            </tr>
-                            <tr>
-                                <th class="px-4 py-3">Hora de pausa</th>
-                                <td class="px-4 py-3">' . ($parada ? $parada->format('H:i') . $gpsPausa : '-') . '</td>
-                            </tr>
-                            <tr>
-                                <th class="px-4 py-3">Hora de reanudación</th>
-                                <td class="px-4 py-3">' . ($reanudacion ? $reanudacion->format('H:i') . $gpsReanudar : '-') . '</td>
-                            </tr>
-                            <tr>
-                                <th class="px-4 py-3">Hora de finalización</th>
-                                <td class="px-4 py-3">' . ($fin ? $fin->format('H:i') . $gpsFin : '-') . '</td>
-                            </tr>
-                            <tr class="bg-gray-50 dark:bg-gray-800 border-t">
-                                <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Tiempo total</th>
-                                <td class="px-4 py-3 font-semibold">' . $horas . 'h ' . $minutos . 'min</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-                ';
+                                    <div class="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
+                                        <table class="w-full text-sm text-left text-gray-700 dark:text-gray-200">
+                                            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                                                <tr class="bg-gray-50 dark:bg-gray-800">
+                                                    <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Estado actual</th>
+                                                    <td class="px-4 py-3 font-semibold text-gray-900 dark:text-white">' . $emoji . ' ' . $estado . '</td>
+                                                </tr>
+                                                <tr>
+                                                    <th class="px-4 py-3">Hora de inicio</th>
+                                                    <td class="px-4 py-3">' . $inicio->format('H:i') . $gpsInicio . '</td>
+                                                </tr>
+                                                <tr>
+                                                    <th class="px-4 py-3">Hora de finalización</th>
+                                                    <td class="px-4 py-3">' . ($fin ? $fin->format('H:i') . $gpsFin : '-') . '</td>
+                                                </tr>
+                                                ' . $detallePausas . '
+                                                <tr class="bg-gray-50 dark:bg-gray-800 border-t">
+                                                    <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-300">Tiempo total</th>
+                                                    <td class="px-4 py-3 font-semibold">' . $horas . 'h ' . $minutos . 'min</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                ';
+
                                 return new HtmlString($tabla);
                             })
                             ->visible(function () {
@@ -303,33 +294,8 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                                         ->url('https://maps.google.com/?q=' . $record->gps_inicio_trabajo, shouldOpenInNewTab: true);
                                 }
                                 return null;
-                            }),
-
-                        DateTimePicker::make('fecha_hora_parada_trabajo')
-                            ->label('Hora de pausa')
-                            ->timezone('Europe/Madrid')
-                            ->suffixAction(function ($record) {
-                                if ($record?->gps_parada_trabajo) {
-                                    return Actions\Action::make('ver_gps_pausa')
-                                        ->icon('heroicon-o-map')
-                                        ->tooltip('Ver ubicación en Google Maps')
-                                        ->url('https://maps.google.com/?q=' . $record->gps_parada_trabajo, shouldOpenInNewTab: true);
-                                }
-                                return null;
-                            }),
-
-                        DateTimePicker::make('fecha_hora_reanudacion_trabajo')
-                            ->label('Hora de reanudación')
-                            ->timezone('Europe/Madrid')
-                            ->suffixAction(function ($record) {
-                                if ($record?->gps_reanudacion_trabajo) {
-                                    return Actions\Action::make('ver_gps_reanudar')
-                                        ->icon('heroicon-o-map')
-                                        ->tooltip('Ver ubicación en Google Maps')
-                                        ->url('https://maps.google.com/?q=' . $record->gps_reanudacion_trabajo, shouldOpenInNewTab: true);
-                                }
-                                return null;
-                            }),
+                            })
+                            ->disabled(fn() => !Filament::auth()->user()?->hasAnyRole(['superadmin', 'administración'])),
 
                         DateTimePicker::make('fecha_hora_fin_trabajo')
                             ->label('Hora de finalización')
@@ -342,7 +308,130 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                                         ->url('https://maps.google.com/?q=' . $record->gps_fin_trabajo, shouldOpenInNewTab: true);
                                 }
                                 return null;
-                            }),
+                            })
+                            ->disabled(fn() => !Filament::auth()->user()?->hasAnyRole(['superadmin', 'administración'])),
+
+                        Placeholder::make('pausas_detalle')
+                            ->label('Pausas registradas')
+                            ->content(function ($record) {
+                                if (!$record) {
+                                    return 'Sin pausas';
+                                }
+
+                                $rows = '';
+                                $index = 1;
+
+                                // 1) MODO LEGACY: usar los campos antiguos del propio parte
+                                $tieneLegacy =
+                                    ($record->fecha_hora_parada_trabajo !== null)
+                                    || ($record->fecha_hora_reanudacion_trabajo !== null);
+
+                                if ($tieneLegacy) {
+                                    $inicio = $record->fecha_hora_parada_trabajo
+                                        ? $record->fecha_hora_parada_trabajo->copy()->timezone('Europe/Madrid')->format('d/m/Y H:i')
+                                        : '-';
+
+                                    $fin = $record->fecha_hora_reanudacion_trabajo
+                                        ? $record->fecha_hora_reanudacion_trabajo->copy()->timezone('Europe/Madrid')->format('d/m/Y H:i')
+                                        : '-';
+
+                                    // Duración de la pausa legacy
+                                    $duracionMin = 0;
+                                    if ($record->fecha_hora_parada_trabajo && $record->fecha_hora_reanudacion_trabajo) {
+                                        $duracionMin = $record->fecha_hora_parada_trabajo
+                                            ->diffInMinutes($record->fecha_hora_reanudacion_trabajo);
+                                    }
+                                    $durH = intdiv($duracionMin, 60);
+                                    $durM = $duracionMin % 60;
+                                    $duracionStr = $duracionMin > 0 ? "{$durH}h {$durM}min" : '—';
+
+                                    $gpsInicio = $record->gps_parada_trabajo
+                                        ? '<a href="https://maps.google.com/?q=' . $record->gps_parada_trabajo . '" target="_blank" class="text-blue-600 underline">📍</a>'
+                                        : '—';
+
+                                    $gpsFin = $record->gps_reanudacion_trabajo
+                                        ? '<a href="https://maps.google.com/?q=' . $record->gps_reanudacion_trabajo . '" target="_blank" class="text-blue-600 underline">📍</a>'
+                                        : '—';
+
+                                    $rows .= '
+                <tr class="border-b border-gray-200 dark:border-gray-700">
+                    <td class="px-3 py-2 text-center">' . $index . '</td>
+                    <td class="px-3 py-2 text-sm">' . $inicio . '</td>
+                    <td class="px-3 py-2 text-sm">' . $fin . '</td>
+                    <td class="px-3 py-2 text-sm text-center">' . $duracionStr . '</td>
+                    <td class="px-3 py-2 text-sm text-center">' . $gpsInicio . '</td>
+                    <td class="px-3 py-2 text-sm text-center">' . $gpsFin . '</td>
+                </tr>';
+                                } else {
+                                    // 2) NUEVO MODELO: usar la relación pausas()
+                                    $pausas = $record->pausas()
+                                        ->orderBy('inicio_pausa')
+                                        ->get();
+
+                                    if ($pausas->isEmpty()) {
+                                        return 'Sin pausas registradas.';
+                                    }
+
+                                    foreach ($pausas as $pausa) {
+                                        $inicio = $pausa->inicio_pausa
+                                            ? $pausa->inicio_pausa->copy()->timezone('Europe/Madrid')->format('d/m/Y H:i')
+                                            : '-';
+
+                                        $fin = $pausa->fin_pausa
+                                            ? $pausa->fin_pausa->copy()->timezone('Europe/Madrid')->format('d/m/Y H:i')
+                                            : '-';
+
+                                        // Duración de la pausa
+                                        $duracionMin = 0;
+                                        if ($pausa->inicio_pausa && $pausa->fin_pausa) {
+                                            $duracionMin = $pausa->inicio_pausa->diffInMinutes($pausa->fin_pausa);
+                                        }
+                                        $durH = intdiv($duracionMin, 60);
+                                        $durM = $duracionMin % 60;
+                                        $duracionStr = $duracionMin > 0 ? "{$durH}h {$durM}min" : '—';
+
+                                        $gpsInicio = $pausa->gps_inicio_pausa
+                                            ? '<a href="https://maps.google.com/?q=' . $pausa->gps_inicio_pausa . '" target="_blank" class="text-blue-600 underline">📍</a>'
+                                            : '—';
+
+                                        $gpsFin = $pausa->gps_fin_pausa
+                                            ? '<a href="https://maps.google.com/?q=' . $pausa->gps_fin_pausa . '" target="_blank" class="text-blue-600 underline">📍</a>'
+                                            : '—';
+
+                                        $rows .= '
+                <tr class="border-b border-gray-200 dark:border-gray-700">
+                    <td class="px-3 py-2 text-center">' . $index++ . '</td>
+                    <td class="px-3 py-2 text-sm">' . $inicio . '</td>
+                    <td class="px-3 py-2 text-sm">' . $fin . '</td>
+                    <td class="px-3 py-2 text-sm text-center">' . $duracionStr . '</td>
+                    <td class="px-3 py-2 text-sm text-center">' . $gpsInicio . '</td>
+                    <td class="px-3 py-2 text-sm text-center">' . $gpsFin . '</td>
+                </tr>';
+                                    }
+                                }
+
+                                $html = '
+            <div class="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm mt-2">
+                <table class="w-full text-sm text-left text-gray-700 dark:text-gray-200">
+                    <thead class="bg-gray-50 dark:bg-gray-800">
+                        <tr>
+                            <th class="px-3 py-2 text-center w-12">#</th>
+                            <th class="px-3 py-2">Inicio pausa</th>
+                            <th class="px-3 py-2">Fin pausa</th>
+                            <th class="px-3 py-2 text-center">Duración</th>
+                            <th class="px-3 py-2 text-center">GPS inicio</th>
+                            <th class="px-3 py-2 text-center">GPS fin</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+                        ' . $rows . '
+                    </tbody>
+                </table>
+            </div>';
+
+                                return new HtmlString($html);
+                            })
+                            ->columnSpanFull(),
 
                         Placeholder::make('tiempo_total')
                             ->label('Tiempo total')
@@ -351,45 +440,18 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                                     return 'Sin iniciar';
                                 }
 
-                                $inicio = Carbon::parse($record->fecha_hora_inicio_trabajo)->timezone('Europe/Madrid');
-                                $fin = $record->fecha_hora_fin_trabajo
-                                    ? Carbon::parse($record->fecha_hora_fin_trabajo)->timezone('Europe/Madrid')
-                                    : Carbon::now('Europe/Madrid');
-                                $parada = $record->fecha_hora_parada_trabajo
-                                    ? Carbon::parse($record->fecha_hora_parada_trabajo)->timezone('Europe/Madrid')
-                                    : null;
-                                $reanudacion = $record->fecha_hora_reanudacion_trabajo
-                                    ? Carbon::parse($record->fecha_hora_reanudacion_trabajo)->timezone('Europe/Madrid')
-                                    : null;
+                                $minutos = $record->minutos_trabajados;
+                                $horas = intdiv($minutos, 60);
+                                $resto = $minutos % 60;
 
-                                $totalMinutos = 0;
-
-                                if ($record->fecha_hora_fin_trabajo) {
-                                    if ($parada && $reanudacion) {
-                                        $totalMinutos = $inicio->diffInMinutes($parada) + $reanudacion->diffInMinutes($fin);
-                                    } else {
-                                        $totalMinutos = $inicio->diffInMinutes($fin);
-                                    }
-                                } elseif ($reanudacion) {
-                                    $totalMinutos = $inicio->diffInMinutes($parada) + $reanudacion->diffInMinutes(Carbon::now('Europe/Madrid'));
-                                } elseif ($parada) {
-                                    $totalMinutos = $inicio->diffInMinutes($parada);
-                                } else {
-                                    $totalMinutos = $inicio->diffInMinutes(Carbon::now('Europe/Madrid'));
-                                }
-
-                                $horas = floor($totalMinutos / 60);
-                                $minutos = $totalMinutos % 60;
-
-                                return "{$horas}h {$minutos}min";
-                            }),
+                                return "{$horas}h {$resto}min";
+                            })
+                            ->columnSpan(1),
                     ])
                     ->columns(2)
                     ->visible(
                         fn($record) =>
-                        $record &&
-                        $record->exists &&
-                        Filament::auth()->user()?->hasAnyRole(['superadmin', 'administración'])
+                        filled($record?->fecha_hora_inicio_trabajo)
                     ),
 
                 Section::make('Observaciones')
@@ -463,16 +525,11 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
 
                 Section::make()
                     ->visible(function ($record) {
-                        if (!$record)
+                        if (!$record) {
                             return false;
+                        }
 
-                        return (
-                            $record->fecha_hora_inicio_trabajo && !$record->fecha_hora_parada_trabajo && !$record->fecha_hora_fin_trabajo ||
-
-                            $record->fecha_hora_parada_trabajo && !$record->fecha_hora_reanudacion_trabajo && !$record->fecha_hora_fin_trabajo ||
-
-                            $record->fecha_hora_inicio_trabajo && !$record->fecha_hora_fin_trabajo
-                        );
+                        return $record->fecha_hora_inicio_trabajo && !$record->fecha_hora_fin_trabajo;
                     })
                     ->schema([
                         Actions::make([
@@ -481,34 +538,50 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                                 ->color('warning')
                                 ->button()
                                 ->extraAttributes(['id' => 'btn-parar-trabajo', 'class' => 'w-full'])
-                                ->visible(
-                                    fn($record) =>
-                                    $record &&
-                                    $record->fecha_hora_inicio_trabajo &&
-                                    !$record->fecha_hora_parada_trabajo &&
-                                    !$record->fecha_hora_fin_trabajo &&
-                                    (function () {
-                                        $u = auth()->user();
-                                        if (!$u)
-                                            return false;
+                                ->visible(function ($record) {
+                                    if (
+                                        !$record ||
+                                        !$record->fecha_hora_inicio_trabajo ||
+                                        $record->fecha_hora_fin_trabajo
+                                    ) {
+                                        return false;
+                                    }
 
-                                        // Pueden ver: operarios, superadmin, administración, proveedor de servicio
-                                        $allowed = $u->hasAnyRole(['operarios', 'superadmin', 'administración', 'proveedor de servicio']);
+                                    // No mostrar si ya hay una pausa abierta
+                                    $hayPausaAbierta = $record->pausas()
+                                        ->whereNull('fin_pausa')
+                                        ->exists();
 
-                                        // No mostrar si tiene simultáneamente operarios + técnico
-                                        $exclude = $u->hasAllRoles(['operarios', 'técnico']);
+                                    if ($hayPausaAbierta) {
+                                        return false;
+                                    }
 
-                                        return $allowed && !$exclude;
-                                    })()
-                                )
+                                    $u = auth()->user();
+                                    if (!$u) {
+                                        return false;
+                                    }
+
+                                    $allowed = $u->hasAnyRole(['operarios', 'superadmin', 'administración', 'proveedor de servicio']);
+                                    $exclude = $u->hasAllRoles(['operarios', 'técnico']);
+
+                                    return $allowed && !$exclude;
+                                })
                                 ->requiresConfirmation()
                                 ->form([
-                                    Hidden::make('gps_parada_trabajo'),
+                                    TextInput::make('gps_inicio_pausa')
+                                        ->label('GPS inicio pausa')
+                                        ->required()
+                                        ->readOnly(fn() => !Auth::user()?->hasAnyRole(['administración', 'superadmin'])),
+
+                                    // Componente que rellena el campo con la ubicación del navegador
+                                    View::make('livewire.location-inicio-pausa')
+                                        ->columnSpanFull(),
                                 ])
                                 ->action(function (array $data, $record) {
-                                    $record->update([
-                                        'fecha_hora_parada_trabajo' => now(),
-                                        'gps_parada_trabajo' => $data['gps_parada_trabajo'],
+                                    // Creamos una nueva pausa
+                                    $record->pausas()->create([
+                                        'inicio_pausa' => now(),
+                                        'gps_inicio_pausa' => $data['gps_inicio_pausa'] ?? null,
                                     ]);
 
                                     Notification::make()
@@ -521,35 +594,64 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                                 ->label('Reanudar trabajo')
                                 ->color('info')
                                 ->extraAttributes(['id' => 'btn-reanudar-trabajo', 'class' => 'w-full'])
-                                ->visible(
-                                    fn($record) =>
-                                    $record &&
-                                    $record->fecha_hora_parada_trabajo &&
-                                    !$record->fecha_hora_reanudacion_trabajo &&
-                                    !$record->fecha_hora_fin_trabajo &&
-                                    (function () {
-                                        $u = auth()->user();
-                                        if (!$u)
-                                            return false;
+                                ->visible(function ($record) {
+                                    if (
+                                        !$record ||
+                                        !$record->fecha_hora_inicio_trabajo ||
+                                        $record->fecha_hora_fin_trabajo
+                                    ) {
+                                        return false;
+                                    }
 
-                                        // Roles que sí pueden ver
-                                        $allowed = $u->hasAnyRole(['operarios', 'superadmin', 'administración', 'proveedor de servicio']);
+                                    // Solo mostrar si hay una pausa abierta
+                                    $hayPausaAbierta = $record->pausas()
+                                        ->whereNull('fin_pausa')
+                                        ->exists();
 
-                                        // Exclusión: operarios + técnico a la vez
-                                        $exclude = $u->hasAllRoles(['operarios', 'técnico']);
+                                    if (!$hayPausaAbierta) {
+                                        return false;
+                                    }
 
-                                        return $allowed && !$exclude;
-                                    })()
-                                )
+                                    $u = auth()->user();
+                                    if (!$u) {
+                                        return false;
+                                    }
+
+                                    $allowed = $u->hasAnyRole(['operarios', 'superadmin', 'administración', 'proveedor de servicio']);
+                                    $exclude = $u->hasAllRoles(['operarios', 'técnico']);
+
+                                    return $allowed && !$exclude;
+                                })
                                 ->button()
                                 ->requiresConfirmation()
                                 ->form([
-                                    Hidden::make('gps_reanudacion_trabajo'),
+                                    TextInput::make('gps_fin_pausa')
+                                        ->label('GPS fin pausa')
+                                        ->required()
+                                        ->readOnly(fn() => !Auth::user()?->hasAnyRole(['administración', 'superadmin'])),
+
+                                    // Componente que rellena el campo con la ubicación del navegador
+                                    View::make('livewire.location-fin-pausa')
+                                        ->columnSpanFull(),
                                 ])
                                 ->action(function (array $data, $record) {
-                                    $record->update([
-                                        'fecha_hora_reanudacion_trabajo' => now(),
-                                        'gps_reanudacion_trabajo' => $data['gps_reanudacion_trabajo'],
+                                    $pausa = $record->pausas()
+                                        ->whereNull('fin_pausa')
+                                        ->latest('inicio_pausa')
+                                        ->first();
+
+                                    if (!$pausa) {
+                                        Notification::make()
+                                            ->danger()
+                                            ->title('No hay ninguna pausa activa')
+                                            ->send();
+
+                                        return;
+                                    }
+
+                                    $pausa->update([
+                                        'fin_pausa' => now(),
+                                        'gps_fin_pausa' => $data['gps_fin_pausa'] ?? null,
                                     ]);
 
                                     Notification::make()
@@ -610,7 +712,18 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
 
                                         TextInput::make('cantidad_producida')
                                             ->numeric()
-                                            ->label(fn(Get $get) => 'Cantidad producida (' . ($get('tipo_cantidad_producida') ?? 'camiones/tn') . ')')
+                                            ->label(function (Get $get) {
+
+                                                $tipo = $get('tipo_cantidad_producida');
+
+                                                $labels = [
+                                                    'camiones' => 'Camiones',
+                                                    'toneladas' => 'Toneladas',
+                                                    'metros_cubicos' => 'm³',
+                                                ];
+
+                                                return 'Cantidad producida (' . ($labels[$tipo] ?? 'camiones/tn') . ')';
+                                            })
                                             ->visible(fn(Get $get) => filled($get('tipo_cantidad_producida')))
                                             ->required(),
 
@@ -659,7 +772,7 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                                             ->inline()
                                             ->columnSpanFull()
                                             ->default(false),
-                                            
+
                                         TextInput::make('gps_fin_trabajo')
                                             ->label('GPS')
                                             ->required()
@@ -669,6 +782,11 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                                     ];
                                 })
                                 ->action(function (array $data, $record) {
+                                    // Cerrar cualquier pausa que haya quedado abierta
+                                    $record->pausas()
+                                        ->whereNull('fin_pausa')
+                                        ->update(['fin_pausa' => now()]);
+
                                     $record->update([
                                         'horas_encendido' => $data['horas_encendido'] ?? null,
                                         'horas_rotor' => $data['horas_rotor'] ?? null,
@@ -684,12 +802,9 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
                                         'gps_fin_trabajo' => $data['gps_fin_trabajo'] ?? null,
                                     ]);
 
-                                    if (!empty($data['cerrar_referencia'])) {
-                                        if ($record->referencia) {
-                                            $record->referencia->update(['estado' => 'cerrado']);
-
-                                            $record->referencia->usuarios()->sync([]);
-                                        }
+                                    if (!empty($data['cerrar_referencia']) && $record->referencia) {
+                                        $record->referencia->update(['estado' => 'cerrado']);
+                                        $record->referencia->usuarios()->sync([]);
                                     }
 
                                     Notification::make()
@@ -706,7 +821,6 @@ class ParteTrabajoSuministroOperacionMaquinaResource extends Resource
 
                                     return redirect(ParteTrabajoSuministroOperacionMaquinaResource::getUrl());
                                 }),
-
                         ])
                             ->columns(4)
                     ]),

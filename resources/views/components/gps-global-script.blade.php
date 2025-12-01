@@ -8,7 +8,6 @@
                 id: 'location-fin-carga',
                 inputIdSuffix: 'gps_fin_carga'
             },
-
             {
                 id: 'location-descarga',
                 inputIdSuffix: 'gps_descarga'
@@ -57,6 +56,15 @@
             {
                 id: 'location-fin-ayudante',
                 inputIdSuffix: 'gps_fin_ayudante'
+            },
+
+            {
+                id: 'location-inicio-pausa',
+                inputIdSuffix: 'gps_inicio_pausa'
+            },
+            {
+                id: 'location-fin-pausa',
+                inputIdSuffix: 'gps_fin_pausa'
             },
         ];
 

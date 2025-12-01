@@ -2,9 +2,11 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Activitylog\LogOptions;
@@ -118,5 +120,50 @@ class ParteTrabajoAyudante extends Model
                 <div style='font-weight: bold;'>{$usuario}</div>
                 <div style='font-size: 0.85rem; color: #666;'>{$medio}</div>
             </div>";
+    }
+
+    public function pausas(): MorphMany
+    {
+        return $this->morphMany(PausaParteTrabajo::class, 'parte_trabajo');
+    }
+
+    /**
+     * Minutos netos trabajados (inicio-fin menos todas las pausas).
+     */
+    public function getMinutosTrabajadosAttribute(): int
+    {
+        if (!$this->fecha_hora_inicio_ayudante) {
+            return 0;
+        }
+
+        $inicio = $this->fecha_hora_inicio_ayudante instanceof Carbon
+            ? $this->fecha_hora_inicio_ayudante
+            : Carbon::parse($this->fecha_hora_inicio_ayudante);
+
+        $finReferencia = $this->fecha_hora_fin_ayudante
+            ? ($this->fecha_hora_fin_ayudante instanceof Carbon
+                ? $this->fecha_hora_fin_ayudante
+                : Carbon::parse($this->fecha_hora_fin_ayudante))
+            : now();
+
+        // Duración total bruta
+        $total = $inicio->diffInMinutes($finReferencia);
+
+        // Restar todas las pausas
+        $totalPausas = $this->pausas->sum(function (PausaParteTrabajo $pausa) use ($finReferencia) {
+            $ini = $pausa->inicio_pausa instanceof Carbon
+                ? $pausa->inicio_pausa
+                : Carbon::parse($pausa->inicio_pausa);
+
+            $fin = $pausa->fin_pausa
+                ? ($pausa->fin_pausa instanceof Carbon
+                    ? $pausa->fin_pausa
+                    : Carbon::parse($pausa->fin_pausa))
+                : $finReferencia;
+
+            return $ini->diffInMinutes($fin);
+        });
+
+        return max($total - $totalPausas, 0);
     }
 }
